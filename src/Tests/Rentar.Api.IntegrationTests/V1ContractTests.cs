@@ -84,9 +84,12 @@ public class V1ContractTests(RentarApiFactory factory) : IntegrationTestBase(fac
         "carimages/delete => 200 {message: null, success: true}",
         "carimages/delete without images => 400 \"This car do not have image!\"",
         "customers/add => 200 {message: \"Customer Added\", success: true}",
+        "customers/add unknown user => 400 {message: \"User not found\", success: false}",
         "customers/getall => 200 {data: [{companyName: string, id: number, userId: number}], message: \"Customers Listed\", success: true}",
         "customers/getcustomersbyuserid => 200 {data: [{companyName: string, id: number, userId: number}], message: null, success: true}",
         "rentals/add => 200 {message: \"Rental Added\", success: true}",
+        "rentals/add unknown car => 400 {message: \"Car not found\", success: false}",
+        "rentals/add unknown customer => 400 {message: \"Customer not found\", success: false}",
         "rentals/getall => 200 {data: [{carId: number, customerId: number, id: number, rentDate: string, returnDate: string}], message: \"Rentals Listed\", success: true}",
         "rentals/getrentalbycarid => 200 {data: {carId: number, customerId: number, id: number, rentDate: string, returnDate: string}, message: null, success: true}",
         "rentals/getrentaldetails => 200 {data: [{brandName: string, carId: number, colorName: string, companyName: string, dailyPrice: number, description: string, modelYear: number, rentDate: string, rentalId: number, returnDate: string, userName: string}], message: null, success: true}",
@@ -180,10 +183,13 @@ public class V1ContractTests(RentarApiFactory factory) : IntegrationTestBase(fac
     private async Task CustomersRentalsPaymentsAndFindeksAsync()
     {
         await Post("customers/add", "/api/v1/customers/add", new { userId = 1, companyName = "Rentar Logistics" });
+        await Post("customers/add unknown user", "/api/v1/customers/add", new { userId = 404, companyName = "Rentar Logistics" });
         await Get("customers/getall", "/api/v1/customers/getall");
         await Get("customers/getcustomersbyuserid", "/api/v1/customers/getcustomersbyuserid?userId=1");
 
         await Post("rentals/add", "/api/v1/rentals/add", new { carId = 1, customerId = 1, rentDate = "2026-09-18T10:00:00", returnDate = "2026-09-20T10:00:00" });
+        await Post("rentals/add unknown car", "/api/v1/rentals/add", new { carId = 404, customerId = 1, rentDate = "2026-09-18T10:00:00", returnDate = "2026-09-20T10:00:00" });
+        await Post("rentals/add unknown customer", "/api/v1/rentals/add", new { carId = 1, customerId = 404, rentDate = "2026-09-18T10:00:00", returnDate = "2026-09-20T10:00:00" });
         await Get("rentals/getall", "/api/v1/rentals/getall");
         await Get("rentals/getrentalbycarid", "/api/v1/rentals/getrentalbycarid?carId=1");
         await Get("rentals/getrentaldetails", "/api/v1/rentals/getrentaldetails");

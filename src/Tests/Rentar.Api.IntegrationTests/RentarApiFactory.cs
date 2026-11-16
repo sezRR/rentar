@@ -97,6 +97,17 @@ public class RentarApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         }
     }
 
+    /// <summary>Stores the user as inactive (<c>Status</c> false). No v2 endpoint does, and updating a user activates it.</summary>
+    public async Task DeactivateUserAsync(int userId)
+    {
+        await using var connection = new NpgsqlConnection(ConnectionString);
+        await connection.OpenAsync();
+
+        await using var command = new NpgsqlCommand("""UPDATE identity."Users" SET "Status" = false WHERE "Id" = @userId""", connection);
+        command.Parameters.AddWithValue("userId", userId);
+        await command.ExecuteNonQueryAsync();
+    }
+
     private async Task ExecuteAsync(string sql)
     {
         await using var connection = new NpgsqlConnection(ConnectionString);

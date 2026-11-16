@@ -14,27 +14,55 @@ public class CustomersEndpointsTests(RentarApiFactory factory) : V2TestBase(fact
     [Fact]
     public async Task Create_AnswersCreated_WithTheCustomerAndWhereItLives()
     {
-        var response = await Client.PostJsonAsync("/api/v2/customers", new CreateCustomerCommand(7, "Rentar Logistics"));
+        var user = await CreateUserAsync("renter@example.com");
+
+        var response = await Client.PostJsonAsync("/api/v2/customers", new CreateCustomerCommand(user.Id, "Rentar Logistics"));
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var customer = await response.ReadAsAsync<Customer>();
         Assert.Equal($"/api/v2/customers/{customer.Id}", response.Headers.Location?.OriginalString);
 
         var fetched = await (await Client.GetJsonAsync($"/api/v2/customers/{customer.Id}")).ReadAsAsync<Customer>();
-        Assert.Equal(7, fetched.UserId);
+        Assert.Equal(user.Id, fetched.UserId);
         Assert.Equal("Rentar Logistics", fetched.CompanyName);
+    }
+
+    [Fact]
+    public async Task Create_ForAUserThatIsNotStored_IsABadRequest()
+    {
+        FreezeClockAtNoon();
+
+        var response = await Client.PostJsonAsync("/api/v2/customers", new CreateCustomerCommand(404, "Rentar Logistics"));
+
+        await AssertProblemAsync(response, HttpStatusCode.BadRequest, Messages.UserNotFound);
+        Assert.Empty(await CompanyNamesAsync("/api/v2/customers"));
+    }
+
+    [Fact]
+    public async Task Create_ForAnInactiveUser_IsABadRequest()
+    {
+        FreezeClockAtNoon();
+        var user = await CreateUserAsync("inactive@example.com");
+        await Factory.DeactivateUserAsync(user.Id);
+
+        var response = await Client.PostJsonAsync("/api/v2/customers", new CreateCustomerCommand(user.Id, "Rentar Logistics"));
+
+        await AssertProblemAsync(response, HttpStatusCode.BadRequest, Messages.UserNotActive);
+        Assert.Empty(await CompanyNamesAsync("/api/v2/customers"));
     }
 
     [Fact]
     public async Task GetAll_FiltersByUser()
     {
         FreezeClockAtNoon();
-        await CreateAsync<Customer>("/api/v2/customers", new CreateCustomerCommand(1, "First Company"));
-        await CreateAsync<Customer>("/api/v2/customers", new CreateCustomerCommand(2, "Second Company"));
-        await CreateAsync<Customer>("/api/v2/customers", new CreateCustomerCommand(2, "Third Company"));
+        var first = await CreateUserAsync("first@example.com");
+        var second = await CreateUserAsync("second@example.com");
+        await CreateAsync<Customer>("/api/v2/customers", new CreateCustomerCommand(first.Id, "First Company"));
+        await CreateAsync<Customer>("/api/v2/customers", new CreateCustomerCommand(second.Id, "Second Company"));
+        await CreateAsync<Customer>("/api/v2/customers", new CreateCustomerCommand(second.Id, "Third Company"));
 
         Assert.Equal(["First Company", "Second Company", "Third Company"], await CompanyNamesAsync("/api/v2/customers"));
-        Assert.Equal(["Second Company", "Third Company"], await CompanyNamesAsync("/api/v2/customers?userId=2"));
+        Assert.Equal(["Second Company", "Third Company"], await CompanyNamesAsync($"/api/v2/customers?userId={second.Id}"));
     }
 
     [Fact]

@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
+using Rentar.Modules.Customers.Application.Commands;
+using Rentar.Modules.Customers.Domain;
 using Rentar.Modules.Fleet.Domain;
 using Rentar.Modules.Fleet.Infrastructure.Storage;
 using Rentar.Modules.Fleet.Presentation.Endpoints.V2;
@@ -73,6 +75,13 @@ public abstract class V2TestBase(RentarApiFactory factory) : IntegrationTestBase
     protected Task<UserResponse> CreateUserAsync(string email, string firstName = "Sezer", int findeksRating = 900)
     {
         return CreateAsync<UserResponse>("/api/v2/users", new UserRequest(firstName, "Tetik", email, Password, findeksRating));
+    }
+
+    /// <summary>Creates a customer together with the user it belongs to; the email tells the users apart.</summary>
+    protected async Task<Customer> CreateCustomerAsync(string email = "renter@example.com", string companyName = "Rentar Logistics")
+    {
+        var user = await CreateUserAsync(email);
+        return await CreateAsync<Customer>("/api/v2/customers", new CreateCustomerCommand(user.Id, companyName));
     }
 
     protected async Task<HttpResponseMessage> UploadImageAsync(int carId, string fileName, byte[] bytes)

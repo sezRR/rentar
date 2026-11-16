@@ -29,7 +29,8 @@ public class RentalsEndpoints : IEndpoint
             .ProducesProblem(StatusCodes.Status503ServiceUnavailable);
         group.MapGet("/availability", GetAvailability);
         group.MapPost("/", Create)
-            .ProducesValidationProblem();
+            .ProducesValidationProblem()
+            .ProducesProblem(StatusCodes.Status400BadRequest);
     }
 
     /// <summary>

@@ -1,5 +1,3 @@
-using Rentar.Modules.Customers.Application.Commands;
-using Rentar.Modules.Customers.Domain;
 using Rentar.Modules.Rentals.Application;
 using Rentar.Modules.Rentals.Application.Commands;
 using Rentar.Modules.Rentals.Application.Common.Models;
@@ -22,33 +20,65 @@ public class RentalsEndpointsTests(RentarApiFactory factory) : V2TestBase(factor
     [Fact]
     public async Task Create_AnswersCreated_WithTheRentalAndWhereItLives()
     {
-        var response = await Client.PostJsonAsync("/api/v2/rentals", new CreateRentalCommand(1, 3, RentDate, ReturnDate));
+        var car = await CreateCarAsync();
+        var customer = await CreateCustomerAsync();
+
+        var response = await Client.PostJsonAsync("/api/v2/rentals", new CreateRentalCommand(car.Id, customer.Id, RentDate, ReturnDate));
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var rental = await response.ReadAsAsync<Rental>();
         Assert.Equal($"/api/v2/rentals/{rental.Id}", response.Headers.Location?.OriginalString);
 
         var fetched = await (await Client.GetJsonAsync($"/api/v2/rentals/{rental.Id}")).ReadAsAsync<Rental>();
-        Assert.Equal(1, fetched.CarId);
-        Assert.Equal(3, fetched.CustomerId);
+        Assert.Equal(car.Id, fetched.CarId);
+        Assert.Equal(customer.Id, fetched.CustomerId);
         Assert.Equal(RentDate, fetched.RentDate);
         Assert.Equal(ReturnDate, fetched.ReturnDate);
     }
 
     [Fact]
+    public async Task Create_ForACarThatIsNotStored_IsABadRequest()
+    {
+        var customer = await CreateCustomerAsync();
+
+        var response = await Client.PostJsonAsync("/api/v2/rentals", new CreateRentalCommand(404, customer.Id, RentDate, ReturnDate));
+
+        await AssertProblemAsync(response, HttpStatusCode.BadRequest, Messages.CarNotFound);
+        Assert.Empty(await (await Client.GetJsonAsync("/api/v2/rentals")).ReadAsAsync<List<Rental>>());
+    }
+
+    [Fact]
+    public async Task Create_ForACustomerThatIsNotStored_IsABadRequest()
+    {
+        var car = await CreateCarAsync();
+
+        var response = await Client.PostJsonAsync("/api/v2/rentals", new CreateRentalCommand(car.Id, 404, RentDate, ReturnDate));
+
+        await AssertProblemAsync(response, HttpStatusCode.BadRequest, Messages.CustomerNotFound);
+        Assert.Empty(await (await Client.GetJsonAsync("/api/v2/rentals")).ReadAsAsync<List<Rental>>());
+    }
+
+    [Fact]
     public async Task GetAll_FiltersByCar_AndReturnsEveryRentalOfIt()
     {
+        var brand = await CreateBrandAsync();
+        var color = await CreateColorAsync();
+        var firstCar = await CreateCarAsync(brand.Id, color.Id, "Corolla 1.6");
+        var secondCar = await CreateCarAsync(brand.Id, color.Id, "Yaris 1.5");
+        var first = await CreateCustomerAsync("first@example.com");
+        var second = await CreateCustomerAsync("second@example.com");
+
         // v1's getrentalbycarid expects at most one rental per car; the v2 filter lists them all.
-        await CreateRentalAsync(carId: 1, customerId: 1);
-        await CreateRentalAsync(carId: 2, customerId: 1, RentDate.AddDays(10), ReturnDate.AddDays(10));
-        await CreateRentalAsync(carId: 2, customerId: 2, RentDate.AddDays(20), ReturnDate.AddDays(20));
+        await CreateRentalAsync(firstCar.Id, first.Id);
+        await CreateRentalAsync(secondCar.Id, first.Id, RentDate.AddDays(10), ReturnDate.AddDays(10));
+        await CreateRentalAsync(secondCar.Id, second.Id, RentDate.AddDays(20), ReturnDate.AddDays(20));
 
         var all = await (await Client.GetJsonAsync("/api/v2/rentals")).ReadAsAsync<List<Rental>>();
-        var ofCar = await (await Client.GetJsonAsync("/api/v2/rentals?carId=2")).ReadAsAsync<List<Rental>>();
+        var ofCar = await (await Client.GetJsonAsync($"/api/v2/rentals?carId={secondCar.Id}")).ReadAsAsync<List<Rental>>();
 
         Assert.Equal(3, all.Count);
-        Assert.Equal([1, 2], ofCar.Select(r => r.CustomerId).Order());
-        Assert.All(ofCar, r => Assert.Equal(2, r.CarId));
+        Assert.Equal([first.Id, second.Id], ofCar.Select(r => r.CustomerId).Order());
+        Assert.All(ofCar, r => Assert.Equal(secondCar.Id, r.CarId));
     }
 
     [Theory]
@@ -57,23 +87,25 @@ public class RentalsEndpointsTests(RentarApiFactory factory) : V2TestBase(factor
     [InlineData("2026-09-21T10:00:00", "2026-09-25T10:00:00", true)]
     public async Task Availability_IsFalseOnlyWhenTheCarIsRentedDuringThePeriod(string from, string to, bool expected)
     {
-        await CreateRentalAsync(carId: 1, customerId: 1);
+        var car = await CreateCarAsync();
+        await CreateRentalAsync(car.Id, (await CreateCustomerAsync()).Id);
 
-        var response = await Client.GetJsonAsync($"/api/v2/rentals/availability?carId=1&rentDate={from}&returnDate={to}");
+        var response = await Client.GetJsonAsync($"/api/v2/rentals/availability?carId={car.Id}&rentDate={from}&returnDate={to}");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var availability = await response.ReadAsAsync<RentalAvailabilityResponse>();
         Assert.Equal(expected, availability.Available);
-        Assert.Equal(1, availability.CarId);
+        Assert.Equal(car.Id, availability.CarId);
         Assert.Equal(DateTime.Parse(from), availability.RentDate);
     }
 
     [Fact]
     public async Task Availability_OfAnotherCar_IsNotAffected()
     {
-        await CreateRentalAsync(carId: 1, customerId: 1);
+        var car = await CreateCarAsync();
+        await CreateRentalAsync(car.Id, (await CreateCustomerAsync()).Id);
 
-        var response = await Client.GetJsonAsync($"/api/v2/rentals/availability?carId=2&rentDate=2026-09-19T10:00:00&returnDate=2026-09-19T12:00:00");
+        var response = await Client.GetJsonAsync($"/api/v2/rentals/availability?carId={car.Id + 1}&rentDate=2026-09-19T10:00:00&returnDate=2026-09-19T12:00:00");
 
         Assert.True((await response.ReadAsAsync<RentalAvailabilityResponse>()).Available);
     }
@@ -82,12 +114,14 @@ public class RentalsEndpointsTests(RentarApiFactory factory) : V2TestBase(factor
     public async Task Details_CombineCustomerUserAndCarFromTheirModules()
     {
         FreezeClockAtNoon();
-        var user = await CreateUserAsync("renter@example.com", "Sezer");
-        var customer = await CreateAsync<Customer>("/api/v2/customers", new CreateCustomerCommand(user.Id, "Rentar Logistics"));
+        var customer = await CreateCustomerAsync("renter@example.com", "Rentar Logistics");
         var car = await CreateCarAsync("Toyota", "Red", "Corolla 1.6");
+        var deletedCar = await CreateCarAsync("Fiat", "Blue", "Egea 1.4");
         await CreateRentalAsync(car.Id, customer.Id);
-        // Points at a car Fleet does not know, so it has no details to show.
-        await CreateRentalAsync(carId: 999, customer.Id);
+        await CreateRentalAsync(deletedCar.Id, customer.Id);
+        // Fleet no longer knows this car, so its rental has no details to show.
+        var delete = await Client.DeleteAsync($"/api/v2/cars/{deletedCar.Id}", TestContext.Current.CancellationToken);
+        Assert.Equal(HttpStatusCode.NoContent, delete.StatusCode);
 
         var response = await Client.GetJsonAsync("/api/v2/rentals/details");
 

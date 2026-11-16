@@ -94,10 +94,11 @@ versions in a dropdown, and their OpenAPI documents are at `/openapi/v1.json` an
 Bruno requests for both versions are in `api-docs/`.
 
 - **v1** is the original API and is unchanged, except that it now also refuses input its validators reject (e.g. an
-  update with an empty brand name), with the same error body as before, and refuses what the database's relationships
-  forbid with `400 { success: false, message }`: a car whose brand or color is not stored, an image of a car that is not
-  stored, deleting a brand or color that cars still have, and an email another user already has. It uses action-style routes (`/brands/getall`, `/brands/add`,
-  `POST /brands/delete`), answers 200 or 400, and wraps every body in `{ success, message, data }`.
+  update with an empty brand name), with the same error body as before, and refuses what the stored data forbids with
+  `400 { success: false, message }`: a car whose brand or color is not stored, an image of a car that is not
+  stored, a customer of a user that is not stored or not active, a rental of a car or customer that is not stored,
+  deleting a brand or color that cars still have, and an email another user already has. It uses action-style routes (`/brands/getall`,
+  `/brands/add`, `POST /brands/delete`), answers 200 or 400, and wraps every body in `{ success, message, data }`.
 - **v2** is RESTful:
   - Routes name resources, and the HTTP method says what to do with them.
   - Ids are in the path and filters are in the query string.
@@ -151,7 +152,7 @@ src/
 |-----------|----------------------------------------|-------------|------------------------------|
 | Identity  | users, operation claims, auth (JWT)    | `identity`  | -                            |
 | Fleet     | brands, colors, cars, car images       | `fleet`     | -                            |
-| Customers | customer accounts                      | `customers` | -                            |
+| Customers | customer accounts                      | `customers` | Identity                     |
 | Rentals   | rentals                                | `rentals`   | Customers, Identity, Fleet   |
 | Payments  | payments (stateless)                   | -           | -                            |
 | Findeks   | credit ratings (stateless)             | -           | -                            |
@@ -172,6 +173,8 @@ Inside a module, relationships are mapped as EF Core navigations backed by forei
 
 There is no one-to-one relationship: nothing in the model has exactly one of something else. References across
 modules (`Customer.UserId`, `Rental.CarId`, `Rental.CustomerId`) are plain ids, indexed where they are looked up.
+With no foreign key to guard them, creating a customer asks Identity whether its user exists and is active, and
+creating a rental asks Fleet and Customers whether its car and customer exist; otherwise the request answers `400`.
 
 - Each module's `Persistence/Configurations` holds an `IEntityTypeConfiguration<T>` per entity that needs more than the
   conventions, and its context applies them with `ApplyConfigurationsFromAssembly`. Domain projects compile with

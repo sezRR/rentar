@@ -18,6 +18,6 @@ public class IdentityModuleApi(IUserDal userDal) : IIdentityModuleApi
 
         var ids = userIds.ToArray();
         var users = await userDal.GetAllAsync(u => ids.Contains(u.Id), cancellationToken);
-        return users.ConvertAll(u => new UserSummary(u.Id, u.FirstName, u.LastName));
+        return users.ConvertAll(u => new UserSummary(u.Id, u.FirstName, u.LastName, u.Status));
     }
 }
