@@ -4,7 +4,6 @@ using Rentar.Shared.Application.Security;
 using Rentar.Shared.Infrastructure.Caching;
 using Rentar.Shared.Infrastructure.Security;
 using System;
-using System.Diagnostics;
 
 namespace Rentar.Shared.Infrastructure;
 
@@ -19,7 +18,6 @@ public static class SharedInfrastructureServiceCollectionExtensions
         services.AddSingleton<ICacheManager, MemoryCacheManager>();
         services.AddHttpContextAccessor();
         services.AddSingleton<ICurrentUser, HttpCurrentUser>();
-        services.AddSingleton<Stopwatch>();
         services.AddSingleton(TimeProvider.System);
 
         return services;

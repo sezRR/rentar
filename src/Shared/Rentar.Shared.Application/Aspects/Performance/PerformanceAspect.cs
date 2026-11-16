@@ -1,27 +1,32 @@
 using Castle.DynamicProxy;
-using Microsoft.Extensions.DependencyInjection;
 using Rentar.Shared.Application.Interceptors;
-using Rentar.Shared.Application.IoC;
 using System.Diagnostics;
 
 namespace Rentar.Shared.Application.Aspects.Performance;
 
+/// <summary>
+/// Reports a call that completes but takes longer than <c>interval</c> seconds.
+/// </summary>
+/// <remarks>
+/// One aspect instance serves every call to its handler, concurrent ones included, so the start time is kept per
+/// call rather than in a field.
+/// </remarks>
 public class PerformanceAspect(int interval) : MethodInterception
 {
     private readonly int _interval = interval;
-    private readonly Stopwatch _stopwatch = ServiceTool.ServiceProvider.GetRequiredService<Stopwatch>();
 
-    protected override void OnBefore(IInvocation invocation)
+    public override void Intercept(IInvocation invocation)
     {
-        _stopwatch.Start();
-    }
+        var startedAt = Stopwatch.GetTimestamp();
 
-    protected override void OnAfter(IInvocation invocation)
-    {
-        if (_stopwatch.Elapsed.TotalSeconds > _interval)
+        invocation.Proceed();
+
+        var elapsed = Stopwatch.GetElapsedTime(startedAt);
+        if (elapsed.TotalSeconds > _interval)
         {
-            Debug.WriteLine($"Performance : {invocation.Method.DeclaringType.FullName}.{invocation.Method.Name}-->{_stopwatch.Elapsed.TotalSeconds}");
+            // The handler class, not the shared handler interface the proxy was called through.
+            var handler = (invocation.TargetType ?? invocation.Method.DeclaringType).FullName;
+            Debug.WriteLine($"Performance : {handler}.{invocation.Method.Name}-->{elapsed.TotalSeconds}");
         }
-        _stopwatch.Reset();
     }
 }
