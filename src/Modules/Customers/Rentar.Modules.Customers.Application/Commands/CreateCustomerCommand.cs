@@ -1,10 +1,8 @@
-using FluentValidation;
 using Rentar.Modules.Companies.Contracts;
 using Rentar.Modules.Customers.Application.Common.Interfaces;
 using Rentar.Modules.Customers.Domain;
 using Rentar.Modules.Identity.Contracts;
 using Rentar.Shared.Application.UseCases;
-using Rentar.Shared.Application.Validation;
 using Rentar.Shared.Kernel.Exceptions;
 using System.Linq;
 using System.Threading;
@@ -13,24 +11,16 @@ using System.Threading.Tasks;
 namespace Rentar.Modules.Customers.Application.Commands;
 
 /// <summary>
-/// Stores a new customer of the Identity user <see cref="UserId"/> and answers it with its id set. Both company fields
-/// are optional: <see cref="CompanyName"/> is free text, stored as <c>null</c> when blank, and <see cref="CompanyId"/>
-/// makes the customer one of that company's, which needs the user to be its employee. A company customer without a
-/// name of its own is stored with the company's name.
+/// Stores the customer account of the Identity user <see cref="UserId"/> and answers it with its id set.
+/// <see cref="CompanyId"/> makes it one of that company's customers, which needs the user to be its employee; leave it
+/// out for a customer with no partner company.
 /// </summary>
 /// <remarks>
 /// Throws <see cref="BusinessRuleException"/> when the Identity module does not know the user or holds it as inactive,
-/// or when the Companies module does not hold the user as an employee of <see cref="CompanyId"/>.
+/// or when the Companies module does not hold the user as an employee of <see cref="CompanyId"/>, and
+/// <see cref="ConflictException"/> when the user already has a customer account.
 /// </remarks>
-public sealed record CreateCustomerCommand(int UserId, string CompanyName = null, int? CompanyId = null);
-
-public sealed class CreateCustomerCommandValidator : UseCaseValidator<CreateCustomerCommand>
-{
-    public CreateCustomerCommandValidator()
-    {
-        RuleFor(c => c.CompanyName).MinimumLength(5).When(c => !string.IsNullOrWhiteSpace(c.CompanyName));
-    }
-}
+public sealed record CreateCustomerCommand(int UserId, int? CompanyId = null);
 
 public sealed class CreateCustomerCommandHandler(
     ICustomerDal customerDal,
@@ -52,16 +42,19 @@ public sealed class CreateCustomerCommandHandler(
             throw new BusinessRuleException(Messages.UserNotActive);
         }
 
-        var companyName = string.IsNullOrWhiteSpace(command.CompanyName) ? null : command.CompanyName;
-        if (command.CompanyId is { } companyId)
+        // The unique index refuses it too; asking first turns that into an answer the caller can act on.
+        if (await customerDal.AnyAsync(c => c.UserId == command.UserId, cancellationToken))
         {
-            var employee = await companiesModule.GetEmployeeAsync(companyId, command.UserId, cancellationToken)
-                ?? throw new BusinessRuleException(Messages.UserNotEmployeeOfCompany);
-
-            companyName ??= employee.CompanyName;
+            throw new ConflictException(Messages.UserAlreadyCustomer);
         }
 
-        var customer = new Customer { UserId = command.UserId, CompanyName = companyName, CompanyId = command.CompanyId };
+        if (command.CompanyId is { } companyId
+            && await companiesModule.GetEmployeeAsync(companyId, command.UserId, cancellationToken) is null)
+        {
+            throw new BusinessRuleException(Messages.UserNotEmployeeOfCompany);
+        }
+
+        var customer = new Customer { UserId = command.UserId, CompanyId = command.CompanyId };
         await customerDal.AddAsync(customer, cancellationToken);
         return customer;
     }

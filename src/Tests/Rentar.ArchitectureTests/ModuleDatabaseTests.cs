@@ -17,7 +17,7 @@ namespace Rentar.ArchitectureTests;
 /// </summary>
 public class ModuleDatabaseTests
 {
-    private static readonly string[] ModulesWithDatabase = ["Companies", "Customers", "Fleet", "Identity", "Rentals"];
+    private static readonly string[] ModulesWithDatabase = ["Companies", "Customers", "Findeks", "Fleet", "Identity", "Rentals"];
 
     private static readonly Lazy<IServiceProvider> ModuleServices = new(BuildModuleServices);
 

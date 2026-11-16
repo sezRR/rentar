@@ -18,8 +18,7 @@ public sealed record AddUserCommand(
     string Email,
     byte[] PasswordHash,
     byte[] PasswordSalt,
-    bool Status,
-    int FindeksRating);
+    bool Status);
 
 public sealed class AddUserCommandValidator : UseCaseValidator<AddUserCommand>
 {
@@ -48,8 +47,7 @@ public sealed class AddUserCommandHandler(IUserDal userDal) : ICommandHandler<Ad
             Email = command.Email,
             PasswordHash = command.PasswordHash,
             PasswordSalt = command.PasswordSalt,
-            Status = command.Status,
-            FindeksRating = command.FindeksRating
+            Status = command.Status
         }, cancellationToken);
     }
 }

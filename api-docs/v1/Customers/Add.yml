@@ -10,8 +10,7 @@ http:
     type: json
     data: |
       {
-        "userId": {{userId}},
-        "companyName": "Example Company"
+        "userId": {{userId}}
       }
 
 settings:

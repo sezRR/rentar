@@ -41,14 +41,13 @@ public class V1ContractTests(RentarApiFactory factory) : IntegrationTestBase(fac
         "auth/login => 200 {data: {expiration: string, token: string}, message: \"Access Token Created\", success: true}",
         "auth/login wrong password => 400 \"Password is wrong\"",
         "auth/login unknown email => 400 \"User not found\"",
-        "auth/checkpassword => 200 {data: {email: string, findeksRating: number, firstName: string, id: number, lastName: string, passwordHash: string, passwordSalt: string, status: bool}, message: \"Logged in to system successfully\", success: true}",
+        "auth/checkpassword => 200 {data: {email: string, firstName: string, id: number, lastName: string, passwordHash: string, passwordSalt: string, status: bool}, message: \"Logged in to system successfully\", success: true}",
         "auth/checkpassword wrong password => 400 \"Password is wrong\"",
-        "users/getall => 200 {data: [{email: string, findeksRating: number, firstName: string, id: number, lastName: string, passwordHash: string, passwordSalt: string, status: bool}], message: \"Users Listed\", success: true}",
-        "users/getbymail => 200 {data: {email: string, findeksRating: number, firstName: string, id: number, lastName: string, passwordHash: string, passwordSalt: string, status: bool}, message: null, success: true}",
-        "users/getuserfindeksrating => 200 {data: [{email: string, findeksRating: number, firstName: string, id: number, lastName: string, passwordHash: string, passwordSalt: string, status: bool}], message: null, success: true}",
-        "users/getuserbyid => 200 {data: {email: string, findeksRating: number, firstName: string, id: number, lastName: string, passwordHash: string, passwordSalt: string, status: bool}, message: null, success: true}",
+        "users/getall => 200 {data: [{email: string, firstName: string, id: number, lastName: string, passwordHash: string, passwordSalt: string, status: bool}], message: \"Users Listed\", success: true}",
+        "users/getbymail => 200 {data: {email: string, firstName: string, id: number, lastName: string, passwordHash: string, passwordSalt: string, status: bool}, message: null, success: true}",
+        "users/getuserbyid => 200 {data: {email: string, firstName: string, id: number, lastName: string, passwordHash: string, passwordSalt: string, status: bool}, message: null, success: true}",
         "users/add => 200 {message: \"User Added\", success: true}",
-        "users/update => 200 {data: {email: string, findeksRating: number, firstName: string, id: number, lastName: string, passwordHash: string, passwordSalt: string, status: bool}, message: \"Your settings successfully updated\", success: true}",
+        "users/update => 200 {data: {email: string, firstName: string, id: number, lastName: string, passwordHash: string, passwordSalt: string, status: bool}, message: \"Your settings successfully updated\", success: true}",
         "users/getall maintenance => 400 {data: null, message: \"Servers in Maintenance (Time)\", success: false}",
         "customers/getall maintenance => 400 {data: null, message: \"Servers in Maintenance (Time)\", success: false}",
         "rentals/getrentaldetails maintenance => 400 {data: null, message: \"Servers in Maintenance (Time)\", success: false}",
@@ -85,14 +84,14 @@ public class V1ContractTests(RentarApiFactory factory) : IntegrationTestBase(fac
         "carimages/delete without images => 400 \"This car do not have image!\"",
         "customers/add => 200 {message: \"Customer Added\", success: true}",
         "customers/add unknown user => 400 {message: \"User not found\", success: false}",
-        "customers/getall => 200 {data: [{companyId: null, companyName: string, id: number, userId: number}], message: \"Customers Listed\", success: true}",
-        "customers/getcustomersbyuserid => 200 {data: [{companyId: null, companyName: string, id: number, userId: number}], message: null, success: true}",
+        "customers/getall => 200 {data: [{companyId: null, id: number, userId: number}], message: \"Customers Listed\", success: true}",
+        "customers/getcustomersbyuserid => 200 {data: [{companyId: null, id: number, userId: number}], message: null, success: true}",
         "rentals/add => 200 {message: \"Rental Added\", success: true}",
         "rentals/add unknown car => 400 {message: \"Car not found\", success: false}",
         "rentals/add unknown customer => 400 {message: \"Customer not found\", success: false}",
         "rentals/getall => 200 {data: [{carId: number, customerId: number, id: number, rentDate: string, returnDate: string}], message: \"Rentals Listed\", success: true}",
         "rentals/getrentalbycarid => 200 {data: {carId: number, customerId: number, id: number, rentDate: string, returnDate: string}, message: null, success: true}",
-        "rentals/getrentaldetails => 200 {data: [{brandName: string, carId: number, colorName: string, companyName: string, dailyPrice: number, description: string, modelYear: number, rentDate: string, rentalId: number, returnDate: string, userName: string}], message: null, success: true}",
+        "rentals/getrentaldetails => 200 {data: [{brandName: string, carId: number, colorName: string, companyName: null, dailyPrice: number, description: string, modelYear: number, rentDate: string, rentalId: number, returnDate: string, userName: string}], message: null, success: true}",
         "rentals/isrentable => 200 {message: null, success: true}",
         "rentals/isrentable taken => 400 {message: \"This car already rentaled by someone\", success: false}",
         "payments/pay => 200 {message: \"Payment successful\", success: true}",
@@ -109,6 +108,8 @@ public class V1ContractTests(RentarApiFactory factory) : IntegrationTestBase(fac
 
     private async Task AuthAndUsersAsync()
     {
+        // v1 clients still send findeksRating and companyName; the ratings now live in Findeks and companies in Companies,
+        // so both are ignored.
         var registration = new { firstName = "Sezer", lastName = "Tetik", email = "driver@example.com", password = "Passw0rd!", findeksRating = 900 };
         await Post("auth/register", "/api/v1/auth/register", registration);
         await Post("auth/register taken", "/api/v1/auth/register", registration);
@@ -121,7 +122,6 @@ public class V1ContractTests(RentarApiFactory factory) : IntegrationTestBase(fac
 
         await Get("users/getall", "/api/v1/users/getall");
         await Get("users/getbymail", "/api/v1/users/getbymail?email=driver@example.com");
-        await Get("users/getuserfindeksrating", "/api/v1/users/getuserfindeksrating?findeksRating=500");
         await Get("users/getuserbyid", "/api/v1/users/getuserbyid?id=1");
         await Post("users/add", "/api/v1/users/add", new { firstName = "Ada", lastName = "Lovelace", email = "ada@example.com", passwordHash = "AAAA", passwordSalt = "AAAA", status = true, findeksRating = 1200 });
         await Post("users/update", "/api/v1/users/update", new { id = 1, firstName = "Sezer", lastName = "Tetik", email = "driver@example.com", password = "Passw0rd!", findeksRating = 1000 });

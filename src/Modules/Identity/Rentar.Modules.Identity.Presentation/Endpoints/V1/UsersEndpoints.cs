@@ -21,7 +21,6 @@ public class UsersEndpoints : IEndpoint
 
         group.MapGet("/getall", GetAll);
         group.MapGet("/getbymail", GetByMail);
-        group.MapGet("/getuserfindeksrating", GetUserFindeksRating);
         group.MapGet("/getuserbyid", GetUserById);
         group.MapPost("/add", Add);
         group.MapPost("/update", Update);
@@ -38,15 +37,6 @@ public class UsersEndpoints : IEndpoint
         CancellationToken cancellationToken)
     {
         return V1Results.Ok(await getUserByEmail.HandleAsync(new GetUserByEmailQuery(email), cancellationToken), null);
-    }
-
-    private static async Task<Ok<V1Response<List<User>>>> GetUserFindeksRating(
-        IQueryHandler<GetUsersByMinFindeksRatingQuery, List<User>> getUsersByMinFindeksRating,
-        int findeksRating,
-        CancellationToken cancellationToken)
-    {
-        var users = await getUsersByMinFindeksRating.HandleAsync(new GetUsersByMinFindeksRatingQuery(findeksRating), cancellationToken);
-        return V1Results.Ok(users, null);
     }
 
     private static async Task<Ok<V1Response<User>>> GetUserById(IQueryHandler<GetUserByIdQuery, User> getUserById, int id, CancellationToken cancellationToken)

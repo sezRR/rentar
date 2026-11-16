@@ -34,34 +34,21 @@ public class UsersEndpoints : IEndpoint
     }
 
     /// <summary>
-    /// Lists users, optionally only the one with an email and/or those with at least a Findeks rating.
-    /// The full list is closed during the 22:00 maintenance hour.
+    /// Lists users, optionally only the one with an email. The full list is closed during the 22:00 maintenance hour.
     /// </summary>
     private static async Task<Ok<List<UserResponse>>> GetAll(
         IQueryHandler<GetUsersQuery, List<User>> getUsers,
         IQueryHandler<GetUserByEmailQuery, User> getUserByEmail,
-        IQueryHandler<GetUsersByMinFindeksRatingQuery, List<User>> getUsersByMinFindeksRating,
         string? email,
-        int? minFindeksRating,
         CancellationToken cancellationToken)
     {
         if (email is not null)
         {
             var user = await getUserByEmail.HandleAsync(new GetUserByEmailQuery(email), cancellationToken);
-            var matches = new List<UserResponse>();
-
-            if (user is not null && user.FindeksRating >= (minFindeksRating ?? int.MinValue))
-            {
-                matches.Add(UserResponse.From(user));
-            }
-
-            return TypedResults.Ok(matches);
+            return TypedResults.Ok(user is null ? new List<UserResponse>() : [UserResponse.From(user)]);
         }
 
-        var users = minFindeksRating is { } rating
-            ? await getUsersByMinFindeksRating.HandleAsync(new GetUsersByMinFindeksRatingQuery(rating), cancellationToken)
-            : await getUsers.HandleAsync(new GetUsersQuery(), cancellationToken);
-
+        var users = await getUsers.HandleAsync(new GetUsersQuery(), cancellationToken);
         return TypedResults.Ok(users.ConvertAll(UserResponse.From));
     }
 
@@ -85,7 +72,7 @@ public class UsersEndpoints : IEndpoint
         CancellationToken cancellationToken)
     {
         var user = await registerUser.HandleAsync(
-            new RegisterUserCommand(body.FirstName, body.LastName, body.Email, body.Password, body.FindeksRating),
+            new RegisterUserCommand(body.FirstName, body.LastName, body.Email, body.Password),
             cancellationToken);
         return RestResults.Created(request, user.Id, UserResponse.From(user));
     }
@@ -106,7 +93,7 @@ public class UsersEndpoints : IEndpoint
         }
 
         await updateUser.HandleAsync(
-            new UpdateUserCommand(id, body.FirstName, body.LastName, body.Email, body.Password, body.FindeksRating),
+            new UpdateUserCommand(id, body.FirstName, body.LastName, body.Email, body.Password),
             cancellationToken);
         return TypedResults.NoContent();
     }

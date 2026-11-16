@@ -14,7 +14,7 @@ namespace Rentar.Modules.Identity.Application.Auth.Commands;
 /// Creates an account with a salted hash of <see cref="Password"/> and answers the stored user. Throws
 /// <see cref="ConflictException"/> when the email is already registered.
 /// </summary>
-public sealed record RegisterUserCommand(string FirstName, string LastName, string Email, string Password, int FindeksRating);
+public sealed record RegisterUserCommand(string FirstName, string LastName, string Email, string Password);
 
 public sealed class RegisterUserCommandValidator : UseCaseValidator<RegisterUserCommand>
 {
@@ -46,7 +46,6 @@ public sealed class RegisterUserCommandHandler(IUserDal userDal) : ICommandHandl
             PasswordHash = passwordHash,
             PasswordSalt = passwordSalt,
             Status = true,
-            FindeksRating = command.FindeksRating,
         };
 
         await userDal.AddAsync(user, cancellationToken);

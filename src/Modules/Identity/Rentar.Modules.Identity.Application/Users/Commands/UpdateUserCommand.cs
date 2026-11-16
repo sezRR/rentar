@@ -13,7 +13,7 @@ namespace Rentar.Modules.Identity.Application.Users.Commands;
 /// Replaces the user, storing a fresh salted hash of <see cref="Password"/>, and answers the stored user. Throws
 /// <see cref="ConflictException"/> when another user already has the email.
 /// </summary>
-public sealed record UpdateUserCommand(int Id, string FirstName, string LastName, string Email, string Password, int FindeksRating);
+public sealed record UpdateUserCommand(int Id, string FirstName, string LastName, string Email, string Password);
 
 public sealed class UpdateUserCommandValidator : UseCaseValidator<UpdateUserCommand>
 {
@@ -47,7 +47,6 @@ public sealed class UpdateUserCommandHandler(IUserDal userDal) : ICommandHandler
             PasswordHash = passwordHash,
             PasswordSalt = passwordSalt,
             Status = true,
-            FindeksRating = command.FindeksRating,
         };
 
         await userDal.UpdateAsync(user, cancellationToken);

@@ -33,9 +33,6 @@ namespace Rentar.Modules.Customers.Infrastructure.Persistence.Migrations
                     b.Property<int?>("CompanyId")
                         .HasColumnType("integer");
 
-                    b.Property<string>("CompanyName")
-                        .HasColumnType("text");
-
                     b.Property<int>("UserId")
                         .HasColumnType("integer");
 
@@ -43,7 +40,8 @@ namespace Rentar.Modules.Customers.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("CompanyId");
 
-                    b.HasIndex("UserId");
+                    b.HasIndex("UserId")
+                        .IsUnique();
 
                     b.ToTable("Customers", "customers");
                 });

@@ -15,7 +15,6 @@ public class User : IEntity
     public byte[] PasswordHash { get; init; }
     public byte[] PasswordSalt { get; init; }
     public bool Status { get; init; }
-    public int FindeksRating { get; init; }
 
     /// <summary>The operation claims granted to the user, linked through <see cref="UserOperationClaim"/>.</summary>
     public ICollection<OperationClaim> OperationClaims { get; init; } = [];

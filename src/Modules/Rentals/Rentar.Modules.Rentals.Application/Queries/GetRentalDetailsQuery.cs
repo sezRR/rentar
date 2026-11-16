@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Rentar.Modules.Companies.Contracts;
 using Rentar.Modules.Customers.Contracts;
 using Rentar.Modules.Fleet.Contracts;
 using Rentar.Modules.Identity.Contracts;
@@ -14,7 +15,8 @@ using Rentar.Shared.Kernel.Exceptions;
 namespace Rentar.Modules.Rentals.Application.Queries;
 
 /// <summary>
-/// Rentals together with their car, customer and user; a rental whose car, customer or user is gone is left out.
+/// Rentals together with their car, customer, user and the customer's company; a rental whose car, customer or user is
+/// gone is left out, and the company name is <c>null</c> for a customer with no company.
 /// Throws <see cref="UnavailableException"/> during the 22:00 maintenance hour.
 /// </summary>
 public sealed record GetRentalDetailsQuery;
@@ -24,6 +26,7 @@ public sealed class GetRentalDetailsQueryHandler(
     ICustomersModuleApi customersModule,
     IIdentityModuleApi identityModule,
     IFleetModuleApi fleetModule,
+    ICompaniesModuleApi companiesModule,
     TimeProvider timeProvider) : IQueryHandler<GetRentalDetailsQuery, List<RentalDetailResponse>>
 {
     public async Task<List<RentalDetailResponse>> HandleAsync(GetRentalDetailsQuery query, CancellationToken cancellationToken = default)
@@ -40,6 +43,9 @@ public sealed class GetRentalDetailsQueryHandler(
             .ToDictionary(c => c.CustomerId);
         var users = (await identityModule.GetUsersAsync(customers.Values.Select(c => c.UserId).Distinct().ToList(), cancellationToken))
             .ToDictionary(u => u.UserId);
+        var companyIds = customers.Values.Select(c => c.CompanyId).OfType<int>().Distinct().ToList();
+        var companies = (await companiesModule.GetCompaniesAsync(companyIds, cancellationToken))
+            .ToDictionary(c => c.CompanyId);
         var cars = (await fleetModule.GetCarsAsync(rentals.Select(r => r.CarId).Distinct().ToList(), cancellationToken))
             .ToDictionary(c => c.CarId);
 
@@ -65,7 +71,7 @@ public sealed class GetRentalDetailsQueryHandler(
                 Description = car.Description,
                 DailyPrice = car.DailyPrice,
                 ModelYear = car.ModelYear,
-                CompanyName = customer.CompanyName,
+                CompanyName = customer.CompanyId is { } companyId ? companies.GetValueOrDefault(companyId)?.Name : null,
                 UserName = user.FirstName
             });
         }

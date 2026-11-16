@@ -45,7 +45,8 @@ To migrate by hand instead:
 
 ```bash
 dotnet tool restore
-for module in Identity Companies Fleet Customers Rentals; do
+# alphabetical, as on startup: Findeks has to run before Identity (see the upgrade notes below)
+for module in Companies Customers Findeks Fleet Identity Rentals; do
   project=src/Modules/$module/Rentar.Modules.$module.Infrastructure
   dotnet ef database update --project $project --startup-project $project
 done
@@ -65,6 +66,14 @@ dotnet ef migrations add <Name> --project $project --startup-project $project --
 > `AddUserOperationClaimsManyToMany` migrations add foreign keys and a unique index on `Users.Email`, so they stop on
 > rows that break them: car images of a deleted car, cars whose brand or color is gone, users sharing an email, or a
 > claim granted to a user twice. Fix or delete those rows first. Required text columns that hold `NULL` are set to `''`.
+
+> Upgrading a database from before ratings moved to Findeks: `OneCustomerPerUserWithoutCompanyName` drops
+> `Customers.CompanyName` and makes `Customers.UserId` unique. A user with several customers keeps the oldest one: it
+> takes a newer one's company when it has none, the newer ones' rentals move to it, and the newer ones are deleted.
+> Findeks' `InitialCreate` then copies each user's `FindeksRating` to the score of the
+> user's customer, and Identity's `RemoveUserFindeksRating` drops the column. A user without a customer loses the
+> rating. Startup migrates schemas in alphabetical order, which keeps Findeks ahead of Identity; when migrating by hand,
+> do the same, or the ratings are gone before they are copied.
 
 **Tests**
 
@@ -97,8 +106,10 @@ Bruno requests for both versions are in `api-docs/`.
   update with an empty brand name), with the same error body as before, and refuses what the stored data forbids with
   `400 { success: false, message }`: a car whose brand or color is not stored, an image of a car that is not
   stored, a customer of a user that is not stored or not active, a rental of a car or customer that is not stored,
-  deleting a brand or color that cars still have, and an email another user already has. Customers also carry the
-  `companyId` field (`null` unless the customer rents for a company), and their `companyName` may be `null`. It uses action-style routes (`/brands/getall`,
+  deleting a brand or color that cars still have, an email another user already has, and a second customer for a user.
+  Users no longer carry `findeksRating` (ratings are customer scores in v2 now) and `users/getuserfindeksrating` is
+  gone; a `findeksRating` sent in a body is ignored. Customers carry `companyId` instead of `companyName` (`null` for
+  a customer with no partner company), and rental details take `companyName` from the customer's company. It uses action-style routes (`/brands/getall`,
   `/brands/add`, `POST /brands/delete`), answers 200 or 400, and wraps every body in `{ success, message, data }`.
 - **v2** is RESTful:
   - Routes name resources, and the HTTP method says what to do with them.
@@ -113,7 +124,7 @@ Bruno requests for both versions are in `api-docs/`.
 | v2 route | v1 equivalent |
 |----------|---------------|
 | `POST /auth/tokens` (log in, `401` on bad credentials) | `POST /auth/login`, `POST /auth/checkpassword` |
-| `GET/POST /users`, `GET/PUT /users/{id}`<br>filters: `?email=`, `?minFindeksRating=` | `users/getall`, `getbymail`, `getuserfindeksrating`, `getuserbyid`, `add`, `update`;<br>`POST /users` (`409` if the email is taken) also replaces `auth/register` |
+| `GET/POST /users`, `GET/PUT /users/{id}`<br>filter: `?email=` | `users/getall`, `getbymail`, `getuserbyid`, `add`, `update`;<br>`POST /users` (`409` if the email is taken) also replaces `auth/register` |
 | `GET/POST /brands`, `GET/PUT/DELETE /brands/{id}` | `brands/*` |
 | `GET/POST /colors`, `GET/PUT/DELETE /colors/{id}` | `colors/*` |
 | `GET/POST /cars`, `GET/PUT/DELETE /cars/{id}`<br>filters: `?brandId=`, `?colorId=` | `cars/getall`, `getcardetails`, `getcardetailsbyid`, `getcarsby*`, `add`, `addreturnabledata`, `update`, `delete` |
@@ -125,6 +136,7 @@ Bruno requests for both versions are in `api-docs/`.
 | `GET /companies/{companyId}/rentals` | - |
 | `POST /payments` (`204`, or `402` when declined) | `GET /payments/pay` |
 | `GET /findeks/rating` | `GET /findeks/calculate` |
+| `GET/POST /customers/{customerId}/score` (`POST` calculates and stores a new Findeks rating) | - |
 
 Registering in v2 takes two calls: `POST /users`, then `POST /auth/tokens`.
 
@@ -132,9 +144,9 @@ The `/companies` routes are the only ones that need an access token (`Authorizat
 `POST /auth/tokens`); without one they answer `401`. They act for the caller the token was issued to: a company the
 caller does not work at answers `404`, as if it did not exist, and a missing permission answers `403`.
 
-A customer's `companyName` is optional free text, stored as `null` when blank. `companyId` is optional too: it makes the
-customer one of that company's, which needs the user to be its employee, and a company customer without a name of its
-own takes the company's name.
+A user has at most one customer account; a second one answers `409`. Its `companyId` is optional: it makes the
+customer one of that company's, which needs the user to be its employee; leaving it out stands for a customer with no
+partner company (the "other" choice). There is no free-text company name.
 
 <br>
 
@@ -168,7 +180,7 @@ src/
 | Customers | customer accounts                      | `customers` | Identity, Companies          |
 | Rentals   | rentals                                | `rentals`   | Customers, Identity, Fleet, Companies |
 | Payments  | payments (stateless)                   | -           | -                            |
-| Findeks   | credit ratings (stateless)             | -           | -                            |
+| Findeks   | Findeks ratings, customer scores       | `findeks`   | Customers                    |
 
 Every module with state has its own `DbContext`, its own schema and its own `__EFMigrationsHistory` table inside that
 schema, so modules migrate independently. Data in another module is referenced by id only: there are no cross-schema
@@ -188,11 +200,13 @@ Inside a module, relationships are mapped as EF Core navigations backed by forei
 | `Employee.Roles` / `Role.Employees` | many-to-many through `EmployeeRole` | `EmployeeRoles.(EmployeeId, RoleId)`, also its key | cascade |
 
 There is no one-to-one relationship: nothing in the model has exactly one of something else. References across
-modules (`Customer.UserId`, `Customer.CompanyId`, `Employee.UserId`, `Rental.CarId`, `Rental.CustomerId`) are plain ids,
+modules (`Customer.UserId`, `Customer.CompanyId`, `Employee.UserId`, `CustomerScore.CustomerId`, `Rental.CarId`,
+`Rental.CustomerId`) are plain ids,
 indexed where they are looked up. With no foreign key to guard them, creating a customer asks Identity whether its user
 exists and is active and, for a company customer, Companies whether the user works there; registering a company or
 adding an employee asks Identity about the user; creating a rental asks Fleet and Customers whether its car and customer
-exist. Otherwise the request answers `400`.
+exist. Otherwise the request answers `400`. Calculating a score asks Customers whether the customer exists, and answers
+`404` when it does not, since the customer is in the path.
 
 - Each module's `Persistence/Configurations` holds an `IEntityTypeConfiguration<T>` per entity that needs more than the
   conventions, and its context applies them with `ApplyConfigurationsFromAssembly`. Domain projects compile with

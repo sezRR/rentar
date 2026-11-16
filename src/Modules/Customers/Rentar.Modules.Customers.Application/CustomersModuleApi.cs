@@ -32,6 +32,6 @@ public class CustomersModuleApi(ICustomerDal customerDal) : ICustomersModuleApi
 
     private static CustomerSummary ToSummary(Customer customer)
     {
-        return new CustomerSummary(customer.Id, customer.UserId, customer.CompanyName, customer.CompanyId);
+        return new CustomerSummary(customer.Id, customer.UserId, customer.CompanyId);
     }
 }

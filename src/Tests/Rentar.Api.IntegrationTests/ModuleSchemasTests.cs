@@ -11,6 +11,7 @@ public class ModuleSchemasTests(RentarApiFactory factory) : IntegrationTestBase(
 {
     [Theory]
     [InlineData("companies", new[] { "Companies", "EmployeeRoles", "Employees", "Roles", "__EFMigrationsHistory" })]
+    [InlineData("findeks", new[] { "CustomerScores", "__EFMigrationsHistory" })]
     [InlineData("identity", new[] { "OperationClaims", "UserOperationClaims", "Users", "__EFMigrationsHistory" })]
     [InlineData("fleet", new[] { "Brands", "CarImages", "Cars", "Colors", "__EFMigrationsHistory" })]
     [InlineData("customers", new[] { "Customers", "__EFMigrationsHistory" })]

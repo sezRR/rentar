@@ -80,16 +80,16 @@ public abstract class V2TestBase(RentarApiFactory factory) : IntegrationTestBase
         return CreateAsync<CarResponse>("/api/v2/cars", new CarRequest(brandId, colorId, 2021, 950m, description, 700));
     }
 
-    protected Task<UserResponse> CreateUserAsync(string email, string firstName = "Sezer", int findeksRating = 900)
+    protected Task<UserResponse> CreateUserAsync(string email, string firstName = "Sezer")
     {
-        return CreateAsync<UserResponse>("/api/v2/users", new UserRequest(firstName, "Tetik", email, Password, findeksRating));
+        return CreateAsync<UserResponse>("/api/v2/users", new UserRequest(firstName, "Tetik", email, Password));
     }
 
     /// <summary>Creates a customer together with the user it belongs to; the email tells the users apart.</summary>
-    protected async Task<Customer> CreateCustomerAsync(string email = "renter@example.com", string companyName = "Rentar Logistics")
+    protected async Task<Customer> CreateCustomerAsync(string email = "renter@example.com")
     {
         var user = await CreateUserAsync(email);
-        return await CreateAsync<Customer>("/api/v2/customers", new CreateCustomerCommand(user.Id, companyName));
+        return await CreateAsync<Customer>("/api/v2/customers", new CreateCustomerCommand(user.Id));
     }
 
     /// <summary>

@@ -73,6 +73,6 @@ public class AuthEndpointsTests(RentarApiFactory factory) : IntegrationTestBase(
 
     private static RegisterUserCommand NewUser()
     {
-        return new RegisterUserCommand("Sezer", "Tetik", Email, Password, 900);
+        return new RegisterUserCommand("Sezer", "Tetik", Email, Password);
     }
 }

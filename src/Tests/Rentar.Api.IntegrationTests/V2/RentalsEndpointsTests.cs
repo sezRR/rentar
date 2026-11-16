@@ -114,10 +114,13 @@ public class RentalsEndpointsTests(RentarApiFactory factory) : V2TestBase(factor
     }
 
     [Fact]
-    public async Task Details_CombineCustomerUserAndCarFromTheirModules()
+    public async Task Details_CombineCustomerUserCompanyAndCarFromTheirModules()
     {
+        // Signed in before the clock is frozen: the access token's times come from the clock.
+        var owner = await SignInAsNewUserAsync("renter@example.com");
+        var company = await RegisterCompanyAsync("Rentar Logistics");
+        var customer = await CreateAsync<Customer>("/api/v2/customers", new CreateCustomerCommand(owner.Id, company.Id));
         FreezeClockAtNoon();
-        var customer = await CreateCustomerAsync("renter@example.com", "Rentar Logistics");
         var car = await CreateCarAsync("Toyota", "Red", "Corolla 1.6");
         var deletedCar = await CreateCarAsync("Fiat", "Blue", "Egea 1.4");
         await CreateRentalAsync(car.Id, customer.Id);
@@ -189,8 +192,8 @@ public class RentalsEndpointsTests(RentarApiFactory factory) : V2TestBase(factor
     {
         var owner = await SignInAsNewUserAsync("owner@example.com");
         var company = await RegisterCompanyAsync();
-        var companyCustomer = await CreateAsync<Customer>("/api/v2/customers", new CreateCustomerCommand(owner.Id, CompanyId: company.Id));
-        var privateCustomer = await CreateAsync<Customer>("/api/v2/customers", new CreateCustomerCommand(owner.Id, "Sezer Tetik"));
+        var companyCustomer = await CreateAsync<Customer>("/api/v2/customers", new CreateCustomerCommand(owner.Id, company.Id));
+        var privateCustomer = await CreateCustomerAsync("private@example.com");
         var car = await CreateCarAsync();
         var companyRental = await CreateAsync<Rental>("/api/v2/rentals", new CreateRentalCommand(car.Id, companyCustomer.Id, RentDate, ReturnDate));
         await CreateAsync<Rental>("/api/v2/rentals", new CreateRentalCommand(car.Id, privateCustomer.Id, RentDate.AddDays(5), ReturnDate.AddDays(5)));

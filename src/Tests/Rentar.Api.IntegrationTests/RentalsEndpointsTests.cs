@@ -24,7 +24,7 @@ public class RentalsEndpointsTests(RentarApiFactory factory) : IntegrationTestBa
     public async Task Add_StoresLocalDateTimes_AndGetAllReturnsThem()
     {
         var carId = await AddCarAsync();
-        var customerId = await AddCustomerAsync(await RegisterUserAsync("Sezer", "renter@example.com"), "Rentar Logistics");
+        var customerId = await AddCustomerAsync(await RegisterUserAsync("Sezer", "renter@example.com"));
 
         var response = await Client.PostJsonAsync("/api/v1/rentals/add", NewRental(carId, customerId));
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -43,8 +43,8 @@ public class RentalsEndpointsTests(RentarApiFactory factory) : IntegrationTestBa
     {
         var firstCar = await AddCarAsync(description: "Corolla 1.6");
         var secondCar = await AddCarAsync(description: "Yaris 1.5");
-        var first = await AddCustomerAsync(await RegisterUserAsync("First", "first@example.com"), "First Company");
-        var second = await AddCustomerAsync(await RegisterUserAsync("Second", "second@example.com"), "Second Company");
+        var first = await AddCustomerAsync(await RegisterUserAsync("First", "first@example.com"));
+        var second = await AddCustomerAsync(await RegisterUserAsync("Second", "second@example.com"));
         await Client.PostJsonAsync("/api/v1/rentals/add", NewRental(firstCar, first));
         await Client.PostJsonAsync("/api/v1/rentals/add", NewRental(secondCar, second));
 
@@ -78,7 +78,7 @@ public class RentalsEndpointsTests(RentarApiFactory factory) : IntegrationTestBa
         Factory.Clock.FreezeAt(new DateTimeOffset(DateTime.Today.AddHours(12)));
 
         var userId = await RegisterUserAsync("Sezer", "renter@example.com");
-        var customerId = await AddCustomerAsync(userId, "Rentar Logistics");
+        var customerId = await AddCustomerAsync(userId);
         var carId = await AddCarAsync("Toyota", "Red", "Corolla 1.6");
         var deletedCarId = await AddCarAsync("Fiat", "Blue", "Egea 1.4");
 
@@ -98,22 +98,23 @@ public class RentalsEndpointsTests(RentarApiFactory factory) : IntegrationTestBa
         Assert.Equal("Red", detail.ColorName);
         Assert.Equal("Corolla 1.6", detail.Description);
         Assert.Equal(950m, detail.DailyPrice);
-        Assert.Equal("Rentar Logistics", detail.CompanyName);
+        // The customer rents for no company.
+        Assert.Null(detail.CompanyName);
         Assert.Equal("Sezer", detail.UserName);
         Assert.Equal(RentDate, detail.RentDate);
     }
 
     private async Task<int> RegisterUserAsync(string firstName, string email)
     {
-        await Client.PostJsonAsync("/api/v1/auth/register", new RegisterUserCommand(firstName, "Tetik", email, "Passw0rd!", 900));
+        await Client.PostJsonAsync("/api/v1/auth/register", new RegisterUserCommand(firstName, "Tetik", email, "Passw0rd!"));
 
         var response = await Client.GetJsonAsync($"/api/v1/users/getbymail?email={email}");
         return (await response.ReadAsAsync<V1Response<User>>()).Data.Id;
     }
 
-    private async Task<int> AddCustomerAsync(int userId, string companyName)
+    private async Task<int> AddCustomerAsync(int userId)
     {
-        await Client.PostJsonAsync("/api/v1/customers/add", new Customer { UserId = userId, CompanyName = companyName });
+        await Client.PostJsonAsync("/api/v1/customers/add", new Customer { UserId = userId });
 
         var response = await Client.GetJsonAsync($"/api/v1/customers/getcustomersbyuserid?userId={userId}");
         return (await response.ReadAsAsync<V1Response<List<Customer>>>()).Data.Single().Id;

@@ -14,8 +14,7 @@ http:
         "firstName": "Jane",
         "lastName": "Doe",
         "email": "{{email}}",
-        "password": "Password123!",
-        "findeksRating": 1000
+        "password": "Password123!"
       }
 
 settings:

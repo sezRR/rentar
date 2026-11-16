@@ -10,11 +10,10 @@ public sealed record UserResponse(
     string FirstName,
     string LastName,
     string Email,
-    bool Status,
-    int FindeksRating)
+    bool Status)
 {
     internal static UserResponse From(User user)
     {
-        return new UserResponse(user.Id, user.FirstName, user.LastName, user.Email, user.Status, user.FindeksRating);
+        return new UserResponse(user.Id, user.FirstName, user.LastName, user.Email, user.Status);
     }
 }

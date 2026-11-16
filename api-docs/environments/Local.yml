@@ -27,8 +27,6 @@ variables:
     value: paste-the-token-from-auth-create-token
   - name: email
     value: user@example.com
-  - name: findeksRating
-    value: "1000"
   - name: imageFilePath
     value: ../src/Bootstrapper/Rentar.Api/wwwroot/uploads/default.png
   - name: carImageFileName

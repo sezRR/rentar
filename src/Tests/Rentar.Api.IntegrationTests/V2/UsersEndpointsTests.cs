@@ -19,14 +19,14 @@ public class UsersEndpointsTests(RentarApiFactory factory) : V2TestBase(factory)
     [Fact]
     public async Task Create_AnswersCreated_WithoutThePasswordHashOrSalt()
     {
-        var response = await Client.PostJsonAsync("/api/v2/users", new UserRequest("Sezer", "Tetik", Email, Password, 900));
+        var response = await Client.PostJsonAsync("/api/v2/users", new UserRequest("Sezer", "Tetik", Email, Password));
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var json = await response.ReadTextAsync();
         Assert.DoesNotContain("password", json, System.StringComparison.OrdinalIgnoreCase);
 
         var user = await response.ReadAsAsync<UserResponse>();
-        Assert.Equal(new UserResponse(user.Id, "Sezer", "Tetik", Email, true, 900), user);
+        Assert.Equal(new UserResponse(user.Id, "Sezer", "Tetik", Email, true), user);
         Assert.Equal($"/api/v2/users/{user.Id}", response.Headers.Location?.OriginalString);
 
         var fetched = await Client.GetJsonAsync($"/api/v2/users/{user.Id}");
@@ -37,7 +37,7 @@ public class UsersEndpointsTests(RentarApiFactory factory) : V2TestBase(factory)
     [Fact]
     public async Task Create_WithoutAValidEmailOrAPassword_ReturnsValidationProblem()
     {
-        var response = await Client.PostJsonAsync("/api/v2/users", new UserRequest("Sezer", "Tetik", "not-an-email", "", 900));
+        var response = await Client.PostJsonAsync("/api/v2/users", new UserRequest("Sezer", "Tetik", "not-an-email", ""));
 
         await AssertValidationProblemAsync(response, "email", "password");
     }
@@ -47,7 +47,7 @@ public class UsersEndpointsTests(RentarApiFactory factory) : V2TestBase(factory)
     {
         await CreateUserAsync(Email);
 
-        var response = await Client.PostJsonAsync("/api/v2/users", new UserRequest("Other", "Driver", Email, Password, 500));
+        var response = await Client.PostJsonAsync("/api/v2/users", new UserRequest("Other", "Driver", Email, Password));
 
         await AssertProblemAsync(response, HttpStatusCode.Conflict, Messages.UserAlreadyExists);
     }
@@ -55,22 +55,20 @@ public class UsersEndpointsTests(RentarApiFactory factory) : V2TestBase(factory)
     [Fact]
     public async Task Create_WithoutAName_ReturnsValidationProblem()
     {
-        var response = await Client.PostJsonAsync("/api/v2/users", new UserRequest("", "", Email, Password, 900));
+        var response = await Client.PostJsonAsync("/api/v2/users", new UserRequest("", "", Email, Password));
 
         await AssertValidationProblemAsync(response, "firstName", "lastName");
     }
 
     [Fact]
-    public async Task GetAll_FiltersByEmailAndMinimumFindeksRating()
+    public async Task GetAll_FiltersByEmail()
     {
         FreezeClockAtNoon();
-        await CreateUserAsync("low@example.com", "Low", findeksRating: 400);
-        await CreateUserAsync("high@example.com", "High", findeksRating: 1200);
+        await CreateUserAsync("low@example.com", "Low");
+        await CreateUserAsync("high@example.com", "High");
 
         Assert.Equal(["High", "Low"], await FirstNamesAsync("/api/v2/users"));
         Assert.Equal(["Low"], await FirstNamesAsync("/api/v2/users?email=low@example.com"));
-        Assert.Equal(["High"], await FirstNamesAsync("/api/v2/users?minFindeksRating=1000"));
-        Assert.Empty(await FirstNamesAsync("/api/v2/users?email=low@example.com&minFindeksRating=1000"));
         Assert.Empty(await FirstNamesAsync("/api/v2/users?email=nobody@example.com"));
     }
 
@@ -89,11 +87,11 @@ public class UsersEndpointsTests(RentarApiFactory factory) : V2TestBase(factory)
     {
         var user = await CreateUserAsync(Email);
 
-        var response = await Client.PutJsonAsync($"/api/v2/users/{user.Id}", new UserRequest("Sezer", "Tetik", Email, "N3wPassw0rd!", 1000));
+        var response = await Client.PutJsonAsync($"/api/v2/users/{user.Id}", new UserRequest("Sezen", "Tetik", Email, "N3wPassw0rd!"));
 
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
         var fetched = await (await Client.GetJsonAsync($"/api/v2/users/{user.Id}")).ReadAsAsync<UserResponse>();
-        Assert.Equal(1000, fetched.FindeksRating);
+        Assert.Equal("Sezen", fetched.FirstName);
 
         var withNewPassword = await Client.PostJsonAsync("/api/v2/auth/tokens", new VerifyCredentialsQuery(Email, "N3wPassw0rd!"));
         var withOldPassword = await Client.PostJsonAsync("/api/v2/auth/tokens", new VerifyCredentialsQuery(Email, Password));
@@ -107,7 +105,7 @@ public class UsersEndpointsTests(RentarApiFactory factory) : V2TestBase(factory)
         await CreateUserAsync("taken@example.com");
         var user = await CreateUserAsync(Email);
 
-        var response = await Client.PutJsonAsync($"/api/v2/users/{user.Id}", new UserRequest("Sezer", "Tetik", "taken@example.com", Password, 900));
+        var response = await Client.PutJsonAsync($"/api/v2/users/{user.Id}", new UserRequest("Sezer", "Tetik", "taken@example.com", Password));
 
         await AssertProblemAsync(response, HttpStatusCode.Conflict, Messages.UserAlreadyExists);
         Assert.Equal(Email, (await (await Client.GetJsonAsync($"/api/v2/users/{user.Id}")).ReadAsAsync<UserResponse>()).Email);
@@ -131,7 +129,7 @@ public class UsersEndpointsTests(RentarApiFactory factory) : V2TestBase(factory)
     public async Task UnknownUser_IsNotFound()
     {
         var get = await Client.GetJsonAsync("/api/v2/users/404");
-        var put = await Client.PutJsonAsync("/api/v2/users/404", new UserRequest("Sezer", "Tetik", Email, Password, 900));
+        var put = await Client.PutJsonAsync("/api/v2/users/404", new UserRequest("Sezer", "Tetik", Email, Password));
 
         await AssertProblemAsync(get, HttpStatusCode.NotFound, "User 404 was not found.");
         await AssertProblemAsync(put, HttpStatusCode.NotFound, "User 404 was not found.");
