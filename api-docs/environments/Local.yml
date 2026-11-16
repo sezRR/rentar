@@ -17,6 +17,14 @@ variables:
     value: "1"
   - name: userId
     value: "1"
+  - name: companyId
+    value: "1"
+  - name: employeeId
+    value: "1"
+  - name: roleId
+    value: "3"
+  - name: accessToken
+    value: paste-the-token-from-auth-create-token
   - name: email
     value: user@example.com
   - name: findeksRating

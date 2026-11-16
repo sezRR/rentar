@@ -10,5 +10,8 @@ internal sealed class CustomerConfiguration : IEntityTypeConfiguration<Customer>
     {
         // The user lives in the Identity schema, so there is no foreign key to index it; customers are listed by user.
         builder.HasIndex(customer => customer.UserId);
+
+        // Same for the company in the Companies schema; a company's rentals are found through its customers.
+        builder.HasIndex(customer => customer.CompanyId);
     }
 }

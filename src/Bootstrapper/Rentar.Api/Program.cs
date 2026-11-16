@@ -6,6 +6,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Rentar.Api.OpenApi;
+using Rentar.Modules.Companies.Infrastructure;
 using Rentar.Modules.Customers.Infrastructure;
 using Rentar.Modules.Findeks.Infrastructure;
 using Rentar.Modules.Fleet.Infrastructure;
@@ -28,6 +29,7 @@ IModule[] modules =
 [
     new IdentityModule(),
     new FleetModule(),
+    new CompaniesModule(),
     new CustomersModule(),
     new RentalsModule(),
     new PaymentsModule(),

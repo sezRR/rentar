@@ -45,7 +45,7 @@ To migrate by hand instead:
 
 ```bash
 dotnet tool restore
-for module in Identity Fleet Customers Rentals; do
+for module in Identity Companies Fleet Customers Rentals; do
   project=src/Modules/$module/Rentar.Modules.$module.Infrastructure
   dotnet ef database update --project $project --startup-project $project
 done
@@ -97,7 +97,8 @@ Bruno requests for both versions are in `api-docs/`.
   update with an empty brand name), with the same error body as before, and refuses what the stored data forbids with
   `400 { success: false, message }`: a car whose brand or color is not stored, an image of a car that is not
   stored, a customer of a user that is not stored or not active, a rental of a car or customer that is not stored,
-  deleting a brand or color that cars still have, and an email another user already has. It uses action-style routes (`/brands/getall`,
+  deleting a brand or color that cars still have, and an email another user already has. Customers also carry the
+  `companyId` field (`null` unless the customer rents for a company), and their `companyName` may be `null`. It uses action-style routes (`/brands/getall`,
   `/brands/add`, `POST /brands/delete`), answers 200 or 400, and wraps every body in `{ success, message, data }`.
 - **v2** is RESTful:
   - Routes name resources, and the HTTP method says what to do with them.
@@ -119,10 +120,21 @@ Bruno requests for both versions are in `api-docs/`.
 | `GET/POST/DELETE /cars/{carId}/images`, `GET/PUT/DELETE /cars/{carId}/images/{imageId}`, `GET /car-images` | `carimages/*` (form field `file`) |
 | `GET/POST /customers`, `GET /customers/{id}`<br>filter: `?userId=` | `customers/*` |
 | `GET/POST /rentals`, `GET /rentals/{id}`, `GET /rentals/details`, `GET /rentals/availability?carId=&rentDate=&returnDate=`<br>filter: `?carId=` | `rentals/*`, `isrentable` |
+| `GET/POST /companies`, `GET/PUT /companies/{companyId}`, `GET /companies/{companyId}/roles` | - |
+| `GET/POST /companies/{companyId}/employees`, `DELETE /companies/{companyId}/employees/{employeeId}` | - |
+| `GET /companies/{companyId}/rentals` | - |
 | `POST /payments` (`204`, or `402` when declined) | `GET /payments/pay` |
 | `GET /findeks/rating` | `GET /findeks/calculate` |
 
 Registering in v2 takes two calls: `POST /users`, then `POST /auth/tokens`.
+
+The `/companies` routes are the only ones that need an access token (`Authorization: Bearer <token>` from
+`POST /auth/tokens`); without one they answer `401`. They act for the caller the token was issued to: a company the
+caller does not work at answers `404`, as if it did not exist, and a missing permission answers `403`.
+
+A customer's `companyName` is optional free text, stored as `null` when blank. `companyId` is optional too: it makes the
+customer one of that company's, which needs the user to be its employee, and a company customer without a name of its
+own takes the company's name.
 
 <br>
 
@@ -152,8 +164,9 @@ src/
 |-----------|----------------------------------------|-------------|------------------------------|
 | Identity  | users, operation claims, auth (JWT)    | `identity`  | -                            |
 | Fleet     | brands, colors, cars, car images       | `fleet`     | -                            |
-| Customers | customer accounts                      | `customers` | Identity                     |
-| Rentals   | rentals                                | `rentals`   | Customers, Identity, Fleet   |
+| Companies | companies, employees, roles (company IAM) | `companies` | Identity                  |
+| Customers | customer accounts                      | `customers` | Identity, Companies          |
+| Rentals   | rentals                                | `rentals`   | Customers, Identity, Fleet, Companies |
 | Payments  | payments (stateless)                   | -           | -                            |
 | Findeks   | credit ratings (stateless)             | -           | -                            |
 
@@ -170,11 +183,16 @@ Inside a module, relationships are mapped as EF Core navigations backed by forei
 | `Color.Cars` / `Car.Color` | one-to-many | `Cars.ColorId` | restrict |
 | `Car.Images` / `CarImage.Car` | one-to-many | `CarImages.CarId` | cascade: the rows go with the car, `DeleteCarCommand` deletes the files |
 | `User.OperationClaims` / `OperationClaim.Users` | many-to-many through `UserOperationClaim` | `UserOperationClaims.(UserId, OperationClaimId)`, also its key | cascade |
+| `Company.Employees` / `Employee.Company` | one-to-many | `Employees.CompanyId` | cascade |
+| `Company.Roles` / `Role.Company` | one-to-many | `Roles.CompanyId` | cascade |
+| `Employee.Roles` / `Role.Employees` | many-to-many through `EmployeeRole` | `EmployeeRoles.(EmployeeId, RoleId)`, also its key | cascade |
 
 There is no one-to-one relationship: nothing in the model has exactly one of something else. References across
-modules (`Customer.UserId`, `Rental.CarId`, `Rental.CustomerId`) are plain ids, indexed where they are looked up.
-With no foreign key to guard them, creating a customer asks Identity whether its user exists and is active, and
-creating a rental asks Fleet and Customers whether its car and customer exist; otherwise the request answers `400`.
+modules (`Customer.UserId`, `Customer.CompanyId`, `Employee.UserId`, `Rental.CarId`, `Rental.CustomerId`) are plain ids,
+indexed where they are looked up. With no foreign key to guard them, creating a customer asks Identity whether its user
+exists and is active and, for a company customer, Companies whether the user works there; registering a company or
+adding an employee asks Identity about the user; creating a rental asks Fleet and Customers whether its car and customer
+exist. Otherwise the request answers `400`.
 
 - Each module's `Persistence/Configurations` holds an `IEntityTypeConfiguration<T>` per entity that needs more than the
   conventions, and its context applies them with `ApplyConfigurationsFromAssembly`. Domain projects compile with
@@ -247,6 +265,26 @@ public sealed class CreateBrandCommandHandler(IBrandDal brandDal) : ICommandHand
 
 <br>
 
+**Companies and their IAM**
+
+A company is registered by a signed-in user, who becomes its first employee. Employees are Identity users; a user can
+work at several companies, and can also be a customer of one of them (`Customer.CompanyId`).
+
+- **Permissions** are a fixed catalogue in `CompanyPermissions` (Companies contracts, since other modules check them):
+  `company.manage`, `employees.read`, `employees.manage`, `rentals.read`.
+- **Roles** belong to one company and grant a set of permissions; an employee holds one or more of them. Every company
+  starts with copies of the predefined roles: **Owner** (every permission), **Admin** (`employees.*`, `rentals.read`)
+  and **Member** (none). `Role.IsPredefined` tells them from roles a company creates, which is not exposed yet.
+- An employee grants or removes only what they hold themselves: adding someone with a role whose permissions the caller
+  lacks, or removing someone who holds such permissions, answers `403`. So an Admin can not make an Owner or remove one.
+- A company always keeps an employee who holds every permission; removing the last one answers `400`.
+- Use cases take the acting user as part of the record (`ActorUserId`), read from the access token by the endpoint, so
+  a handler never trusts a body for who is asking.
+- Adding a permission later: add it to `CompanyPermissions.All`, and grant it to the stored Owner roles in a migration,
+  since roles are copied when a company registers.
+
+<br>
+
 **Validation**
 
 Each rule has one home, chosen by what it needs:
@@ -271,7 +309,7 @@ Each rule has one home, chosen by what it needs:
 **Cross-cutting**
 
 - Errors: use cases return plain values and throw the Kernel exceptions (`BusinessRuleException`, `NotFoundException`,
-  `ConflictException`, `InvalidCredentialsException`, `UnavailableException`) when they refuse a request.
+  `ConflictException`, `ForbiddenException`, `InvalidCredentialsException`, `UnavailableException`) when they refuse a request.
   `ApiExceptionHandler`, an ASP.NET Core `IExceptionHandler`, turns them into problem details for v2 and into the
   `{ success, message, data }` body for v1. `V1ContractTests` pins every v1 response.
 - Aspects on use case handlers, run by Autofac/Castle interceptors: caching, transaction scope, performance, secured

@@ -1,0 +1,18 @@
+info:
+  name: Remove Employee
+  type: http
+  seq: 8
+
+http:
+  method: DELETE
+  url: "{{baseUrl}}/api/v2/companies/{{companyId}}/employees/{{employeeId}}"
+  headers:
+    - name: Authorization
+      value: "Bearer {{accessToken}}"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: true

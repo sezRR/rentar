@@ -7,6 +7,7 @@ using Rentar.Modules.Rentals.Application.Commands;
 using Rentar.Modules.Rentals.Application.Common.Models;
 using Rentar.Modules.Rentals.Application.Queries;
 using Rentar.Modules.Rentals.Domain;
+using Rentar.Shared.Application.Security;
 using Rentar.Shared.Application.UseCases;
 using Rentar.Shared.Presentation.Endpoints;
 using System;
@@ -31,6 +32,30 @@ public class RentalsEndpoints : IEndpoint
         group.MapPost("/", Create)
             .ProducesValidationProblem()
             .ProducesProblem(StatusCodes.Status400BadRequest);
+
+        // A company's rentals are addressed under it, and only its employees with the permission may see them.
+        builder.MapVersionedGroup("Rentals", "companies/{companyId:int}/rentals", 2.0)
+            .RequireAuthorization()
+            .MapGet("/", GetByCompany)
+            // Authentication refuses a missing or invalid token with an empty 401, not a problem.
+            .Produces(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound);
+    }
+
+    /// <summary>
+    /// Rentals booked by the company's customers; needs <c>rentals.read</c> in the company. A company the caller does
+    /// not work at answers 404.
+    /// </summary>
+    private static async Task<Ok<List<Rental>>> GetByCompany(
+        IQueryHandler<GetCompanyRentalsQuery, List<Rental>> getCompanyRentals,
+        ICurrentUser currentUser,
+        int companyId,
+        CancellationToken cancellationToken)
+    {
+        return TypedResults.Ok(await getCompanyRentals.HandleAsync(
+            new GetCompanyRentalsQuery(currentUser.RequireUserId(), companyId),
+            cancellationToken));
     }
 
     /// <summary>

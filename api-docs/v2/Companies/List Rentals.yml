@@ -1,0 +1,18 @@
+info:
+  name: List Rentals
+  type: http
+  seq: 9
+
+http:
+  method: GET
+  url: "{{baseUrl}}/api/v2/companies/{{companyId}}/rentals"
+  headers:
+    - name: Authorization
+      value: "Bearer {{accessToken}}"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: true

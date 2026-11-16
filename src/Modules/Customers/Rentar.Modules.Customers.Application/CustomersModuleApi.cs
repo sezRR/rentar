@@ -1,5 +1,6 @@
 using Rentar.Modules.Customers.Application.Common.Interfaces;
 using Rentar.Modules.Customers.Contracts;
+using Rentar.Modules.Customers.Domain;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -20,6 +21,17 @@ public class CustomersModuleApi(ICustomerDal customerDal) : ICustomersModuleApi
 
         var ids = customerIds.ToArray();
         var customers = await customerDal.GetAllAsync(c => ids.Contains(c.Id), cancellationToken);
-        return customers.ConvertAll(c => new CustomerSummary(c.Id, c.UserId, c.CompanyName));
+        return customers.ConvertAll(ToSummary);
+    }
+
+    public async Task<IReadOnlyList<CustomerSummary>> GetCompanyCustomersAsync(int companyId, CancellationToken cancellationToken = default)
+    {
+        var customers = await customerDal.GetAllAsync(c => c.CompanyId == companyId, cancellationToken);
+        return customers.ConvertAll(ToSummary);
+    }
+
+    private static CustomerSummary ToSummary(Customer customer)
+    {
+        return new CustomerSummary(customer.Id, customer.UserId, customer.CompanyName, customer.CompanyId);
     }
 }

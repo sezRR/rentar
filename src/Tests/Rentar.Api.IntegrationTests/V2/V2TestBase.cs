@@ -1,16 +1,24 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
+using Rentar.Modules.Companies.Application.Common.Models;
+using Rentar.Modules.Companies.Domain;
+using Rentar.Modules.Companies.Presentation.Endpoints.V2;
 using Rentar.Modules.Customers.Application.Commands;
 using Rentar.Modules.Customers.Domain;
 using Rentar.Modules.Fleet.Domain;
 using Rentar.Modules.Fleet.Infrastructure.Storage;
 using Rentar.Modules.Fleet.Presentation.Endpoints.V2;
+using Rentar.Modules.Identity.Application.Auth;
+using Rentar.Modules.Identity.Application.Auth.Queries;
 using Rentar.Modules.Identity.Presentation.Endpoints.V2;
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Net;
 using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Text;
 using System.Threading.Tasks;
 using Rentar.Modules.Fleet.Application.Common.Interfaces;
@@ -82,6 +90,49 @@ public abstract class V2TestBase(RentarApiFactory factory) : IntegrationTestBase
     {
         var user = await CreateUserAsync(email);
         return await CreateAsync<Customer>("/api/v2/customers", new CreateCustomerCommand(user.Id, companyName));
+    }
+
+    /// <summary>
+    /// Logs in as the user with <see cref="Password"/>, so every later request of <see cref="IntegrationTestBase.Client"/>
+    /// carries its access token. The token's times come from the test clock, so do not freeze it before signing in.
+    /// </summary>
+    protected async Task SignInAsync(string email)
+    {
+        Client.DefaultRequestHeaders.Authorization = null;
+
+        var response = await Client.PostJsonAsync("/api/v2/auth/tokens", new VerifyCredentialsQuery(email, Password));
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var token = await response.ReadAsAsync<AccessToken>();
+        Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token.Token);
+    }
+
+    protected async Task<UserResponse> SignInAsNewUserAsync(string email, string firstName = "Sezer")
+    {
+        var user = await CreateUserAsync(email, firstName);
+        await SignInAsync(email);
+        return user;
+    }
+
+    /// <summary>Registers a company for the signed-in user, who becomes its Owner.</summary>
+    protected Task<Company> RegisterCompanyAsync(string name = "Rentar Logistics")
+    {
+        return CreateAsync<Company>("/api/v2/companies", new CompanyRequest(name));
+    }
+
+    protected async Task<int> RoleIdAsync(int companyId, string roleName)
+    {
+        var response = await Client.GetJsonAsync($"/api/v2/companies/{companyId}/roles");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        return (await response.ReadAsAsync<List<Role>>()).Single(role => role.Name == roleName).Id;
+    }
+
+    /// <summary>Employs the user with one predefined role, on behalf of the signed-in user.</summary>
+    protected async Task<EmployeeResponse> AddEmployeeAsync(int companyId, int userId, string roleName)
+    {
+        var roleId = await RoleIdAsync(companyId, roleName);
+        return await CreateAsync<EmployeeResponse>($"/api/v2/companies/{companyId}/employees", new EmployeeRequest(userId, [roleId]));
     }
 
     protected async Task<HttpResponseMessage> UploadImageAsync(int carId, string fileName, byte[] bytes)

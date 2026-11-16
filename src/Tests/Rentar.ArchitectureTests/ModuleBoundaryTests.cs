@@ -9,7 +9,7 @@ namespace Rentar.ArchitectureTests;
 /// </summary>
 public class ModuleBoundaryTests
 {
-    private static readonly string[] ExpectedModules = ["Customers", "Findeks", "Fleet", "Identity", "Payments", "Rentals"];
+    private static readonly string[] ExpectedModules = ["Companies", "Customers", "Findeks", "Fleet", "Identity", "Payments", "Rentals"];
 
     /// <summary>Layers of its own module each module layer may use.</summary>
     private static readonly Dictionary<string, string[]> OwnModuleLayers = new()

@@ -7,5 +7,8 @@ namespace Rentar.Shared.Application.Security;
 /// </summary>
 public interface ICurrentUser
 {
+    /// <summary>The Identity user the access token was issued to, or <c>null</c> for an anonymous caller.</summary>
+    int? UserId { get; }
+
     IReadOnlyCollection<string> Roles { get; }
 }

@@ -10,6 +10,7 @@ namespace Rentar.Api.IntegrationTests;
 public class ModuleSchemasTests(RentarApiFactory factory) : IntegrationTestBase(factory)
 {
     [Theory]
+    [InlineData("companies", new[] { "Companies", "EmployeeRoles", "Employees", "Roles", "__EFMigrationsHistory" })]
     [InlineData("identity", new[] { "OperationClaims", "UserOperationClaims", "Users", "__EFMigrationsHistory" })]
     [InlineData("fleet", new[] { "Brands", "CarImages", "Cars", "Colors", "__EFMigrationsHistory" })]
     [InlineData("customers", new[] { "Customers", "__EFMigrationsHistory" })]
@@ -55,6 +56,10 @@ public class ModuleSchemasTests(RentarApiFactory factory) : IntegrationTestBase(
 
         Assert.Equal(
         [
+            "companies.EmployeeRoles -> companies.Employees",
+            "companies.EmployeeRoles -> companies.Roles",
+            "companies.Employees -> companies.Companies",
+            "companies.Roles -> companies.Companies",
             "fleet.CarImages -> fleet.Cars",
             "fleet.Cars -> fleet.Brands",
             "fleet.Cars -> fleet.Colors",

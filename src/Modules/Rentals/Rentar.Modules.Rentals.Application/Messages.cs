@@ -11,4 +11,9 @@ public static class Messages
     public const string CarNotFound = "Car not found";
     public const string CustomerNotFound = "Customer not found";
     public const string MaintenanceTime = "Servers in Maintenance (Time)";
+
+    /// <summary>Worded like the v2 not-found problems, so an outsider can not tell a company exists.</summary>
+    public static string CompanyNotFound(int companyId) => $"Company {companyId} was not found.";
+
+    public static string PermissionMissing(string permission) => $"Your roles in the company do not grant {permission}";
 }

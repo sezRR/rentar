@@ -56,6 +56,7 @@ public sealed class ApiExceptionHandler(ILogger<ApiExceptionHandler> logger) : I
             },
             // One answer for an unknown email and a wrong password, so the response does not reveal which accounts exist.
             InvalidCredentialsException => Problem(StatusCodes.Status401Unauthorized, "Email or password is wrong."),
+            ForbiddenException forbidden => Problem(StatusCodes.Status403Forbidden, forbidden.Message),
             NotFoundException notFound => Problem(StatusCodes.Status404NotFound, notFound.Message),
             ConflictException conflict => Problem(StatusCodes.Status409Conflict, conflict.Message),
             UnavailableException unavailable => Problem(StatusCodes.Status503ServiceUnavailable, unavailable.Message),

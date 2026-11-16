@@ -9,5 +9,6 @@ public static class Messages
     public const string CustomerCompanyNameInvalid = "Customer Company Name is Invalid";
     public const string UserNotFound = "User not found";
     public const string UserNotActive = "User is not active";
+    public const string UserNotEmployeeOfCompany = "User is not an employee of the company";
     public const string MaintenanceTime = "Servers in Maintenance (Time)";
 }

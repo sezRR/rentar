@@ -1,3 +1,6 @@
+using Rentar.Modules.Companies.Contracts;
+using Rentar.Modules.Customers.Application.Commands;
+using Rentar.Modules.Customers.Domain;
 using Rentar.Modules.Rentals.Application;
 using Rentar.Modules.Rentals.Application.Commands;
 using Rentar.Modules.Rentals.Application.Common.Models;
@@ -179,5 +182,57 @@ public class RentalsEndpointsTests(RentarApiFactory factory) : V2TestBase(factor
     private Task<Rental> CreateRentalAsync(int carId, int customerId, DateTime? rentDate = null, DateTime? returnDate = null)
     {
         return CreateAsync<Rental>("/api/v2/rentals", new CreateRentalCommand(carId, customerId, rentDate ?? RentDate, returnDate ?? ReturnDate));
+    }
+
+    [Fact]
+    public async Task GetByCompany_ListsOnlyTheRentalsOfTheCompanysCustomers()
+    {
+        var owner = await SignInAsNewUserAsync("owner@example.com");
+        var company = await RegisterCompanyAsync();
+        var companyCustomer = await CreateAsync<Customer>("/api/v2/customers", new CreateCustomerCommand(owner.Id, CompanyId: company.Id));
+        var privateCustomer = await CreateAsync<Customer>("/api/v2/customers", new CreateCustomerCommand(owner.Id, "Sezer Tetik"));
+        var car = await CreateCarAsync();
+        var companyRental = await CreateAsync<Rental>("/api/v2/rentals", new CreateRentalCommand(car.Id, companyCustomer.Id, RentDate, ReturnDate));
+        await CreateAsync<Rental>("/api/v2/rentals", new CreateRentalCommand(car.Id, privateCustomer.Id, RentDate.AddDays(5), ReturnDate.AddDays(5)));
+
+        var response = await Client.GetJsonAsync($"/api/v2/companies/{company.Id}/rentals");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var rentals = await response.ReadAsAsync<List<Rental>>();
+        Assert.Equal([companyRental.Id], rentals.Select(r => r.Id));
+    }
+
+    [Fact]
+    public async Task GetByCompany_ForAMemberWithoutRentalsRead_IsForbidden()
+    {
+        await SignInAsNewUserAsync("owner@example.com");
+        var company = await RegisterCompanyAsync();
+        var member = await CreateUserAsync("member@example.com");
+        await AddEmployeeAsync(company.Id, member.Id, "Member");
+        await SignInAsync("member@example.com");
+
+        var response = await Client.GetJsonAsync($"/api/v2/companies/{company.Id}/rentals");
+
+        await AssertProblemAsync(response, HttpStatusCode.Forbidden, Messages.PermissionMissing(CompanyPermissions.RentalsRead));
+    }
+
+    [Fact]
+    public async Task GetByCompany_ForSomeoneWhoDoesNotWorkThere_IsNotFound()
+    {
+        await SignInAsNewUserAsync("owner@example.com");
+        var company = await RegisterCompanyAsync();
+        await SignInAsNewUserAsync("outsider@example.com");
+
+        var response = await Client.GetJsonAsync($"/api/v2/companies/{company.Id}/rentals");
+
+        await AssertProblemAsync(response, HttpStatusCode.NotFound, Messages.CompanyNotFound(company.Id));
+    }
+
+    [Fact]
+    public async Task GetByCompany_WithoutAnAccessToken_IsUnauthorized()
+    {
+        var response = await Client.GetJsonAsync("/api/v2/companies/1/rentals");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 }

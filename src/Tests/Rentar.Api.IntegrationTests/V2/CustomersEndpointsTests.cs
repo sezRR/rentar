@@ -28,6 +28,74 @@ public class CustomersEndpointsTests(RentarApiFactory factory) : V2TestBase(fact
     }
 
     [Fact]
+    public async Task Create_WithoutACompany_StoresNoCompanyNameOrCompany()
+    {
+        var user = await CreateUserAsync("renter@example.com");
+
+        var customer = await CreateAsync<Customer>("/api/v2/customers", new CreateCustomerCommand(user.Id));
+
+        Assert.Null(customer.CompanyName);
+        Assert.Null(customer.CompanyId);
+        Assert.Null((await (await Client.GetJsonAsync($"/api/v2/customers/{customer.Id}")).ReadAsAsync<Customer>()).CompanyName);
+    }
+
+    [Fact]
+    public async Task Create_WithABlankCompanyName_StoresNone()
+    {
+        var user = await CreateUserAsync("renter@example.com");
+
+        var customer = await CreateAsync<Customer>("/api/v2/customers", new CreateCustomerCommand(user.Id, "   "));
+
+        Assert.Null(customer.CompanyName);
+    }
+
+    [Fact]
+    public async Task Create_ForACompanyTheUserWorksAt_TakesTheCompanysName()
+    {
+        var owner = await SignInAsNewUserAsync("owner@example.com");
+        var company = await RegisterCompanyAsync("Rentar Logistics");
+
+        var customer = await CreateAsync<Customer>("/api/v2/customers", new CreateCustomerCommand(owner.Id, CompanyId: company.Id));
+
+        Assert.Equal(company.Id, customer.CompanyId);
+        Assert.Equal("Rentar Logistics", customer.CompanyName);
+    }
+
+    [Fact]
+    public async Task Create_ForACompany_KeepsTheNameItIsGiven()
+    {
+        var owner = await SignInAsNewUserAsync("owner@example.com");
+        var company = await RegisterCompanyAsync("Rentar Logistics");
+
+        var customer = await CreateAsync<Customer>("/api/v2/customers", new CreateCustomerCommand(owner.Id, "Rentar Istanbul Office", company.Id));
+
+        Assert.Equal(company.Id, customer.CompanyId);
+        Assert.Equal("Rentar Istanbul Office", customer.CompanyName);
+    }
+
+    [Fact]
+    public async Task Create_ForACompanyTheUserDoesNotWorkAt_IsABadRequest()
+    {
+        await SignInAsNewUserAsync("owner@example.com");
+        var company = await RegisterCompanyAsync();
+        var outsider = await CreateUserAsync("outsider@example.com");
+
+        var response = await Client.PostJsonAsync("/api/v2/customers", new CreateCustomerCommand(outsider.Id, CompanyId: company.Id));
+
+        await AssertProblemAsync(response, HttpStatusCode.BadRequest, Messages.UserNotEmployeeOfCompany);
+    }
+
+    [Fact]
+    public async Task Create_ForACompanyThatIsNotStored_IsABadRequest()
+    {
+        var user = await CreateUserAsync("renter@example.com");
+
+        var response = await Client.PostJsonAsync("/api/v2/customers", new CreateCustomerCommand(user.Id, CompanyId: 404));
+
+        await AssertProblemAsync(response, HttpStatusCode.BadRequest, Messages.UserNotEmployeeOfCompany);
+    }
+
+    [Fact]
     public async Task Create_ForAUserThatIsNotStored_IsABadRequest()
     {
         FreezeClockAtNoon();
