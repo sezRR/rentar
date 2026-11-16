@@ -7,10 +7,10 @@ namespace Rentar.Modules.Payments.Domain;
 /// </summary>
 public class Payment : IEntity
 {
-    public string CardNumber { get; set; }
-    public string HolderName { get; set; }
-    public string MounthOfExp { get; set; }
-    public string YearOfExp { get; set; }
-    public string CVC { get; set; }
-    public int Amount { get; set; }
+    public string CardNumber { get; init; }
+    public string HolderName { get; init; }
+    public string MounthOfExp { get; init; }
+    public string YearOfExp { get; init; }
+    public string CVC { get; init; }
+    public int Amount { get; init; }
 }

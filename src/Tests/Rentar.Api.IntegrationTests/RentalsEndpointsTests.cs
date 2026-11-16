@@ -1,8 +1,7 @@
 using Rentar.Modules.Customers.Domain;
 using Rentar.Modules.Fleet.Domain;
-using Rentar.Modules.Identity.Application.Auth;
+using Rentar.Modules.Identity.Application.Auth.Commands;
 using Rentar.Modules.Identity.Domain;
-using Rentar.Modules.Rentals.Application;
 using Rentar.Modules.Rentals.Domain;
 using Rentar.Shared.Presentation.Endpoints;
 using Rentar.Shared.Presentation.Errors;
@@ -11,6 +10,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
+using Rentar.Modules.Rentals.Application.Common.Models;
 using Xunit;
 
 namespace Rentar.Api.IntegrationTests;
@@ -81,7 +81,7 @@ public class RentalsEndpointsTests(RentarApiFactory factory) : IntegrationTestBa
         var response = await Client.GetJsonAsync("/api/v1/rentals/getrentaldetails");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var details = await response.ReadAsAsync<V1Response<List<RentalDetailDto>>>();
+        var details = await response.ReadAsAsync<V1Response<List<RentalDetailResponse>>>();
         var detail = Assert.Single(details.Data);
         Assert.Equal(carId, detail.CarId);
         Assert.Equal("Toyota", detail.BrandName);
@@ -95,7 +95,7 @@ public class RentalsEndpointsTests(RentarApiFactory factory) : IntegrationTestBa
 
     private async Task<int> RegisterUserAsync(string firstName, string email)
     {
-        await Client.PostJsonAsync("/api/v1/auth/register", new RegisterUser(firstName, "Tetik", email, "Passw0rd!", 900));
+        await Client.PostJsonAsync("/api/v1/auth/register", new RegisterUserCommand(firstName, "Tetik", email, "Passw0rd!", 900));
 
         var response = await Client.GetJsonAsync($"/api/v1/users/getbymail?email={email}");
         return (await response.ReadAsAsync<V1Response<User>>()).Data.Id;

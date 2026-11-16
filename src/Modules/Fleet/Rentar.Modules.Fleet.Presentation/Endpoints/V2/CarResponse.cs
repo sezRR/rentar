@@ -1,4 +1,4 @@
-using Rentar.Modules.Fleet.Application.Cars;
+using Rentar.Modules.Fleet.Application.Common.Models;
 using Rentar.Modules.Fleet.Domain;
 
 namespace Rentar.Modules.Fleet.Presentation.Endpoints.V2;
@@ -18,7 +18,7 @@ public sealed record CarResponse(
     int MinimumFindeksRating,
     string ImagePath)
 {
-    internal static CarResponse From(CarDetailDto car)
+    internal static CarResponse From(CarDetailResponse car)
     {
         return new CarResponse(
             car.Id,

@@ -1,5 +1,4 @@
 using Microsoft.Extensions.DependencyInjection;
-using Rentar.Modules.Fleet.Application.CarImages;
 using Rentar.Modules.Fleet.Application;
 using Rentar.Modules.Fleet.Domain;
 using Rentar.Modules.Fleet.Infrastructure.Storage;
@@ -11,6 +10,7 @@ using System.Net.Http;
 using System.Net;
 using System.Text;
 using System.Threading.Tasks;
+using Rentar.Modules.Fleet.Application.Common.Interfaces;
 using Xunit;
 
 namespace Rentar.Api.IntegrationTests;

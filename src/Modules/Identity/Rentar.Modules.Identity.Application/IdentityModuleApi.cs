@@ -1,7 +1,7 @@
-using Rentar.Modules.Identity.Application.Users;
 using Rentar.Modules.Identity.Contracts;
 using System.Collections.Generic;
 using System.Linq;
+using Rentar.Modules.Identity.Application.Common.Interfaces;
 
 namespace Rentar.Modules.Identity.Application;
 

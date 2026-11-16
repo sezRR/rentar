@@ -4,6 +4,7 @@ using Rentar.Modules.Fleet.Application.CarImages;
 using System;
 using System.IO;
 using System.Transactions;
+using Rentar.Modules.Fleet.Application.Common.Interfaces;
 
 namespace Rentar.Modules.Fleet.Infrastructure.Storage;
 

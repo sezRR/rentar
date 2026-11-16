@@ -2,6 +2,8 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Routing;
 using Rentar.Modules.Customers.Application;
+using Rentar.Modules.Customers.Application.Commands;
+using Rentar.Modules.Customers.Application.Queries;
 using Rentar.Modules.Customers.Domain;
 using Rentar.Shared.Application.UseCases;
 using Rentar.Shared.Presentation.Endpoints;
@@ -20,19 +22,19 @@ public class CustomersEndpoints : IEndpoint
         group.MapPost("/add", Add);
     }
 
-    private static Ok<V1Response<List<Customer>>> GetAll(IQueryHandler<GetCustomers, List<Customer>> getCustomers)
+    private static Ok<V1Response<List<Customer>>> GetAll(IQueryHandler<GetCustomersQuery, List<Customer>> getCustomers)
     {
-        return V1Results.Ok(getCustomers.Handle(new GetCustomers()), Messages.CustomersListed);
+        return V1Results.Ok(getCustomers.Handle(new GetCustomersQuery()), Messages.CustomersListed);
     }
 
     private static Ok<V1Response<List<Customer>>> GetCustomersByUserId(
-        IQueryHandler<GetCustomersByUser, List<Customer>> getCustomersByUser,
+        IQueryHandler<GetCustomersByUserQuery, List<Customer>> getCustomersByUser,
         int userId)
     {
-        return V1Results.Ok(getCustomersByUser.Handle(new GetCustomersByUser(userId)), null);
+        return V1Results.Ok(getCustomersByUser.Handle(new GetCustomersByUserQuery(userId)), null);
     }
 
-    private static Ok<V1Response> Add(ICommandHandler<CreateCustomer, Customer> createCustomer, CreateCustomer command)
+    private static Ok<V1Response> Add(ICommandHandler<CreateCustomerCommand, Customer> createCustomer, CreateCustomerCommand command)
     {
         createCustomer.Handle(command);
         return V1Results.Ok(Messages.CustomerAdded);

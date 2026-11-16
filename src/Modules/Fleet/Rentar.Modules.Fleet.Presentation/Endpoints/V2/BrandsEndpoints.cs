@@ -3,7 +3,8 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Routing;
-using Rentar.Modules.Fleet.Application.Brands;
+using Rentar.Modules.Fleet.Application.Brands.Commands;
+using Rentar.Modules.Fleet.Application.Brands.Queries;
 using Rentar.Modules.Fleet.Domain;
 using Rentar.Shared.Application.UseCases;
 using Rentar.Shared.Presentation.Endpoints;
@@ -29,49 +30,49 @@ public class BrandsEndpoints : IEndpoint
             .ProducesProblem(StatusCodes.Status404NotFound);
     }
 
-    private static Ok<List<Brand>> GetAll(IQueryHandler<GetBrands, List<Brand>> getBrands)
+    private static Ok<List<Brand>> GetAll(IQueryHandler<GetBrandsQuery, List<Brand>> getBrands)
     {
-        return TypedResults.Ok(getBrands.Handle(new GetBrands()));
+        return TypedResults.Ok(getBrands.Handle(new GetBrandsQuery()));
     }
 
-    private static Results<Ok<Brand>, ProblemHttpResult> GetById(IQueryHandler<GetBrandById, Brand> getBrandById, int id)
+    private static Results<Ok<Brand>, ProblemHttpResult> GetById(IQueryHandler<GetBrandByIdQuery, Brand> getBrandById, int id)
     {
-        var brand = getBrandById.Handle(new GetBrandById(id));
+        var brand = getBrandById.Handle(new GetBrandByIdQuery(id));
         return brand is null ? RestResults.NotFound("Brand", id) : TypedResults.Ok(brand);
     }
 
-    private static Created<Brand> Create(ICommandHandler<CreateBrand, Brand> createBrand, HttpRequest request, BrandRequest body)
+    private static Created<Brand> Create(ICommandHandler<CreateBrandCommand, Brand> createBrand, HttpRequest request, BrandRequest body)
     {
-        var brand = createBrand.Handle(new CreateBrand(body.BrandName));
+        var brand = createBrand.Handle(new CreateBrandCommand(body.BrandName));
         return RestResults.Created(request, brand.Id, brand);
     }
 
     private static Results<NoContent, ProblemHttpResult> Update(
-        IQueryHandler<GetBrandById, Brand> getBrandById,
-        ICommandHandler<UpdateBrand> updateBrand,
+        IQueryHandler<GetBrandByIdQuery, Brand> getBrandById,
+        ICommandHandler<UpdateBrandCommand> updateBrand,
         int id,
         BrandRequest body)
     {
-        if (getBrandById.Handle(new GetBrandById(id)) is null)
+        if (getBrandById.Handle(new GetBrandByIdQuery(id)) is null)
         {
             return RestResults.NotFound("Brand", id);
         }
 
-        updateBrand.Handle(new UpdateBrand(id, body.BrandName));
+        updateBrand.Handle(new UpdateBrandCommand(id, body.BrandName));
         return TypedResults.NoContent();
     }
 
     private static Results<NoContent, ProblemHttpResult> Delete(
-        IQueryHandler<GetBrandById, Brand> getBrandById,
-        ICommandHandler<DeleteBrand> deleteBrand,
+        IQueryHandler<GetBrandByIdQuery, Brand> getBrandById,
+        ICommandHandler<DeleteBrandCommand> deleteBrand,
         int id)
     {
-        if (getBrandById.Handle(new GetBrandById(id)) is null)
+        if (getBrandById.Handle(new GetBrandByIdQuery(id)) is null)
         {
             return RestResults.NotFound("Brand", id);
         }
 
-        deleteBrand.Handle(new DeleteBrand(id));
+        deleteBrand.Handle(new DeleteBrandCommand(id));
         return TypedResults.NoContent();
     }
 }

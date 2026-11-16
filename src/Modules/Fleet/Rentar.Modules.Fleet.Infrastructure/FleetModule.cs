@@ -2,10 +2,8 @@ using Autofac;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Rentar.Modules.Fleet.Application;
-using Rentar.Modules.Fleet.Application.Brands;
-using Rentar.Modules.Fleet.Application.CarImages;
-using Rentar.Modules.Fleet.Application.Cars;
-using Rentar.Modules.Fleet.Application.Colors;
+using Rentar.Modules.Fleet.Application.Brands.Queries;
+using Rentar.Modules.Fleet.Application.Common.Interfaces;
 using Rentar.Modules.Fleet.Contracts;
 using Rentar.Modules.Fleet.Infrastructure.Persistence;
 using Rentar.Modules.Fleet.Infrastructure.Storage;
@@ -39,6 +37,6 @@ public sealed class FleetModule : IModule
         builder.RegisterType<LocalImageStorage>().As<IImageStorage>().SingleInstance();
         builder.RegisterType<FleetModuleApi>().As<IFleetModuleApi>().SingleInstance();
 
-        builder.RegisterUseCases(typeof(GetBrands).Assembly);
+        builder.RegisterUseCases(typeof(GetBrandsQuery).Assembly);
     }
 }

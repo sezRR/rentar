@@ -4,6 +4,6 @@ namespace Rentar.Modules.Fleet.Domain;
 
 public class Brand : IEntity
 {
-    public int Id { get; set; }
-    public string BrandName { get; set; }
+    public int Id { get; init; }
+    public string BrandName { get; init; }
 }

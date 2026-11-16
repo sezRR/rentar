@@ -3,7 +3,8 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Routing;
-using Rentar.Modules.Fleet.Application.Colors;
+using Rentar.Modules.Fleet.Application.Colors.Commands;
+using Rentar.Modules.Fleet.Application.Colors.Queries;
 using Rentar.Modules.Fleet.Domain;
 using Rentar.Shared.Application.UseCases;
 using Rentar.Shared.Presentation.Endpoints;
@@ -29,49 +30,49 @@ public class ColorsEndpoints : IEndpoint
             .ProducesProblem(StatusCodes.Status404NotFound);
     }
 
-    private static Ok<List<Color>> GetAll(IQueryHandler<GetColors, List<Color>> getColors)
+    private static Ok<List<Color>> GetAll(IQueryHandler<GetColorsQuery, List<Color>> getColors)
     {
-        return TypedResults.Ok(getColors.Handle(new GetColors()));
+        return TypedResults.Ok(getColors.Handle(new GetColorsQuery()));
     }
 
-    private static Results<Ok<Color>, ProblemHttpResult> GetById(IQueryHandler<GetColorById, Color> getColorById, int id)
+    private static Results<Ok<Color>, ProblemHttpResult> GetById(IQueryHandler<GetColorByIdQuery, Color> getColorById, int id)
     {
-        var color = getColorById.Handle(new GetColorById(id));
+        var color = getColorById.Handle(new GetColorByIdQuery(id));
         return color is null ? RestResults.NotFound("Color", id) : TypedResults.Ok(color);
     }
 
-    private static Created<Color> Create(ICommandHandler<CreateColor, Color> createColor, HttpRequest request, ColorRequest body)
+    private static Created<Color> Create(ICommandHandler<CreateColorCommand, Color> createColor, HttpRequest request, ColorRequest body)
     {
-        var color = createColor.Handle(new CreateColor(body.ColorName));
+        var color = createColor.Handle(new CreateColorCommand(body.ColorName));
         return RestResults.Created(request, color.Id, color);
     }
 
     private static Results<NoContent, ProblemHttpResult> Update(
-        IQueryHandler<GetColorById, Color> getColorById,
-        ICommandHandler<UpdateColor> updateColor,
+        IQueryHandler<GetColorByIdQuery, Color> getColorById,
+        ICommandHandler<UpdateColorCommand> updateColor,
         int id,
         ColorRequest body)
     {
-        if (getColorById.Handle(new GetColorById(id)) is null)
+        if (getColorById.Handle(new GetColorByIdQuery(id)) is null)
         {
             return RestResults.NotFound("Color", id);
         }
 
-        updateColor.Handle(new UpdateColor(id, body.ColorName));
+        updateColor.Handle(new UpdateColorCommand(id, body.ColorName));
         return TypedResults.NoContent();
     }
 
     private static Results<NoContent, ProblemHttpResult> Delete(
-        IQueryHandler<GetColorById, Color> getColorById,
-        ICommandHandler<DeleteColor> deleteColor,
+        IQueryHandler<GetColorByIdQuery, Color> getColorById,
+        ICommandHandler<DeleteColorCommand> deleteColor,
         int id)
     {
-        if (getColorById.Handle(new GetColorById(id)) is null)
+        if (getColorById.Handle(new GetColorByIdQuery(id)) is null)
         {
             return RestResults.NotFound("Color", id);
         }
 
-        deleteColor.Handle(new DeleteColor(id));
+        deleteColor.Handle(new DeleteColorCommand(id));
         return TypedResults.NoContent();
     }
 }

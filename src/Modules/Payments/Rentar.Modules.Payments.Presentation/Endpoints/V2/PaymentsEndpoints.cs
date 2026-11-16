@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Routing;
 using Rentar.Modules.Payments.Application;
+using Rentar.Modules.Payments.Application.Commands;
 using Rentar.Shared.Application.UseCases;
 using Rentar.Shared.Presentation.Endpoints;
 
@@ -22,9 +23,9 @@ public class PaymentsEndpoints : IEndpoint
     /// <summary>
     /// Takes a payment. A declined payment answers 402 Payment Required.
     /// </summary>
-    private static Results<NoContent, ProblemHttpResult> Create(ICommandHandler<TakePayment, bool> takePayment)
+    private static Results<NoContent, ProblemHttpResult> Create(ICommandHandler<TakePaymentCommand, bool> takePayment)
     {
-        return takePayment.Handle(new TakePayment())
+        return takePayment.Handle(new TakePaymentCommand())
             ? TypedResults.NoContent()
             : TypedResults.Problem(detail: Messages.PaymentFailed, statusCode: StatusCodes.Status402PaymentRequired);
     }

@@ -1,6 +1,8 @@
+using Rentar.Modules.Customers.Application.Commands;
 using Rentar.Modules.Customers.Domain;
-using Rentar.Modules.Customers.Presentation.Endpoints.V2;
 using Rentar.Modules.Rentals.Application;
+using Rentar.Modules.Rentals.Application.Commands;
+using Rentar.Modules.Rentals.Application.Common.Models;
 using Rentar.Modules.Rentals.Domain;
 using Rentar.Modules.Rentals.Presentation.Endpoints.V2;
 using System;
@@ -20,7 +22,7 @@ public class RentalsEndpointsTests(RentarApiFactory factory) : V2TestBase(factor
     [Fact]
     public async Task Create_AnswersCreated_WithTheRentalAndWhereItLives()
     {
-        var response = await Client.PostJsonAsync("/api/v2/rentals", new RentalRequest(1, 3, RentDate, ReturnDate));
+        var response = await Client.PostJsonAsync("/api/v2/rentals", new CreateRentalCommand(1, 3, RentDate, ReturnDate));
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var rental = await response.ReadAsAsync<Rental>();
@@ -81,7 +83,7 @@ public class RentalsEndpointsTests(RentarApiFactory factory) : V2TestBase(factor
     {
         FreezeClockAtNoon();
         var user = await CreateUserAsync("renter@example.com", "Sezer");
-        var customer = await CreateAsync<Customer>("/api/v2/customers", new CustomerRequest(user.Id, "Rentar Logistics"));
+        var customer = await CreateAsync<Customer>("/api/v2/customers", new CreateCustomerCommand(user.Id, "Rentar Logistics"));
         var car = await CreateCarAsync("Toyota", "Red", "Corolla 1.6");
         await CreateRentalAsync(car.Id, customer.Id);
         // Points at a car Fleet does not know, so it has no details to show.
@@ -90,7 +92,7 @@ public class RentalsEndpointsTests(RentarApiFactory factory) : V2TestBase(factor
         var response = await Client.GetJsonAsync("/api/v2/rentals/details");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var detail = Assert.Single(await response.ReadAsAsync<List<RentalDetailDto>>());
+        var detail = Assert.Single(await response.ReadAsAsync<List<RentalDetailResponse>>());
         Assert.Equal(car.Id, detail.CarId);
         Assert.Equal("Toyota", detail.BrandName);
         Assert.Equal("Red", detail.ColorName);
@@ -117,6 +119,22 @@ public class RentalsEndpointsTests(RentarApiFactory factory) : V2TestBase(factor
     }
 
     [Fact]
+    public async Task Create_ReturningBeforeTheRentDate_ReturnsValidationProblem()
+    {
+        var response = await Client.PostJsonAsync("/api/v2/rentals", new CreateRentalCommand(1, 3, ReturnDate, RentDate));
+
+        await AssertValidationProblemAsync(response, "returnDate");
+    }
+
+    [Fact]
+    public async Task Availability_ForAPeriodEndingBeforeItStarts_ReturnsValidationProblem()
+    {
+        var response = await Client.GetJsonAsync("/api/v2/rentals/availability?carId=1&rentDate=2026-09-20T10:00:00&returnDate=2026-09-18T10:00:00");
+
+        await AssertValidationProblemAsync(response, "returnDate");
+    }
+
+    [Fact]
     public async Task UnknownRental_IsNotFound()
     {
         var response = await Client.GetJsonAsync("/api/v2/rentals/404");
@@ -126,6 +144,6 @@ public class RentalsEndpointsTests(RentarApiFactory factory) : V2TestBase(factor
 
     private Task<Rental> CreateRentalAsync(int carId, int customerId, DateTime? rentDate = null, DateTime? returnDate = null)
     {
-        return CreateAsync<Rental>("/api/v2/rentals", new RentalRequest(carId, customerId, rentDate ?? RentDate, returnDate ?? ReturnDate));
+        return CreateAsync<Rental>("/api/v2/rentals", new CreateRentalCommand(carId, customerId, rentDate ?? RentDate, returnDate ?? ReturnDate));
     }
 }

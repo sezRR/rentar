@@ -4,6 +4,8 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Routing;
 using Rentar.Modules.Identity.Application;
 using Rentar.Modules.Identity.Application.Auth;
+using Rentar.Modules.Identity.Application.Auth.Commands;
+using Rentar.Modules.Identity.Application.Auth.Queries;
 using Rentar.Modules.Identity.Domain;
 using Rentar.Shared.Application.UseCases;
 using Rentar.Shared.Kernel.Exceptions;
@@ -26,14 +28,14 @@ public class AuthEndpoints : IEndpoint
     /// Bad credentials answer the reason as a bare string, not the usual v1 body; v1 clients rely on that.
     /// </summary>
     private static Results<Ok<V1Response<AccessToken>>, BadRequest<string>> Login(
-        IQueryHandler<VerifyCredentials, User> verifyCredentials,
-        ICommandHandler<CreateAccessToken, AccessToken> createAccessToken,
-        VerifyCredentials credentials)
+        IQueryHandler<VerifyCredentialsQuery, User> verifyCredentials,
+        ICommandHandler<CreateAccessTokenCommand, AccessToken> createAccessToken,
+        VerifyCredentialsQuery credentials)
     {
         try
         {
             var user = verifyCredentials.Handle(credentials);
-            return V1Results.Ok(createAccessToken.Handle(new CreateAccessToken(user)), Messages.AccessTokenCreated);
+            return V1Results.Ok(createAccessToken.Handle(new CreateAccessTokenCommand(user)), Messages.AccessTokenCreated);
         }
         catch (InvalidCredentialsException e)
         {
@@ -42,8 +44,8 @@ public class AuthEndpoints : IEndpoint
     }
 
     private static Results<Ok<V1Response<User>>, BadRequest<string>> CheckPassword(
-        IQueryHandler<VerifyCredentials, User> verifyCredentials,
-        VerifyCredentials credentials)
+        IQueryHandler<VerifyCredentialsQuery, User> verifyCredentials,
+        VerifyCredentialsQuery credentials)
     {
         try
         {
@@ -56,11 +58,11 @@ public class AuthEndpoints : IEndpoint
     }
 
     private static Ok<V1Response<AccessToken>> Register(
-        ICommandHandler<RegisterUser, User> registerUser,
-        ICommandHandler<CreateAccessToken, AccessToken> createAccessToken,
-        RegisterUser registration)
+        ICommandHandler<RegisterUserCommand, User> registerUser,
+        ICommandHandler<CreateAccessTokenCommand, AccessToken> createAccessToken,
+        RegisterUserCommand registration)
     {
         var user = registerUser.Handle(registration);
-        return V1Results.Ok(createAccessToken.Handle(new CreateAccessToken(user)), Messages.AccessTokenCreated);
+        return V1Results.Ok(createAccessToken.Handle(new CreateAccessTokenCommand(user)), Messages.AccessTokenCreated);
     }
 }

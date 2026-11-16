@@ -1,5 +1,6 @@
 using Rentar.Modules.Identity.Application;
 using Rentar.Modules.Identity.Application.Auth;
+using Rentar.Modules.Identity.Application.Auth.Queries;
 using Rentar.Modules.Identity.Presentation.Endpoints.V2;
 using System.Collections.Generic;
 using System.Linq;
@@ -29,6 +30,14 @@ public class UsersEndpointsTests(RentarApiFactory factory) : V2TestBase(factory)
         var fetched = await Client.GetJsonAsync($"/api/v2/users/{user.Id}");
         Assert.DoesNotContain("password", await fetched.ReadTextAsync(), System.StringComparison.OrdinalIgnoreCase);
         Assert.Equal(user, await fetched.ReadAsAsync<UserResponse>());
+    }
+
+    [Fact]
+    public async Task Create_WithoutAValidEmailOrAPassword_ReturnsValidationProblem()
+    {
+        var response = await Client.PostJsonAsync("/api/v2/users", new UserRequest("Sezer", "Tetik", "not-an-email", "", 900));
+
+        await AssertValidationProblemAsync(response, "email", "password");
     }
 
     [Fact]
@@ -84,8 +93,8 @@ public class UsersEndpointsTests(RentarApiFactory factory) : V2TestBase(factory)
         var fetched = await (await Client.GetJsonAsync($"/api/v2/users/{user.Id}")).ReadAsAsync<UserResponse>();
         Assert.Equal(1000, fetched.FindeksRating);
 
-        var withNewPassword = await Client.PostJsonAsync("/api/v2/auth/tokens", new TokenRequest(Email, "N3wPassw0rd!"));
-        var withOldPassword = await Client.PostJsonAsync("/api/v2/auth/tokens", new TokenRequest(Email, Password));
+        var withNewPassword = await Client.PostJsonAsync("/api/v2/auth/tokens", new VerifyCredentialsQuery(Email, "N3wPassw0rd!"));
+        var withOldPassword = await Client.PostJsonAsync("/api/v2/auth/tokens", new VerifyCredentialsQuery(Email, Password));
         Assert.Equal(HttpStatusCode.OK, withNewPassword.StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, withOldPassword.StatusCode);
     }
@@ -105,7 +114,7 @@ public class UsersEndpointsTests(RentarApiFactory factory) : V2TestBase(factory)
     {
         await CreateUserAsync(Email);
 
-        var response = await Client.PostJsonAsync("/api/v2/auth/tokens", new TokenRequest(Email, Password));
+        var response = await Client.PostJsonAsync("/api/v2/auth/tokens", new VerifyCredentialsQuery(Email, Password));
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var token = await response.ReadAsAsync<AccessToken>();
@@ -117,8 +126,8 @@ public class UsersEndpointsTests(RentarApiFactory factory) : V2TestBase(factory)
     {
         await CreateUserAsync(Email);
 
-        var wrongPassword = await Client.PostJsonAsync("/api/v2/auth/tokens", new TokenRequest(Email, "wrong-password"));
-        var unknownEmail = await Client.PostJsonAsync("/api/v2/auth/tokens", new TokenRequest("nobody@example.com", Password));
+        var wrongPassword = await Client.PostJsonAsync("/api/v2/auth/tokens", new VerifyCredentialsQuery(Email, "wrong-password"));
+        var unknownEmail = await Client.PostJsonAsync("/api/v2/auth/tokens", new VerifyCredentialsQuery("nobody@example.com", Password));
 
         const string detail = "Email or password is wrong.";
         await AssertProblemAsync(wrongPassword, HttpStatusCode.Unauthorized, detail);

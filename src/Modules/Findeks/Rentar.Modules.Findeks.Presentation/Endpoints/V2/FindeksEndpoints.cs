@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Routing;
-using Rentar.Modules.Findeks.Application;
+using Rentar.Modules.Findeks.Application.Queries;
 using Rentar.Shared.Application.UseCases;
 using Rentar.Shared.Presentation.Endpoints;
 
@@ -21,8 +21,8 @@ public class FindeksEndpoints : IEndpoint
     /// <summary>
     /// Calculates a Findeks rating. Calculating it changes nothing, so it is read with GET.
     /// </summary>
-    private static Ok<FindeksRatingResponse> GetRating(IQueryHandler<CalculateFindeksRating, int> calculateFindeksRating)
+    private static Ok<FindeksRatingResponse> GetRating(IQueryHandler<CalculateFindeksRatingQuery, int> calculateFindeksRating)
     {
-        return TypedResults.Ok(new FindeksRatingResponse(calculateFindeksRating.Handle(new CalculateFindeksRating())));
+        return TypedResults.Ok(new FindeksRatingResponse(calculateFindeksRating.Handle(new CalculateFindeksRatingQuery())));
     }
 }

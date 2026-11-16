@@ -1,5 +1,5 @@
 using Microsoft.EntityFrameworkCore;
-using Rentar.Modules.Fleet.Application.CarImages;
+using Rentar.Modules.Fleet.Application.Common.Interfaces;
 using Rentar.Modules.Fleet.Domain;
 using Rentar.Shared.Infrastructure.Persistence;
 

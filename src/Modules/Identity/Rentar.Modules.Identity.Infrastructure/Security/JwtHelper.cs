@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.IdentityModel.Tokens.Jwt;
 using System.Linq;
 using System.Security.Claims;
+using Rentar.Modules.Identity.Application.Common.Interfaces;
 
 namespace Rentar.Modules.Identity.Infrastructure.Security;
 

@@ -1,36 +1,37 @@
 using Microsoft.EntityFrameworkCore;
-using Rentar.Modules.Fleet.Application.Cars;
 using Rentar.Modules.Fleet.Domain;
 using Rentar.Shared.Infrastructure.Persistence;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
+using Rentar.Modules.Fleet.Application.Common.Interfaces;
+using Rentar.Modules.Fleet.Application.Common.Models;
 
 namespace Rentar.Modules.Fleet.Infrastructure.Persistence;
 
 public class EfCarDal(IDbContextFactory<FleetDbContext> contextFactory) : EfEntityRepositoryBase<Car, FleetDbContext>(contextFactory), ICarDal
 {
-    public List<CarDetailDto> GetCarDetails(Expression<Func<Car, bool>> filter = null)
+    public List<CarDetailResponse> GetCarDetails(Expression<Func<Car, bool>> filter = null)
     {
         using var context = ContextFactory.CreateDbContext();
         return QueryDetails(context, filter).ToList();
     }
 
-    public CarDetailDto GetCarDetailsById(Expression<Func<Car, bool>> filter)
+    public CarDetailResponse GetCarDetailsById(Expression<Func<Car, bool>> filter)
     {
         using var context = ContextFactory.CreateDbContext();
         return QueryDetails(context, filter).FirstOrDefault();
     }
 
-    private static IQueryable<CarDetailDto> QueryDetails(FleetDbContext context, Expression<Func<Car, bool>> filter)
+    private static IQueryable<CarDetailResponse> QueryDetails(FleetDbContext context, Expression<Func<Car, bool>> filter)
     {
         return from c in filter is null ? context.Cars : context.Cars.Where(filter)
                join b in context.Brands
                on c.BrandId equals b.Id
                join co in context.Colors
                on c.ColorId equals co.Id
-               select new CarDetailDto
+               select new CarDetailResponse
                {
                    Id = c.Id,
                    CarId = c.Id,

@@ -1,7 +1,6 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
-using Rentar.Modules.Fleet.Application.CarImages;
 using Rentar.Modules.Fleet.Domain;
 using Rentar.Modules.Fleet.Infrastructure.Storage;
 using Rentar.Modules.Fleet.Presentation.Endpoints.V2;
@@ -12,6 +11,7 @@ using System.Net;
 using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
+using Rentar.Modules.Fleet.Application.Common.Interfaces;
 using Xunit;
 
 namespace Rentar.Api.IntegrationTests.V2;

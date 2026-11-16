@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Routing;
 using Rentar.Modules.Payments.Application;
+using Rentar.Modules.Payments.Application.Commands;
 using Rentar.Shared.Application.UseCases;
 using Rentar.Shared.Presentation.Endpoints;
 
@@ -16,9 +17,9 @@ public class PaymentsEndpoints : IEndpoint
         group.MapGet("/pay", Pay);
     }
 
-    private static Results<Ok<V1Response>, BadRequest<V1Response>> Pay(ICommandHandler<TakePayment, bool> takePayment)
+    private static Results<Ok<V1Response>, BadRequest<V1Response>> Pay(ICommandHandler<TakePaymentCommand, bool> takePayment)
     {
-        return takePayment.Handle(new TakePayment())
+        return takePayment.Handle(new TakePaymentCommand())
             ? V1Results.Ok(Messages.PaymentSuccessful)
             : V1Results.Fail(Messages.PaymentFailed);
     }

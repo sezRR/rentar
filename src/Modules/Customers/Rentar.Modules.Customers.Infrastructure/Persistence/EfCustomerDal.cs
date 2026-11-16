@@ -1,5 +1,5 @@
 using Microsoft.EntityFrameworkCore;
-using Rentar.Modules.Customers.Application;
+using Rentar.Modules.Customers.Application.Common.Interfaces;
 using Rentar.Modules.Customers.Domain;
 using Rentar.Shared.Infrastructure.Persistence;
 

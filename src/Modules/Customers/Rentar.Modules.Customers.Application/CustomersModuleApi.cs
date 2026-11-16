@@ -1,13 +1,12 @@
 using Rentar.Modules.Customers.Contracts;
 using System.Collections.Generic;
 using System.Linq;
+using Rentar.Modules.Customers.Application.Common.Interfaces;
 
 namespace Rentar.Modules.Customers.Application;
 
 public class CustomersModuleApi(ICustomerDal customerDal) : ICustomersModuleApi
 {
-    private readonly ICustomerDal _customerDal = customerDal;
-
     public IReadOnlyList<CustomerSummary> GetCustomers(IReadOnlyCollection<int> customerIds)
     {
         if (customerIds.Count == 0)
@@ -16,7 +15,7 @@ public class CustomersModuleApi(ICustomerDal customerDal) : ICustomersModuleApi
         }
 
         var ids = customerIds.ToArray();
-        return _customerDal.GetAll(c => ids.Contains(c.Id))
+        return customerDal.GetAll(c => ids.Contains(c.Id))
             .Select(c => new CustomerSummary(c.Id, c.UserId, c.CompanyName))
             .ToList();
     }

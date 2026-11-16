@@ -2,6 +2,8 @@ using Autofac;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Rentar.Modules.Customers.Application;
+using Rentar.Modules.Customers.Application.Common.Interfaces;
+using Rentar.Modules.Customers.Application.Queries;
 using Rentar.Modules.Customers.Contracts;
 using Rentar.Modules.Customers.Infrastructure.Persistence;
 using Rentar.Shared.Infrastructure.Modules;
@@ -28,6 +30,6 @@ public sealed class CustomersModule : IModule
         builder.RegisterType<EfCustomerDal>().As<ICustomerDal>().SingleInstance();
         builder.RegisterType<CustomersModuleApi>().As<ICustomersModuleApi>().SingleInstance();
 
-        builder.RegisterUseCases(typeof(GetCustomers).Assembly);
+        builder.RegisterUseCases(typeof(GetCustomersQuery).Assembly);
     }
 }

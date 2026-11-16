@@ -4,6 +4,8 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Rentar.Modules.Fleet.Application.CarImages;
+using Rentar.Modules.Fleet.Application.CarImages.Commands;
+using Rentar.Modules.Fleet.Application.CarImages.Queries;
 using Rentar.Modules.Fleet.Domain;
 using Rentar.Shared.Application.UseCases;
 using Rentar.Shared.Presentation.Endpoints;
@@ -26,36 +28,36 @@ public class CarImagesEndpoints : IEndpoint
         group.MapDelete("/delete", Delete);
     }
 
-    private static Ok<V1Response<List<CarImage>>> GetAll(IQueryHandler<GetCarImages, List<CarImage>> getCarImages)
+    private static Ok<V1Response<List<CarImage>>> GetAll(IQueryHandler<GetCarImagesQuery, List<CarImage>> getCarImages)
     {
-        return V1Results.Ok(getCarImages.Handle(new GetCarImages()), null);
+        return V1Results.Ok(getCarImages.Handle(new GetCarImagesQuery()), null);
     }
 
-    private static Ok<V1Response<CarImage>> GetById(IQueryHandler<GetCarImageById, CarImage> getCarImageById, int id)
+    private static Ok<V1Response<CarImage>> GetById(IQueryHandler<GetCarImageByIdQuery, CarImage> getCarImageById, int id)
     {
-        return V1Results.Ok(getCarImageById.Handle(new GetCarImageById(id)), null);
+        return V1Results.Ok(getCarImageById.Handle(new GetCarImageByIdQuery(id)), null);
     }
 
-    private static Ok<V1Response<List<CarImage>>> GetByCarId(IQueryHandler<GetCarImagesByCar, List<CarImage>> getCarImagesByCar, int carId)
+    private static Ok<V1Response<List<CarImage>>> GetByCarId(IQueryHandler<GetCarImagesByCarQuery, List<CarImage>> getCarImagesByCar, int carId)
     {
-        return V1Results.Ok(getCarImagesByCar.Handle(new GetCarImagesByCar(carId)), null);
+        return V1Results.Ok(getCarImagesByCar.Handle(new GetCarImagesByCarQuery(carId)), null);
     }
 
     private static Ok<V1Response> Add(
-        ICommandHandler<AddCarImage, CarImage> addCarImage,
+        ICommandHandler<AddCarImageCommand, CarImage> addCarImage,
         [FromForm(Name = "carId")] string carId,
         [FromForm(Name = "file")] IFormFile file)
     {
-        addCarImage.Handle(new AddCarImage(Convert.ToInt32(carId), ToUpload(file)));
+        addCarImage.Handle(new AddCarImageCommand(Convert.ToInt32(carId), ToUpload(file)));
         return V1Results.Ok(null);
     }
 
     private static Ok<V1Response> Update(
-        ICommandHandler<ReplaceCarImage> replaceCarImage,
+        ICommandHandler<ReplaceCarImageCommand> replaceCarImage,
         [FromForm(Name = "objectFile")] IFormFile objectFile,
         [FromForm(Name = "carImage")] CarImage carImage)
     {
-        replaceCarImage.Handle(new ReplaceCarImage(carImage.Id, carImage.CarId, ToUpload(objectFile)));
+        replaceCarImage.Handle(new ReplaceCarImageCommand(carImage.Id, carImage.CarId, ToUpload(objectFile)));
         return V1Results.Ok(null);
     }
 
@@ -63,16 +65,16 @@ public class CarImagesEndpoints : IEndpoint
     /// Despite its name, <paramref name="id"/> is a car id: every image of that car is deleted.
     /// </summary>
     private static Results<Ok<V1Response>, BadRequest<string>> Delete(
-        IQueryHandler<GetCarImagesByCar, List<CarImage>> getCarImagesByCar,
-        ICommandHandler<DeleteCarImagesOfCar> deleteCarImagesOfCar,
+        IQueryHandler<GetCarImagesByCarQuery, List<CarImage>> getCarImagesByCar,
+        ICommandHandler<DeleteCarImagesOfCarCommand> deleteCarImagesOfCar,
         int id)
     {
-        if (getCarImagesByCar.Handle(new GetCarImagesByCar(id)).Count == 0)
+        if (getCarImagesByCar.Handle(new GetCarImagesByCarQuery(id)).Count == 0)
         {
             return TypedResults.BadRequest("This car do not have image!");
         }
 
-        deleteCarImagesOfCar.Handle(new DeleteCarImagesOfCar(id));
+        deleteCarImagesOfCar.Handle(new DeleteCarImagesOfCarCommand(id));
         return V1Results.Ok(null);
     }
 

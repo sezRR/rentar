@@ -5,8 +5,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Rentar.Modules.Identity.Application;
-using Rentar.Modules.Identity.Application.Auth;
-using Rentar.Modules.Identity.Application.Users;
+using Rentar.Modules.Identity.Application.Common.Interfaces;
+using Rentar.Modules.Identity.Application.Users.Queries;
 using Rentar.Modules.Identity.Contracts;
 using Rentar.Modules.Identity.Infrastructure.Persistence;
 using Rentar.Modules.Identity.Infrastructure.Security;
@@ -53,6 +53,6 @@ public sealed class IdentityModule : IModule
         builder.RegisterType<JwtHelper>().As<ITokenHelper>().SingleInstance();
         builder.RegisterType<IdentityModuleApi>().As<IIdentityModuleApi>().SingleInstance();
 
-        builder.RegisterUseCases(typeof(GetUsers).Assembly);
+        builder.RegisterUseCases(typeof(GetUsersQuery).Assembly);
     }
 }

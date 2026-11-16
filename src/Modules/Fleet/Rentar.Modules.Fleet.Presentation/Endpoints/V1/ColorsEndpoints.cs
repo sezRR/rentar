@@ -2,7 +2,8 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Routing;
 using Rentar.Modules.Fleet.Application;
-using Rentar.Modules.Fleet.Application.Colors;
+using Rentar.Modules.Fleet.Application.Colors.Commands;
+using Rentar.Modules.Fleet.Application.Colors.Queries;
 using Rentar.Modules.Fleet.Domain;
 using Rentar.Shared.Application.UseCases;
 using Rentar.Shared.Presentation.Endpoints;
@@ -23,29 +24,29 @@ public class ColorsEndpoints : IEndpoint
         group.MapPost("/delete", Delete);
     }
 
-    private static Ok<V1Response<List<Color>>> GetAll(IQueryHandler<GetColors, List<Color>> getColors)
+    private static Ok<V1Response<List<Color>>> GetAll(IQueryHandler<GetColorsQuery, List<Color>> getColors)
     {
-        return V1Results.Ok(getColors.Handle(new GetColors()), Messages.ColorsListed);
+        return V1Results.Ok(getColors.Handle(new GetColorsQuery()), Messages.ColorsListed);
     }
 
-    private static Ok<V1Response<Color>> GetById(IQueryHandler<GetColorById, Color> getColorById, int id)
+    private static Ok<V1Response<Color>> GetById(IQueryHandler<GetColorByIdQuery, Color> getColorById, int id)
     {
-        return V1Results.Ok(getColorById.Handle(new GetColorById(id)), null);
+        return V1Results.Ok(getColorById.Handle(new GetColorByIdQuery(id)), null);
     }
 
-    private static Ok<V1Response> Add(ICommandHandler<CreateColor, Color> createColor, CreateColor command)
+    private static Ok<V1Response> Add(ICommandHandler<CreateColorCommand, Color> createColor, CreateColorCommand command)
     {
         createColor.Handle(command);
         return V1Results.Ok(Messages.ColorAdded);
     }
 
-    private static Ok<V1Response> Update(ICommandHandler<UpdateColor> updateColor, UpdateColor command)
+    private static Ok<V1Response> Update(ICommandHandler<UpdateColorCommand> updateColor, UpdateColorCommand command)
     {
         updateColor.Handle(command);
         return V1Results.Ok(Messages.ColorUpdated);
     }
 
-    private static Ok<V1Response> Delete(ICommandHandler<DeleteColor> deleteColor, DeleteColor command)
+    private static Ok<V1Response> Delete(ICommandHandler<DeleteColorCommand> deleteColor, DeleteColorCommand command)
     {
         deleteColor.Handle(command);
         return V1Results.Ok(Messages.ColorDeleted);

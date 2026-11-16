@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Routing;
 using Rentar.Modules.Findeks.Application;
+using Rentar.Modules.Findeks.Application.Queries;
 using Rentar.Shared.Application.UseCases;
 using Rentar.Shared.Presentation.Endpoints;
 
@@ -16,8 +17,8 @@ public class FindeksEndpoints : IEndpoint
         group.MapGet("/calculate", Calculate);
     }
 
-    private static Ok<V1Response<int>> Calculate(IQueryHandler<CalculateFindeksRating, int> calculateFindeksRating)
+    private static Ok<V1Response<int>> Calculate(IQueryHandler<CalculateFindeksRatingQuery, int> calculateFindeksRating)
     {
-        return V1Results.Ok(calculateFindeksRating.Handle(new CalculateFindeksRating()), Messages.FindeksRatingCalculated);
+        return V1Results.Ok(calculateFindeksRating.Handle(new CalculateFindeksRatingQuery()), Messages.FindeksRatingCalculated);
     }
 }

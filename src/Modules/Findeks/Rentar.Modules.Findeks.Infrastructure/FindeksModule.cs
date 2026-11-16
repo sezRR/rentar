@@ -2,6 +2,7 @@ using Autofac;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Rentar.Modules.Findeks.Application;
+using Rentar.Modules.Findeks.Application.Queries;
 using Rentar.Modules.Findeks.Contracts;
 using Rentar.Shared.Infrastructure.Modules;
 using Rentar.Shared.Presentation.Endpoints;
@@ -24,6 +25,6 @@ public sealed class FindeksModule : IModule
     {
         builder.RegisterType<FindeksModuleApi>().As<IFindeksModuleApi>().SingleInstance();
 
-        builder.RegisterUseCases(typeof(CalculateFindeksRating).Assembly);
+        builder.RegisterUseCases(typeof(CalculateFindeksRatingQuery).Assembly);
     }
 }

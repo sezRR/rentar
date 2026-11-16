@@ -45,6 +45,9 @@ builder.Host
     .UseServiceProviderFactory(new AutofacServiceProviderFactory())
     .ConfigureContainer<ContainerBuilder>(container =>
     {
+        // Once for all modules: it wraps every handler in the container.
+        container.RegisterUseCaseValidation();
+
         foreach (var module in modules)
         {
             module.ConfigureContainer(container);

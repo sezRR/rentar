@@ -3,8 +3,9 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Routing;
-using Rentar.Modules.Identity.Application.Auth;
-using Rentar.Modules.Identity.Application.Users;
+using Rentar.Modules.Identity.Application.Auth.Commands;
+using Rentar.Modules.Identity.Application.Users.Commands;
+using Rentar.Modules.Identity.Application.Users.Queries;
 using Rentar.Modules.Identity.Domain;
 using Rentar.Shared.Application.UseCases;
 using Rentar.Shared.Presentation.Endpoints;
@@ -34,15 +35,15 @@ public class UsersEndpoints : IEndpoint
     /// The full list is closed during the 22:00 maintenance hour.
     /// </summary>
     private static Ok<List<UserResponse>> GetAll(
-        IQueryHandler<GetUsers, List<User>> getUsers,
-        IQueryHandler<GetUserByEmail, User> getUserByEmail,
-        IQueryHandler<GetUsersByMinFindeksRating, List<User>> getUsersByMinFindeksRating,
+        IQueryHandler<GetUsersQuery, List<User>> getUsers,
+        IQueryHandler<GetUserByEmailQuery, User> getUserByEmail,
+        IQueryHandler<GetUsersByMinFindeksRatingQuery, List<User>> getUsersByMinFindeksRating,
         string? email,
         int? minFindeksRating)
     {
         if (email is not null)
         {
-            var user = getUserByEmail.Handle(new GetUserByEmail(email));
+            var user = getUserByEmail.Handle(new GetUserByEmailQuery(email));
             var matches = new List<UserResponse>();
 
             if (user is not null && user.FindeksRating >= (minFindeksRating ?? int.MinValue))
@@ -54,15 +55,15 @@ public class UsersEndpoints : IEndpoint
         }
 
         var users = minFindeksRating is { } rating
-            ? getUsersByMinFindeksRating.Handle(new GetUsersByMinFindeksRating(rating))
-            : getUsers.Handle(new GetUsers());
+            ? getUsersByMinFindeksRating.Handle(new GetUsersByMinFindeksRatingQuery(rating))
+            : getUsers.Handle(new GetUsersQuery());
 
         return TypedResults.Ok(users.ConvertAll(UserResponse.From));
     }
 
-    private static Results<Ok<UserResponse>, ProblemHttpResult> GetById(IQueryHandler<GetUserById, User> getUserById, int id)
+    private static Results<Ok<UserResponse>, ProblemHttpResult> GetById(IQueryHandler<GetUserByIdQuery, User> getUserById, int id)
     {
-        var user = getUserById.Handle(new GetUserById(id));
+        var user = getUserById.Handle(new GetUserByIdQuery(id));
         return user is null ? RestResults.NotFound("User", id) : TypedResults.Ok(UserResponse.From(user));
     }
 
@@ -70,24 +71,24 @@ public class UsersEndpoints : IEndpoint
     /// Creates an account; an email that is already registered answers 409. Log in through
     /// <c>POST /auth/tokens</c> to get an access token for it.
     /// </summary>
-    private static Created<UserResponse> Create(ICommandHandler<RegisterUser, User> registerUser, HttpRequest request, UserRequest body)
+    private static Created<UserResponse> Create(ICommandHandler<RegisterUserCommand, User> registerUser, HttpRequest request, UserRequest body)
     {
-        var user = registerUser.Handle(new RegisterUser(body.FirstName, body.LastName, body.Email, body.Password, body.FindeksRating));
+        var user = registerUser.Handle(new RegisterUserCommand(body.FirstName, body.LastName, body.Email, body.Password, body.FindeksRating));
         return RestResults.Created(request, user.Id, UserResponse.From(user));
     }
 
     private static Results<NoContent, ProblemHttpResult> Update(
-        IQueryHandler<GetUserById, User> getUserById,
-        ICommandHandler<UpdateUser, User> updateUser,
+        IQueryHandler<GetUserByIdQuery, User> getUserById,
+        ICommandHandler<UpdateUserCommand, User> updateUser,
         int id,
         UserRequest body)
     {
-        if (getUserById.Handle(new GetUserById(id)) is null)
+        if (getUserById.Handle(new GetUserByIdQuery(id)) is null)
         {
             return RestResults.NotFound("User", id);
         }
 
-        updateUser.Handle(new UpdateUser(id, body.FirstName, body.LastName, body.Email, body.Password, body.FindeksRating));
+        updateUser.Handle(new UpdateUserCommand(id, body.FirstName, body.LastName, body.Email, body.Password, body.FindeksRating));
         return TypedResults.NoContent();
     }
 }

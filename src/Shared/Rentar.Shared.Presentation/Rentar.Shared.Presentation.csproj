@@ -9,7 +9,6 @@
   <ItemGroup>
     <PackageReference Include="Asp.Versioning.Http" />
     <PackageReference Include="FluentValidation" />
-    <PackageReference Include="JetBrains.Annotations" PrivateAssets="all" />
     <PackageReference Include="Newtonsoft.Json" />
   </ItemGroup>
 

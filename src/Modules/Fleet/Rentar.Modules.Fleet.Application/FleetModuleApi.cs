@@ -1,7 +1,7 @@
-using Rentar.Modules.Fleet.Application.Cars;
 using Rentar.Modules.Fleet.Contracts;
 using System.Collections.Generic;
 using System.Linq;
+using Rentar.Modules.Fleet.Application.Common.Interfaces;
 
 namespace Rentar.Modules.Fleet.Application;
 

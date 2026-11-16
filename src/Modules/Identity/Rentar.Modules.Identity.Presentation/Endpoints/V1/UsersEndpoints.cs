@@ -2,7 +2,8 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Routing;
 using Rentar.Modules.Identity.Application;
-using Rentar.Modules.Identity.Application.Users;
+using Rentar.Modules.Identity.Application.Users.Commands;
+using Rentar.Modules.Identity.Application.Users.Queries;
 using Rentar.Modules.Identity.Domain;
 using Rentar.Shared.Application.UseCases;
 using Rentar.Shared.Presentation.Endpoints;
@@ -24,35 +25,35 @@ public class UsersEndpoints : IEndpoint
         group.MapPost("/update", Update);
     }
 
-    private static Ok<V1Response<List<User>>> GetAll(IQueryHandler<GetUsers, List<User>> getUsers)
+    private static Ok<V1Response<List<User>>> GetAll(IQueryHandler<GetUsersQuery, List<User>> getUsers)
     {
-        return V1Results.Ok(getUsers.Handle(new GetUsers()), Messages.UsersListed);
+        return V1Results.Ok(getUsers.Handle(new GetUsersQuery()), Messages.UsersListed);
     }
 
-    private static Ok<V1Response<User>> GetByMail(IQueryHandler<GetUserByEmail, User> getUserByEmail, string email)
+    private static Ok<V1Response<User>> GetByMail(IQueryHandler<GetUserByEmailQuery, User> getUserByEmail, string email)
     {
-        return V1Results.Ok(getUserByEmail.Handle(new GetUserByEmail(email)), null);
+        return V1Results.Ok(getUserByEmail.Handle(new GetUserByEmailQuery(email)), null);
     }
 
     private static Ok<V1Response<List<User>>> GetUserFindeksRating(
-        IQueryHandler<GetUsersByMinFindeksRating, List<User>> getUsersByMinFindeksRating,
+        IQueryHandler<GetUsersByMinFindeksRatingQuery, List<User>> getUsersByMinFindeksRating,
         int findeksRating)
     {
-        return V1Results.Ok(getUsersByMinFindeksRating.Handle(new GetUsersByMinFindeksRating(findeksRating)), null);
+        return V1Results.Ok(getUsersByMinFindeksRating.Handle(new GetUsersByMinFindeksRatingQuery(findeksRating)), null);
     }
 
-    private static Ok<V1Response<User>> GetUserById(IQueryHandler<GetUserById, User> getUserById, int id)
+    private static Ok<V1Response<User>> GetUserById(IQueryHandler<GetUserByIdQuery, User> getUserById, int id)
     {
-        return V1Results.Ok(getUserById.Handle(new GetUserById(id)), null);
+        return V1Results.Ok(getUserById.Handle(new GetUserByIdQuery(id)), null);
     }
 
-    private static Ok<V1Response> Add(ICommandHandler<AddUser> addUser, AddUser command)
+    private static Ok<V1Response> Add(ICommandHandler<AddUserCommand> addUser, AddUserCommand command)
     {
         addUser.Handle(command);
         return V1Results.Ok(Messages.UserAdded);
     }
 
-    private static Ok<V1Response<User>> Update(ICommandHandler<UpdateUser, User> updateUser, UpdateUser command)
+    private static Ok<V1Response<User>> Update(ICommandHandler<UpdateUserCommand, User> updateUser, UpdateUserCommand command)
     {
         return V1Results.Ok(updateUser.Handle(command), Messages.UserUpdated);
     }

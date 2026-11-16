@@ -1,8 +1,11 @@
+using JetBrains.Annotations;
+
 namespace Rentar.Shared.Application.UseCases;
 
 /// <summary>
 /// Carries out one use case that changes state, described by <typeparamref name="TCommand"/>.
 /// </summary>
+[UsedImplicitly(ImplicitUseKindFlags.InstantiatedNoFixedConstructorSignature, ImplicitUseTargetFlags.WithInheritors)]
 public interface ICommandHandler<in TCommand>
 {
     void Handle(TCommand command);
@@ -11,6 +14,7 @@ public interface ICommandHandler<in TCommand>
 /// <summary>
 /// Carries out one use case that changes state and hands back what the caller needs from it, e.g. the created record.
 /// </summary>
+[UsedImplicitly(ImplicitUseKindFlags.InstantiatedNoFixedConstructorSignature, ImplicitUseTargetFlags.WithInheritors)]
 public interface ICommandHandler<in TCommand, out TResult>
 {
     TResult Handle(TCommand command);

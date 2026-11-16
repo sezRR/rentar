@@ -3,7 +3,8 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Routing;
-using Rentar.Modules.Customers.Application;
+using Rentar.Modules.Customers.Application.Commands;
+using Rentar.Modules.Customers.Application.Queries;
 using Rentar.Modules.Customers.Domain;
 using Rentar.Shared.Application.UseCases;
 using Rentar.Shared.Presentation.Endpoints;
@@ -29,29 +30,29 @@ public class CustomersEndpoints : IEndpoint
     /// Lists customers, optionally only those of a user. The full list is closed during the 22:00 maintenance hour.
     /// </summary>
     private static Ok<List<Customer>> GetAll(
-        IQueryHandler<GetCustomers, List<Customer>> getCustomers,
-        IQueryHandler<GetCustomersByUser, List<Customer>> getCustomersByUser,
+        IQueryHandler<GetCustomersQuery, List<Customer>> getCustomers,
+        IQueryHandler<GetCustomersByUserQuery, List<Customer>> getCustomersByUser,
         int? userId)
     {
         var customers = userId is { } user
-            ? getCustomersByUser.Handle(new GetCustomersByUser(user))
-            : getCustomers.Handle(new GetCustomers());
+            ? getCustomersByUser.Handle(new GetCustomersByUserQuery(user))
+            : getCustomers.Handle(new GetCustomersQuery());
 
         return TypedResults.Ok(customers);
     }
 
-    private static Results<Ok<Customer>, ProblemHttpResult> GetById(IQueryHandler<GetCustomerById, Customer> getCustomerById, int id)
+    private static Results<Ok<Customer>, ProblemHttpResult> GetById(IQueryHandler<GetCustomerByIdQuery, Customer> getCustomerById, int id)
     {
-        var customer = getCustomerById.Handle(new GetCustomerById(id));
+        var customer = getCustomerById.Handle(new GetCustomerByIdQuery(id));
         return customer is null ? RestResults.NotFound("Customer", id) : TypedResults.Ok(customer);
     }
 
     private static Created<Customer> Create(
-        ICommandHandler<CreateCustomer, Customer> createCustomer,
+        ICommandHandler<CreateCustomerCommand, Customer> createCustomer,
         HttpRequest request,
-        CustomerRequest body)
+        CreateCustomerCommand command)
     {
-        var customer = createCustomer.Handle(new CreateCustomer(body.UserId, body.CompanyName));
+        var customer = createCustomer.Handle(command);
         return RestResults.Created(request, customer.Id, customer);
     }
 }

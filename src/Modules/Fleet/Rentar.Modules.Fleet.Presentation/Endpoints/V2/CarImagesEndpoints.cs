@@ -4,6 +4,8 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Routing;
 using Rentar.Modules.Fleet.Application.CarImages;
+using Rentar.Modules.Fleet.Application.CarImages.Commands;
+using Rentar.Modules.Fleet.Application.CarImages.Queries;
 using Rentar.Modules.Fleet.Domain;
 using Rentar.Shared.Application.UseCases;
 using Rentar.Shared.Presentation.Endpoints;
@@ -39,18 +41,18 @@ public class CarImagesEndpoints : IEndpoint
             .MapGet("/", GetAll);
     }
 
-    private static Ok<List<CarImage>> GetAll(IQueryHandler<GetCarImages, List<CarImage>> getCarImages)
+    private static Ok<List<CarImage>> GetAll(IQueryHandler<GetCarImagesQuery, List<CarImage>> getCarImages)
     {
-        return TypedResults.Ok(getCarImages.Handle(new GetCarImages()));
+        return TypedResults.Ok(getCarImages.Handle(new GetCarImagesQuery()));
     }
 
-    private static Ok<List<CarImage>> GetByCar(IQueryHandler<GetCarImagesByCar, List<CarImage>> getCarImagesByCar, int carId)
+    private static Ok<List<CarImage>> GetByCar(IQueryHandler<GetCarImagesByCarQuery, List<CarImage>> getCarImagesByCar, int carId)
     {
-        return TypedResults.Ok(getCarImagesByCar.Handle(new GetCarImagesByCar(carId)));
+        return TypedResults.Ok(getCarImagesByCar.Handle(new GetCarImagesByCarQuery(carId)));
     }
 
     private static Results<Ok<CarImage>, ProblemHttpResult> GetById(
-        IQueryHandler<GetCarImageById, CarImage> getCarImageById,
+        IQueryHandler<GetCarImageByIdQuery, CarImage> getCarImageById,
         int carId,
         int imageId)
     {
@@ -62,12 +64,12 @@ public class CarImagesEndpoints : IEndpoint
     /// Stores a PNG or JPEG sent as the <c>file</c> form field; without one the car gets the default image.
     /// </summary>
     private static Created<CarImage> Upload(
-        ICommandHandler<AddCarImage, CarImage> addCarImage,
+        ICommandHandler<AddCarImageCommand, CarImage> addCarImage,
         HttpRequest request,
         int carId,
         IFormFile? file)
     {
-        var carImage = addCarImage.Handle(new AddCarImage(carId, ToUpload(file)));
+        var carImage = addCarImage.Handle(new AddCarImageCommand(carId, ToUpload(file)));
         return RestResults.Created(request, carImage.Id, carImage);
     }
 
@@ -75,8 +77,8 @@ public class CarImagesEndpoints : IEndpoint
     /// Replaces the image's file with the PNG or JPEG sent as the <c>file</c> form field.
     /// </summary>
     private static Results<NoContent, ProblemHttpResult> Replace(
-        IQueryHandler<GetCarImageById, CarImage> getCarImageById,
-        ICommandHandler<ReplaceCarImage> replaceCarImage,
+        IQueryHandler<GetCarImageByIdQuery, CarImage> getCarImageById,
+        ICommandHandler<ReplaceCarImageCommand> replaceCarImage,
         int carId,
         int imageId,
         IFormFile? file)
@@ -87,13 +89,13 @@ public class CarImagesEndpoints : IEndpoint
         }
 
         // A missing file is turned down by the use case with the same message as an unsupported one.
-        replaceCarImage.Handle(new ReplaceCarImage(imageId, carId, ToUpload(file)));
+        replaceCarImage.Handle(new ReplaceCarImageCommand(imageId, carId, ToUpload(file)));
         return TypedResults.NoContent();
     }
 
     private static Results<NoContent, ProblemHttpResult> Delete(
-        IQueryHandler<GetCarImageById, CarImage> getCarImageById,
-        ICommandHandler<DeleteCarImage> deleteCarImage,
+        IQueryHandler<GetCarImageByIdQuery, CarImage> getCarImageById,
+        ICommandHandler<DeleteCarImageCommand> deleteCarImage,
         int carId,
         int imageId)
     {
@@ -102,26 +104,26 @@ public class CarImagesEndpoints : IEndpoint
             return RestResults.NotFound("Car image", imageId);
         }
 
-        deleteCarImage.Handle(new DeleteCarImage(imageId));
+        deleteCarImage.Handle(new DeleteCarImageCommand(imageId));
         return TypedResults.NoContent();
     }
 
     /// <summary>
     /// Deletes every image of the car. A car without images is already in that state, so this also answers 204.
     /// </summary>
-    private static NoContent DeleteAll(ICommandHandler<DeleteCarImagesOfCar> deleteCarImagesOfCar, int carId)
+    private static NoContent DeleteAll(ICommandHandler<DeleteCarImagesOfCarCommand> deleteCarImagesOfCar, int carId)
     {
-        deleteCarImagesOfCar.Handle(new DeleteCarImagesOfCar(carId));
+        deleteCarImagesOfCar.Handle(new DeleteCarImagesOfCarCommand(carId));
         return TypedResults.NoContent();
     }
 
     /// <summary>
     /// An image is only found under the car it belongs to.
     /// </summary>
-    private static CarImage? Find(IQueryHandler<GetCarImageById, CarImage> getCarImageById, int carId, int imageId)
+    private static CarImage? Find(IQueryHandler<GetCarImageByIdQuery, CarImage> getCarImageById, int carId, int imageId)
     {
-        var carImage = getCarImageById.Handle(new GetCarImageById(imageId));
-        return carImage?.CarId == carId ? carImage : null;
+        var carImage = getCarImageById.Handle(new GetCarImageByIdQuery(imageId));
+        return carImage.CarId == carId ? carImage : null;
     }
 
     private static FileUpload? ToUpload(IFormFile? file)

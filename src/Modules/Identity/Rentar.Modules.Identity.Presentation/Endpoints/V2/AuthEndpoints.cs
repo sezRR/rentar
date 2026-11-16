@@ -4,6 +4,8 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Routing;
 using Rentar.Modules.Identity.Application.Auth;
+using Rentar.Modules.Identity.Application.Auth.Commands;
+using Rentar.Modules.Identity.Application.Auth.Queries;
 using Rentar.Modules.Identity.Domain;
 using Rentar.Shared.Application.UseCases;
 using Rentar.Shared.Presentation.Endpoints;
@@ -28,11 +30,11 @@ public class AuthEndpoints : IEndpoint
     /// accounts exist.
     /// </summary>
     private static Ok<AccessToken> CreateToken(
-        IQueryHandler<VerifyCredentials, User> verifyCredentials,
-        ICommandHandler<CreateAccessToken, AccessToken> createAccessToken,
-        TokenRequest body)
+        IQueryHandler<VerifyCredentialsQuery, User> verifyCredentials,
+        ICommandHandler<CreateAccessTokenCommand, AccessToken> createAccessToken,
+        VerifyCredentialsQuery credentials)
     {
-        var user = verifyCredentials.Handle(new VerifyCredentials(body.Email, body.Password));
-        return TypedResults.Ok(createAccessToken.Handle(new CreateAccessToken(user)));
+        var user = verifyCredentials.Handle(credentials);
+        return TypedResults.Ok(createAccessToken.Handle(new CreateAccessTokenCommand(user)));
     }
 }

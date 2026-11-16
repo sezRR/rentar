@@ -1,9 +1,9 @@
 using Microsoft.EntityFrameworkCore;
-using Rentar.Modules.Identity.Application.Users;
 using Rentar.Modules.Identity.Domain;
 using Rentar.Shared.Infrastructure.Persistence;
 using System.Collections.Generic;
 using System.Linq;
+using Rentar.Modules.Identity.Application.Common.Interfaces;
 
 namespace Rentar.Modules.Identity.Infrastructure.Persistence;
 

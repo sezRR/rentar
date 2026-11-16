@@ -1,6 +1,6 @@
 using Rentar.Modules.Customers.Application;
+using Rentar.Modules.Customers.Application.Commands;
 using Rentar.Modules.Customers.Domain;
-using Rentar.Modules.Customers.Presentation.Endpoints.V2;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
@@ -14,7 +14,7 @@ public class CustomersEndpointsTests(RentarApiFactory factory) : V2TestBase(fact
     [Fact]
     public async Task Create_AnswersCreated_WithTheCustomerAndWhereItLives()
     {
-        var response = await Client.PostJsonAsync("/api/v2/customers", new CustomerRequest(7, "Rentar Logistics"));
+        var response = await Client.PostJsonAsync("/api/v2/customers", new CreateCustomerCommand(7, "Rentar Logistics"));
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var customer = await response.ReadAsAsync<Customer>();
@@ -29,9 +29,9 @@ public class CustomersEndpointsTests(RentarApiFactory factory) : V2TestBase(fact
     public async Task GetAll_FiltersByUser()
     {
         FreezeClockAtNoon();
-        await CreateAsync<Customer>("/api/v2/customers", new CustomerRequest(1, "First Company"));
-        await CreateAsync<Customer>("/api/v2/customers", new CustomerRequest(2, "Second Company"));
-        await CreateAsync<Customer>("/api/v2/customers", new CustomerRequest(2, "Third Company"));
+        await CreateAsync<Customer>("/api/v2/customers", new CreateCustomerCommand(1, "First Company"));
+        await CreateAsync<Customer>("/api/v2/customers", new CreateCustomerCommand(2, "Second Company"));
+        await CreateAsync<Customer>("/api/v2/customers", new CreateCustomerCommand(2, "Third Company"));
 
         Assert.Equal(["First Company", "Second Company", "Third Company"], await CompanyNamesAsync("/api/v2/customers"));
         Assert.Equal(["Second Company", "Third Company"], await CompanyNamesAsync("/api/v2/customers?userId=2"));
@@ -50,7 +50,7 @@ public class CustomersEndpointsTests(RentarApiFactory factory) : V2TestBase(fact
     [Fact]
     public async Task Create_WithCompanyNameShorterThanFiveCharacters_ReturnsValidationProblem()
     {
-        var response = await Client.PostJsonAsync("/api/v2/customers", new CustomerRequest(1, "Acme"));
+        var response = await Client.PostJsonAsync("/api/v2/customers", new CreateCustomerCommand(1, "Acme"));
 
         await AssertValidationProblemAsync(response, "companyName");
     }

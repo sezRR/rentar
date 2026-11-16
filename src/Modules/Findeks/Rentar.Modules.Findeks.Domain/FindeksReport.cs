@@ -7,10 +7,10 @@ namespace Rentar.Modules.Findeks.Domain;
 /// </summary>
 public class FindeksReport : IEntity
 {
-    public int CreditProductRepayments { get; set; }
-    public int CurrentAccountsAndDebts { get; set; }
-    public int LoanUsageIntensity { get; set; }
-    public int NewLoansTaken { get; set; }
-    public int OtherFactors { get; set; }
-    public int MinimumFindeksRating { get; set; }
+    public int CreditProductRepayments { get; init; }
+    public int CurrentAccountsAndDebts { get; init; }
+    public int LoanUsageIntensity { get; init; }
+    public int NewLoansTaken { get; init; }
+    public int OtherFactors { get; init; }
+    public int MinimumFindeksRating { get; init; }
 }

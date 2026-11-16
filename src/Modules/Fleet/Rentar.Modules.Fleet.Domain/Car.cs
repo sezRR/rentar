@@ -4,11 +4,11 @@ namespace Rentar.Modules.Fleet.Domain;
 
 public class Car : IEntity
 {
-    public int Id { get; set; }
-    public int BrandId { get; set; }
-    public int ColorId { get; set; }
-    public int ModelYear { get; set; }
-    public decimal DailyPrice { get; set; }
-    public string Description { get; set; }
-    public int MinimumFindeksRating { get; set; }
+    public int Id { get; init; }
+    public int BrandId { get; init; }
+    public int ColorId { get; init; }
+    public int ModelYear { get; init; }
+    public decimal DailyPrice { get; init; }
+    public string Description { get; init; }
+    public int MinimumFindeksRating { get; init; }
 }

@@ -1,11 +1,11 @@
 using Rentar.Shared.Presentation.Errors;
 using Rentar.Shared.Presentation.Endpoints;
 using Rentar.Modules.Fleet.Domain;
-using Rentar.Modules.Fleet.Application.Cars;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
+using Rentar.Modules.Fleet.Application.Common.Models;
 using Xunit;
 
 namespace Rentar.Api.IntegrationTests;
@@ -57,7 +57,7 @@ public class CarsEndpointsTests(RentarApiFactory factory) : IntegrationTestBase(
         await Client.PostJsonAsync("/api/v1/cars/add", NewCar(brandId, colorId));
 
         var response = await Client.GetJsonAsync("/api/v1/cars/getcardetails");
-        var details = await response.ReadAsAsync<V1Response<List<CarDetailDto>>>();
+        var details = await response.ReadAsAsync<V1Response<List<CarDetailResponse>>>();
 
         var detail = Assert.Single(details.Data);
         Assert.Equal("Toyota", detail.BrandName);
@@ -74,13 +74,13 @@ public class CarsEndpointsTests(RentarApiFactory factory) : IntegrationTestBase(
 
         // First call fills the cache that the caching aspect keeps for this method.
         var firstCall = await Client.GetJsonAsync($"/api/v1/cars/getcarsbybrandid?brandId={brandId}");
-        var firstResult = await firstCall.ReadAsAsync<V1Response<List<CarDetailDto>>>();
+        var firstResult = await firstCall.ReadAsAsync<V1Response<List<CarDetailResponse>>>();
         Assert.Single(firstResult.Data);
 
         await Client.PostJsonAsync("/api/v1/cars/add", NewCar(brandId, colorId, "Corolla 1.8"));
 
         var secondCall = await Client.GetJsonAsync($"/api/v1/cars/getcarsbybrandid?brandId={brandId}");
-        var secondResult = await secondCall.ReadAsAsync<V1Response<List<CarDetailDto>>>();
+        var secondResult = await secondCall.ReadAsAsync<V1Response<List<CarDetailResponse>>>();
 
         Assert.Equal(2, secondResult.Data.Count);
         Assert.Contains(secondResult.Data, c => c.Description == "Corolla 1.8");
@@ -96,7 +96,7 @@ public class CarsEndpointsTests(RentarApiFactory factory) : IntegrationTestBase(
         await Client.PostJsonAsync("/api/v1/cars/add", NewCar(brandId, blue, "Blue car"));
 
         var response = await Client.GetJsonAsync($"/api/v1/cars/getcarsbycolorid?colorId={blue}");
-        var result = await response.ReadAsAsync<V1Response<List<CarDetailDto>>>();
+        var result = await response.ReadAsAsync<V1Response<List<CarDetailResponse>>>();
 
         var car = Assert.Single(result.Data);
         Assert.Equal("Blue car", car.Description);

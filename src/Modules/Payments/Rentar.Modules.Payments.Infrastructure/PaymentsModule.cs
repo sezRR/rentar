@@ -2,6 +2,7 @@ using Autofac;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Rentar.Modules.Payments.Application;
+using Rentar.Modules.Payments.Application.Commands;
 using Rentar.Modules.Payments.Contracts;
 using Rentar.Shared.Infrastructure.Modules;
 using Rentar.Shared.Presentation.Endpoints;
@@ -24,6 +25,6 @@ public sealed class PaymentsModule : IModule
     {
         builder.RegisterType<PaymentsModuleApi>().As<IPaymentsModuleApi>().SingleInstance();
 
-        builder.RegisterUseCases(typeof(TakePayment).Assembly);
+        builder.RegisterUseCases(typeof(TakePaymentCommand).Assembly);
     }
 }

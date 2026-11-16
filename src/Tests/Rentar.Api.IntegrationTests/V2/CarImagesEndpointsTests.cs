@@ -1,5 +1,4 @@
 using Rentar.Modules.Fleet.Application;
-using Rentar.Modules.Fleet.Application.CarImages;
 using Rentar.Modules.Fleet.Domain;
 using System.Collections.Generic;
 using System.IO;
@@ -7,6 +6,7 @@ using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Threading.Tasks;
+using Rentar.Modules.Fleet.Application.Common.Interfaces;
 using Xunit;
 
 namespace Rentar.Api.IntegrationTests.V2;

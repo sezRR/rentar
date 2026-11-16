@@ -4,7 +4,7 @@ namespace Rentar.Modules.Identity.Domain;
 
 public class UserOperationClaim : IEntity
 {
-    public int Id { get; set; }
-    public int UserId { get; set; }
-    public int OperationClaimId { get; set; }
+    public int Id { get; init; }
+    public int UserId { get; init; }
+    public int OperationClaimId { get; init; }
 }

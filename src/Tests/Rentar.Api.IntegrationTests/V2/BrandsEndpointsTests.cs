@@ -86,4 +86,16 @@ public class BrandsEndpointsTests(RentarApiFactory factory) : V2TestBase(factory
         var brands = await (await Client.GetJsonAsync("/api/v2/brands")).ReadAsAsync<List<Brand>>();
         Assert.Empty(brands);
     }
+
+    [Fact]
+    public async Task Replace_WithNameShorterThanTwoCharacters_ReturnsValidationProblem_AndKeepsTheBrand()
+    {
+        var brand = await CreateBrandAsync("Toyota");
+
+        var response = await Client.PutJsonAsync($"/api/v2/brands/{brand.Id}", new BrandRequest("A"));
+
+        await AssertValidationProblemAsync(response, "brandName");
+        var fetched = await (await Client.GetJsonAsync($"/api/v2/brands/{brand.Id}")).ReadAsAsync<Brand>();
+        Assert.Equal("Toyota", fetched.BrandName);
+    }
 }

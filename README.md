@@ -88,7 +88,8 @@ The version is part of the URL (`/api/v1/...`, `/api/v2/...`). In Development, S
 versions in a dropdown, and their OpenAPI documents are at `/openapi/v1.json` and `/openapi/v2.json`.
 Bruno requests for both versions are in `api-docs/`.
 
-- **v1** is the original API and is unchanged. It uses action-style routes (`/brands/getall`, `/brands/add`,
+- **v1** is the original API and is unchanged, except that it now also refuses input its validators reject (e.g. an
+  update with an empty brand name), with the same error body as before. It uses action-style routes (`/brands/getall`, `/brands/add`,
   `POST /brands/delete`), answers 200 or 400, and wraps every body in `{ success, message, data }`.
 - **v2** is RESTful:
   - Routes name resources, and the HTTP method says what to do with them.
@@ -126,13 +127,14 @@ src/
   Bootstrapper/Rentar.Api           host: composes the modules, nothing else
   Shared/
     Rentar.Shared.Kernel            exceptions, entity markers (no dependencies)
-    Rentar.Shared.Application       use case handler interfaces, aspects (validation, caching, transaction, ...)
+    Rentar.Shared.Application       use case handler interfaces, validation, aspects (caching, transaction, ...)
     Rentar.Shared.Infrastructure    EF repository base, per-module DbContext wiring, cache, IModule
     Rentar.Shared.Presentation      endpoint discovery, versioned route groups, exception handler, v1 envelope
   Modules/<Module>/
     Rentar.Modules.<Module>.Contracts       public API other modules may call
-    Rentar.Modules.<Module>.Domain          entities
-    Rentar.Modules.<Module>.Application     use cases, repository interfaces, contract implementation
+    Rentar.Modules.<Module>.Domain          entities, init-only: a change builds a new one
+    Rentar.Modules.<Module>.Application     use cases, contract implementation, and under Common/:
+                                              Interfaces/ (repositories, ports) and Models/ (query responses)
     Rentar.Modules.<Module>.Presentation    minimal-API endpoints
     Rentar.Modules.<Module>.Infrastructure  DbContext, migrations, repositories, adapters, module registration
   Tests/
@@ -149,8 +151,8 @@ src/
 
 Every module with state has its own `DbContext`, its own schema and its own `__EFMigrationsHistory` table inside that
 schema, so modules migrate independently. Data in another module is referenced by id only: there are no cross-schema
-foreign keys or joins. For example, rental details are put together by the `GetRentalDetails` use case from the Customers,
-Identity and Fleet contracts.
+foreign keys or joins. For example, rental details are put together by the `GetRentalDetailsQuery` use case from the
+Customers, Identity and Fleet contracts.
 
 Boundary rules (checked by `Rentar.ArchitectureTests` on the compiled assemblies):
 
@@ -167,28 +169,61 @@ it to the `modules` array in `Program.cs`.
 **Use cases**
 
 Each operation of a module is one use case in its Application project. A use case is one file that holds a record
-describing it, its validator if it has one, and a sealed handler:
+describing it, its validator if it has one, and a sealed handler, e.g. `Brands/Commands/CreateBrandCommand.cs`:
 
 ```csharp
-public sealed record CreateBrand(string BrandName);
+public sealed record CreateBrandCommand(string BrandName);
 
-public sealed class CreateBrandValidator : AbstractValidator<CreateBrand> { ... }
-
-public sealed class CreateBrandHandler(IBrandDal brandDal) : ICommandHandler<CreateBrand, Brand>
+public sealed class CreateBrandCommandValidator : UseCaseValidator<CreateBrandCommand>
 {
-    [ValidationAspect(typeof(CreateBrandValidator))]
-    public Brand Handle(CreateBrand command) { ... }
+    public CreateBrandCommandValidator() => RuleFor(b => b.BrandName).ValidBrandName();
+}
+
+public sealed class CreateBrandCommandHandler(IBrandDal brandDal) : ICommandHandler<CreateBrandCommand, Brand>
+{
+    public Brand Handle(CreateBrandCommand command) { ... }
 }
 ```
 
 - Commands change state and implement `ICommandHandler<TCommand>`, or `ICommandHandler<TCommand, TResult>` when the
   caller needs something back (e.g. the created record). Queries only read and implement `IQueryHandler<TQuery, TResult>`.
-- Endpoints and module APIs inject the handler they need, e.g. `ICommandHandler<CreateBrand, Brand>`. There is no mediator.
+- Naming follows the kind: `<UseCase>Command` in a `Commands` folder (`CreateCustomerCommand`), `<UseCase>Query` in a
+  `Queries` folder (`GetCustomersQuery`), with `<UseCase>Command|QueryHandler` and `...Validator` next to the record.
+  The folders sit inside the entity folder where a module has one (`Fleet.Application/Cars/Queries`), and the
+  namespace follows the folder.
+- What use cases share sits under the Application project's `Common` folder: the interfaces Infrastructure implements
+  (`Common/Interfaces/ICarDal.cs`, `IImageStorage`, `ITokenHelper`) and the read models queries answer with,
+  named `<Name>Response` (`Common/Models/CarDetailResponse.cs`). There are no DTOs.
+- Endpoints and module APIs inject the handler they need, e.g. `ICommandHandler<CreateBrandCommand, Brand>`. There is
+  no mediator.
 - Handlers don't call each other; they use repositories, and endpoints combine use cases where needed (v1 login =
-  `VerifyCredentials` + `CreateAccessToken`).
+  `VerifyCredentialsQuery` + `CreateAccessTokenCommand`).
 - `RegisterUseCases` registers every handler behind a Castle proxy, so aspect attributes on `Handle` run around it.
 - `Rentar.ArchitectureTests` checks that no managers or services are left, that every handler is sealed and named
-  after its record, that every use case has exactly one handler, and that every handler is registered.
+  after its record, that every command and query is named and filed after its kind, that every use case has exactly
+  one handler, that every handler is registered, and the same for validators. It also checks that Application
+  interfaces live in `Common.Interfaces`, that no type is named `*Dto`, and that entity properties are `init`-only.
+
+<br>
+
+**Validation**
+
+Each rule has one home, chosen by what it needs:
+
+| Rule | Lives in | Fails with |
+| --- | --- | --- |
+| About the input alone: required, length, format, how fields relate (return date after rent date) | The use case's validator, a `UseCaseValidator<TUseCase>` next to its record | `ValidationException`: 400 with every failure, grouped by field |
+| Needs stored data: unique email, record exists, at most 5 images per car | The handler | A Kernel exception (`ConflictException`, `NotFoundException`, `BusinessRuleException`, ...) |
+| Must hold for an entity however it is changed | The domain, once entities have behavior. Today they are plain data, so none live there yet | |
+
+- Validators run on their own. `RegisterUseCases` registers them, and a decorator (`RegisterUseCaseValidation`, called
+  once in `Program.cs`) runs a use case's validators before its handler, ahead of any aspect. A use case with no
+  validator passes. Handlers have no attribute to forget.
+- Each property stops at its first failing rule, so an empty name is reported as missing, not also as too short.
+- When several use cases take the same field, its rules live once in `<Entity>Rules` as `IRuleBuilder` extensions,
+  e.g. `ValidBrandName()` for `CreateBrandCommand` and `UpdateBrandCommand`.
+- The one exception is `UpdateColorCommand`, which checks its name in the handler: v1 has always answered it with
+  `"Color Name is Invalid"`, and `V1ContractTests` pins that.
 
 <br>
 
@@ -198,9 +233,9 @@ public sealed class CreateBrandHandler(IBrandDal brandDal) : ICommandHandler<Cre
   `ConflictException`, `InvalidCredentialsException`, `UnavailableException`) when they refuse a request.
   `ApiExceptionHandler`, an ASP.NET Core `IExceptionHandler`, turns them into problem details for v2 and into the
   `{ success, message, data }` body for v1. `V1ContractTests` pins every v1 response.
-- Aspects on use case handlers, run by Autofac/Castle interceptors: validation (FluentValidation), caching, transaction
-  scope, performance, secured operation. Cache keys are named after the handler class, e.g.
-  `...Cars.GetCarsByBrandHandler.Handle(GetCarsByBrand { BrandId = 1 })`
+- Aspects on use case handlers, run by Autofac/Castle interceptors: caching, transaction scope, performance, secured
+  operation. Cache keys are named after the handler class, e.g.
+  `...Cars.Queries.GetCarsByBrandQueryHandler.Handle(GetCarsByBrandQuery { BrandId = 1 })`
 - Security: HMACSHA512 password hashing, JWT access tokens (Identity module)
 - Uploaded car images are stored under `src/Bootstrapper/Rentar.Api/wwwroot/uploads` (`Paths:DefaultCarImagePath`)
 

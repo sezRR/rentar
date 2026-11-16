@@ -1,5 +1,7 @@
-using Rentar.Shared.Presentation.Endpoints;
 using Rentar.Modules.Identity.Application.Auth;
+using Rentar.Modules.Identity.Application.Auth.Commands;
+using Rentar.Modules.Identity.Application.Auth.Queries;
+using Rentar.Shared.Presentation.Endpoints;
 using System.Net;
 using System.Threading.Tasks;
 using Xunit;
@@ -42,7 +44,7 @@ public class AuthEndpointsTests(RentarApiFactory factory) : IntegrationTestBase(
     {
         await Client.PostJsonAsync("/api/v1/auth/register", NewUser());
 
-        var response = await Client.PostJsonAsync("/api/v1/auth/login", new VerifyCredentials(Email, Password));
+        var response = await Client.PostJsonAsync("/api/v1/auth/login", new VerifyCredentialsQuery(Email, Password));
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var result = await response.ReadAsAsync<V1Response<AccessToken>>();
@@ -54,7 +56,7 @@ public class AuthEndpointsTests(RentarApiFactory factory) : IntegrationTestBase(
     {
         await Client.PostJsonAsync("/api/v1/auth/register", NewUser());
 
-        var response = await Client.PostJsonAsync("/api/v1/auth/login", new VerifyCredentials(Email, "wrong-password"));
+        var response = await Client.PostJsonAsync("/api/v1/auth/login", new VerifyCredentialsQuery(Email, "wrong-password"));
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Contains("Password is wrong", await response.ReadTextAsync());
@@ -63,14 +65,14 @@ public class AuthEndpointsTests(RentarApiFactory factory) : IntegrationTestBase(
     [Fact]
     public async Task Login_WithUnknownEmail_ReturnsBadRequest()
     {
-        var response = await Client.PostJsonAsync("/api/v1/auth/login", new VerifyCredentials("nobody@example.com", Password));
+        var response = await Client.PostJsonAsync("/api/v1/auth/login", new VerifyCredentialsQuery("nobody@example.com", Password));
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Contains("User not found", await response.ReadTextAsync());
     }
 
-    private static RegisterUser NewUser()
+    private static RegisterUserCommand NewUser()
     {
-        return new RegisterUser("Sezer", "Tetik", Email, Password, 900);
+        return new RegisterUserCommand("Sezer", "Tetik", Email, Password, 900);
     }
 }
