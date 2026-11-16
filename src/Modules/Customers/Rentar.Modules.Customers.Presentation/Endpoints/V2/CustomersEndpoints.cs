@@ -9,6 +9,8 @@ using Rentar.Modules.Customers.Domain;
 using Rentar.Shared.Application.UseCases;
 using Rentar.Shared.Presentation.Endpoints;
 using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Rentar.Modules.Customers.Presentation.Endpoints.V2;
 
@@ -29,30 +31,35 @@ public class CustomersEndpoints : IEndpoint
     /// <summary>
     /// Lists customers, optionally only those of a user. The full list is closed during the 22:00 maintenance hour.
     /// </summary>
-    private static Ok<List<Customer>> GetAll(
+    private static async Task<Ok<List<Customer>>> GetAll(
         IQueryHandler<GetCustomersQuery, List<Customer>> getCustomers,
         IQueryHandler<GetCustomersByUserQuery, List<Customer>> getCustomersByUser,
-        int? userId)
+        int? userId,
+        CancellationToken cancellationToken)
     {
         var customers = userId is { } user
-            ? getCustomersByUser.Handle(new GetCustomersByUserQuery(user))
-            : getCustomers.Handle(new GetCustomersQuery());
+            ? await getCustomersByUser.HandleAsync(new GetCustomersByUserQuery(user), cancellationToken)
+            : await getCustomers.HandleAsync(new GetCustomersQuery(), cancellationToken);
 
         return TypedResults.Ok(customers);
     }
 
-    private static Results<Ok<Customer>, ProblemHttpResult> GetById(IQueryHandler<GetCustomerByIdQuery, Customer> getCustomerById, int id)
+    private static async Task<Results<Ok<Customer>, ProblemHttpResult>> GetById(
+        IQueryHandler<GetCustomerByIdQuery, Customer> getCustomerById,
+        int id,
+        CancellationToken cancellationToken)
     {
-        var customer = getCustomerById.Handle(new GetCustomerByIdQuery(id));
+        var customer = await getCustomerById.HandleAsync(new GetCustomerByIdQuery(id), cancellationToken);
         return customer is null ? RestResults.NotFound("Customer", id) : TypedResults.Ok(customer);
     }
 
-    private static Created<Customer> Create(
+    private static async Task<Created<Customer>> Create(
         ICommandHandler<CreateCustomerCommand, Customer> createCustomer,
         HttpRequest request,
-        CreateCustomerCommand command)
+        CreateCustomerCommand command,
+        CancellationToken cancellationToken)
     {
-        var customer = createCustomer.Handle(command);
+        var customer = await createCustomer.HandleAsync(command, cancellationToken);
         return RestResults.Created(request, customer.Id, customer);
     }
 }

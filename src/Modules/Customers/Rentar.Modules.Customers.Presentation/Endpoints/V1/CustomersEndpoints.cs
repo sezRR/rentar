@@ -8,6 +8,8 @@ using Rentar.Modules.Customers.Domain;
 using Rentar.Shared.Application.UseCases;
 using Rentar.Shared.Presentation.Endpoints;
 using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Rentar.Modules.Customers.Presentation.Endpoints.V1;
 
@@ -22,21 +24,27 @@ public class CustomersEndpoints : IEndpoint
         group.MapPost("/add", Add);
     }
 
-    private static Ok<V1Response<List<Customer>>> GetAll(IQueryHandler<GetCustomersQuery, List<Customer>> getCustomers)
+    private static async Task<Ok<V1Response<List<Customer>>>> GetAll(
+        IQueryHandler<GetCustomersQuery, List<Customer>> getCustomers,
+        CancellationToken cancellationToken)
     {
-        return V1Results.Ok(getCustomers.Handle(new GetCustomersQuery()), Messages.CustomersListed);
+        return V1Results.Ok(await getCustomers.HandleAsync(new GetCustomersQuery(), cancellationToken), Messages.CustomersListed);
     }
 
-    private static Ok<V1Response<List<Customer>>> GetCustomersByUserId(
+    private static async Task<Ok<V1Response<List<Customer>>>> GetCustomersByUserId(
         IQueryHandler<GetCustomersByUserQuery, List<Customer>> getCustomersByUser,
-        int userId)
+        int userId,
+        CancellationToken cancellationToken)
     {
-        return V1Results.Ok(getCustomersByUser.Handle(new GetCustomersByUserQuery(userId)), null);
+        return V1Results.Ok(await getCustomersByUser.HandleAsync(new GetCustomersByUserQuery(userId), cancellationToken), null);
     }
 
-    private static Ok<V1Response> Add(ICommandHandler<CreateCustomerCommand, Customer> createCustomer, CreateCustomerCommand command)
+    private static async Task<Ok<V1Response>> Add(
+        ICommandHandler<CreateCustomerCommand, Customer> createCustomer,
+        CreateCustomerCommand command,
+        CancellationToken cancellationToken)
     {
-        createCustomer.Handle(command);
+        await createCustomer.HandleAsync(command, cancellationToken);
         return V1Results.Ok(Messages.CustomerAdded);
     }
 }

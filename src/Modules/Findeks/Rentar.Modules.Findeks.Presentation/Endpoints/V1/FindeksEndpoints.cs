@@ -5,6 +5,8 @@ using Rentar.Modules.Findeks.Application;
 using Rentar.Modules.Findeks.Application.Queries;
 using Rentar.Shared.Application.UseCases;
 using Rentar.Shared.Presentation.Endpoints;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Rentar.Modules.Findeks.Presentation.Endpoints.V1;
 
@@ -17,8 +19,11 @@ public class FindeksEndpoints : IEndpoint
         group.MapGet("/calculate", Calculate);
     }
 
-    private static Ok<V1Response<int>> Calculate(IQueryHandler<CalculateFindeksRatingQuery, int> calculateFindeksRating)
+    private static async Task<Ok<V1Response<int>>> Calculate(
+        IQueryHandler<CalculateFindeksRatingQuery, int> calculateFindeksRating,
+        CancellationToken cancellationToken)
     {
-        return V1Results.Ok(calculateFindeksRating.Handle(new CalculateFindeksRatingQuery()), Messages.FindeksRatingCalculated);
+        var rating = await calculateFindeksRating.HandleAsync(new CalculateFindeksRatingQuery(), cancellationToken);
+        return V1Results.Ok(rating, Messages.FindeksRatingCalculated);
     }
 }

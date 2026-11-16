@@ -1,3 +1,6 @@
+using System.Threading;
+using System.Threading.Tasks;
+
 namespace Rentar.Modules.Payments.Contracts;
 
 /// <summary>
@@ -5,6 +8,6 @@ namespace Rentar.Modules.Payments.Contracts;
 /// </summary>
 public interface IPaymentsModuleApi
 {
-    /// <summary>Takes a payment; returns whether it went through.</summary>
-    bool Pay();
+    /// <summary>Takes a payment; answers whether it went through.</summary>
+    Task<bool> PayAsync(CancellationToken cancellationToken = default);
 }

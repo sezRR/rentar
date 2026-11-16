@@ -1,4 +1,6 @@
 using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Rentar.Modules.Identity.Contracts;
 
@@ -8,5 +10,5 @@ namespace Rentar.Modules.Identity.Contracts;
 public interface IIdentityModuleApi
 {
     /// <summary>Users with the given ids; unknown ids are left out.</summary>
-    IReadOnlyList<UserSummary> GetUsers(IReadOnlyCollection<int> userIds);
+    Task<IReadOnlyList<UserSummary>> GetUsersAsync(IReadOnlyCollection<int> userIds, CancellationToken cancellationToken = default);
 }

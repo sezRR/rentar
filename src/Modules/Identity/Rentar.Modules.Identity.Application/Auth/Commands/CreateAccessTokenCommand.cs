@@ -1,6 +1,8 @@
 using Rentar.Modules.Identity.Application.Common.Interfaces;
 using Rentar.Modules.Identity.Domain;
 using Rentar.Shared.Application.UseCases;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Rentar.Modules.Identity.Application.Auth.Commands;
 
@@ -9,8 +11,9 @@ public sealed record CreateAccessTokenCommand(User User);
 
 public sealed class CreateAccessTokenCommandHandler(IUserDal userDal, ITokenHelper tokenHelper) : ICommandHandler<CreateAccessTokenCommand, AccessToken>
 {
-    public AccessToken Handle(CreateAccessTokenCommand command)
+    public async Task<AccessToken> HandleAsync(CreateAccessTokenCommand command, CancellationToken cancellationToken = default)
     {
-        return tokenHelper.CreateToken(command.User, userDal.GetClaims(command.User));
+        var claims = await userDal.GetClaimsAsync(command.User, cancellationToken);
+        return tokenHelper.CreateToken(command.User, claims);
     }
 }

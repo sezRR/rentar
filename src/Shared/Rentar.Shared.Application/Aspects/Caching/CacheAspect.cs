@@ -3,7 +3,10 @@ using Microsoft.Extensions.DependencyInjection;
 using Rentar.Shared.Application.Caching;
 using Rentar.Shared.Application.Interceptors;
 using Rentar.Shared.Application.IoC;
+using System;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Rentar.Shared.Application.Aspects.Caching;
 
@@ -12,19 +15,32 @@ public class CacheAspect(int duration = 60) : MethodInterception
     private readonly int _duration = duration;
     private readonly ICacheManager _cacheManager = ServiceTool.ServiceProvider.GetRequiredService<ICacheManager>();
 
-    public override void Intercept(IInvocation invocation)
+    protected override async Task<object> InterceptAsync(IInvocation invocation, Func<Task<object>> proceed)
     {
-        // Keyed by the handler class (e.g. "...Cars.GetCarsByBrandQueryHandler.Handle") rather than the shared handler
-        // interface, so a CacheRemoveAspect pattern can name the use cases it invalidates.
-        var methodName = $"{(invocation.TargetType ?? invocation.Method.ReflectedType).FullName}.{invocation.Method.Name}";
-        var arguments = invocation.Arguments.ToList();
-        var key = $"{methodName}({string.Join(",", arguments.Select(x => x?.ToString() ?? "<Null>"))})";
+        var key = KeyOf(invocation);
         if (_cacheManager.IsAdd(key))
         {
-            invocation.ReturnValue = _cacheManager.Get(key);
-            return;
+            return _cacheManager.Get(key);
         }
-        invocation.Proceed();
-        _cacheManager.Add(key, invocation.ReturnValue, _duration);
+
+        // The handler's result is cached once it has finished, never the task that is still producing it.
+        var result = await proceed();
+        _cacheManager.Add(key, result, _duration);
+        return result;
+    }
+
+    /// <summary>
+    /// Keyed by the handler class (e.g. "...Cars.Queries.GetCarsByBrandQueryHandler.HandleAsync") rather than the shared
+    /// handler interface, so a CacheRemoveAspect pattern can name the use cases it invalidates. The cancellation token
+    /// says nothing about what was asked, so it is not part of the key.
+    /// </summary>
+    private static string KeyOf(IInvocation invocation)
+    {
+        var methodName = $"{(invocation.TargetType ?? invocation.Method.ReflectedType).FullName}.{invocation.Method.Name}";
+        var arguments = invocation.Arguments
+            .Where(argument => argument is not CancellationToken)
+            .Select(argument => argument?.ToString() ?? "<Null>");
+
+        return $"{methodName}({string.Join(",", arguments)})";
     }
 }

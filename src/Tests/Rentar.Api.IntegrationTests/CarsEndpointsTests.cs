@@ -15,7 +15,10 @@ public class CarsEndpointsTests(RentarApiFactory factory) : IntegrationTestBase(
     [Fact]
     public async Task Add_PersistsCar_AndGetAllReturnsIt()
     {
-        var response = await Client.PostJsonAsync("/api/v1/cars/add", NewCar());
+        var brandId = await AddBrandAsync("Toyota");
+        var colorId = await AddColorAsync("Red");
+
+        var response = await Client.PostJsonAsync("/api/v1/cars/add", NewCar(brandId, colorId));
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         var cars = await Client.GetJsonAsync("/api/v1/cars/getall");

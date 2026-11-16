@@ -46,6 +46,24 @@ public class CarImagesEndpointsTests(RentarApiFactory factory) : V2TestBase(fact
     }
 
     [Fact]
+    public async Task Upload_ForACarThatIsNotStored_IsNotFound()
+    {
+        var response = await UploadImageAsync(404, "car.png", PngBytes);
+
+        await AssertProblemAsync(response, HttpStatusCode.NotFound, Messages.TheCarNotFound);
+    }
+
+    [Fact]
+    public async Task UnknownImage_IsNotFound()
+    {
+        var car = await CreateCarAsync();
+
+        var response = await Client.GetJsonAsync($"/api/v2/cars/{car.Id}/images/404");
+
+        await AssertProblemAsync(response, HttpStatusCode.NotFound, "Car image 404 was not found.");
+    }
+
+    [Fact]
     public async Task Upload_AllowsFiveImagesPerCar_AndRejectsTheSixth()
     {
         var car = await CreateCarAsync();

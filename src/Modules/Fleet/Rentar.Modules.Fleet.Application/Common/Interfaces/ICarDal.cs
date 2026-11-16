@@ -1,14 +1,19 @@
-using System;
-using System.Collections.Generic;
-using System.Linq.Expressions;
 using Rentar.Modules.Fleet.Application.Common.Models;
 using Rentar.Modules.Fleet.Domain;
 using Rentar.Shared.Application.Data;
+using System;
+using System.Collections.Generic;
+using System.Linq.Expressions;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Rentar.Modules.Fleet.Application.Common.Interfaces;
 
 public interface ICarDal : IEntityRepository<Car>
 {
-    List<CarDetailResponse> GetCarDetails(Expression<Func<Car, bool>> filter = null);
-    CarDetailResponse GetCarDetailsById(Expression<Func<Car, bool>> filter);
+    Task<List<CarDetailResponse>> GetCarDetailsAsync(CancellationToken cancellationToken = default);
+    Task<List<CarDetailResponse>> GetCarDetailsAsync(Expression<Func<Car, bool>> filter, CancellationToken cancellationToken = default);
+
+    /// <summary>The car's details, or <c>null</c> when there is no car with that id.</summary>
+    Task<CarDetailResponse> GetCarDetailsByIdAsync(int id, CancellationToken cancellationToken = default);
 }

@@ -2,9 +2,13 @@ using Rentar.Modules.Fleet.Application.Common.Interfaces;
 using Rentar.Modules.Fleet.Domain;
 using Rentar.Shared.Application.UseCases;
 using Rentar.Shared.Application.Validation;
+using Rentar.Shared.Kernel.Exceptions;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Rentar.Modules.Fleet.Application.Cars.Commands;
 
+/// <summary>Replaces the car; throws <see cref="BusinessRuleException"/> when its brand or color is not stored.</summary>
 public sealed record UpdateCarCommand(
     int Id,
     int BrandId,
@@ -24,11 +28,13 @@ public sealed class UpdateCarCommandValidator : UseCaseValidator<UpdateCarComman
     }
 }
 
-public sealed class UpdateCarCommandHandler(ICarDal carDal) : ICommandHandler<UpdateCarCommand>
+public sealed class UpdateCarCommandHandler(ICarDal carDal, IBrandDal brandDal, IColorDal colorDal) : ICommandHandler<UpdateCarCommand>
 {
-    public void Handle(UpdateCarCommand command)
+    public async Task HandleAsync(UpdateCarCommand command, CancellationToken cancellationToken = default)
     {
-        carDal.Update(new Car
+        await CarReferences.EnsureExistAsync(brandDal, colorDal, command.BrandId, command.ColorId, cancellationToken);
+
+        await carDal.UpdateAsync(new Car
         {
             Id = command.Id,
             BrandId = command.BrandId,
@@ -37,6 +43,6 @@ public sealed class UpdateCarCommandHandler(ICarDal carDal) : ICommandHandler<Up
             DailyPrice = command.DailyPrice,
             Description = command.Description,
             MinimumFindeksRating = command.MinimumFindeksRating
-        });
+        }, cancellationToken);
     }
 }

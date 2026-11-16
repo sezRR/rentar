@@ -5,6 +5,8 @@ using Rentar.Modules.Identity.Domain;
 using Rentar.Shared.Application.UseCases;
 using Rentar.Shared.Application.Validation;
 using Rentar.Shared.Kernel.Exceptions;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Rentar.Modules.Identity.Application.Auth.Commands;
 
@@ -27,9 +29,9 @@ public sealed class RegisterUserCommandValidator : UseCaseValidator<RegisterUser
 
 public sealed class RegisterUserCommandHandler(IUserDal userDal) : ICommandHandler<RegisterUserCommand, User>
 {
-    public User Handle(RegisterUserCommand command)
+    public async Task<User> HandleAsync(RegisterUserCommand command, CancellationToken cancellationToken = default)
     {
-        if (userDal.Get(u => u.Email == command.Email) != null)
+        if (await userDal.AnyAsync(u => u.Email == command.Email, cancellationToken))
         {
             throw new ConflictException(Messages.UserAlreadyExists);
         }
@@ -47,7 +49,7 @@ public sealed class RegisterUserCommandHandler(IUserDal userDal) : ICommandHandl
             FindeksRating = command.FindeksRating,
         };
 
-        userDal.Add(user);
+        await userDal.AddAsync(user, cancellationToken);
         return user;
     }
 }

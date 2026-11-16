@@ -1,9 +1,10 @@
-using System;
-using System.Linq;
 using FluentValidation;
 using Rentar.Modules.Rentals.Application.Common.Interfaces;
 using Rentar.Shared.Application.UseCases;
 using Rentar.Shared.Application.Validation;
+using System;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Rentar.Modules.Rentals.Application.Queries;
 
@@ -21,9 +22,12 @@ public sealed class CheckCarAvailabilityQueryValidator : UseCaseValidator<CheckC
 
 public sealed class CheckCarAvailabilityQueryHandler(IRentalDal rentalDal) : IQueryHandler<CheckCarAvailabilityQuery, bool>
 {
-    public bool Handle(CheckCarAvailabilityQuery query)
+    public async Task<bool> HandleAsync(CheckCarAvailabilityQuery query, CancellationToken cancellationToken = default)
     {
-        return !rentalDal.GetAll(r => r.CarId == query.CarId)
-            .Any(r => r.ReturnDate >= query.RentDate && r.RentDate <= query.ReturnDate);
+        var overlaps = await rentalDal.AnyAsync(
+            r => r.CarId == query.CarId && r.ReturnDate >= query.RentDate && r.RentDate <= query.ReturnDate,
+            cancellationToken);
+
+        return !overlaps;
     }
 }

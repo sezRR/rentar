@@ -1,13 +1,17 @@
+using Rentar.Modules.Customers.Application.Common.Interfaces;
 using Rentar.Modules.Customers.Contracts;
 using System.Collections.Generic;
 using System.Linq;
-using Rentar.Modules.Customers.Application.Common.Interfaces;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Rentar.Modules.Customers.Application;
 
 public class CustomersModuleApi(ICustomerDal customerDal) : ICustomersModuleApi
 {
-    public IReadOnlyList<CustomerSummary> GetCustomers(IReadOnlyCollection<int> customerIds)
+    public async Task<IReadOnlyList<CustomerSummary>> GetCustomersAsync(
+        IReadOnlyCollection<int> customerIds,
+        CancellationToken cancellationToken = default)
     {
         if (customerIds.Count == 0)
         {
@@ -15,8 +19,7 @@ public class CustomersModuleApi(ICustomerDal customerDal) : ICustomersModuleApi
         }
 
         var ids = customerIds.ToArray();
-        return customerDal.GetAll(c => ids.Contains(c.Id))
-            .Select(c => new CustomerSummary(c.Id, c.UserId, c.CompanyName))
-            .ToList();
+        var customers = await customerDal.GetAllAsync(c => ids.Contains(c.Id), cancellationToken);
+        return customers.ConvertAll(c => new CustomerSummary(c.Id, c.UserId, c.CompanyName));
     }
 }

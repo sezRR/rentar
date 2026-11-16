@@ -1,17 +1,19 @@
-using System.Collections.Generic;
 using Rentar.Modules.Fleet.Application.Common.Interfaces;
 using Rentar.Modules.Fleet.Application.Common.Models;
 using Rentar.Shared.Application.UseCases;
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Rentar.Modules.Fleet.Application.Cars.Queries;
 
-/// <summary>Every car with the names of its brand and color; a car whose brand or color is not stored is left out.</summary>
+/// <summary>Every car with the names of its brand and color.</summary>
 public sealed record GetCarDetailsQuery;
 
 public sealed class GetCarDetailsQueryHandler(ICarDal carDal) : IQueryHandler<GetCarDetailsQuery, List<CarDetailResponse>>
 {
-    public List<CarDetailResponse> Handle(GetCarDetailsQuery query)
+    public Task<List<CarDetailResponse>> HandleAsync(GetCarDetailsQuery query, CancellationToken cancellationToken = default)
     {
-        return carDal.GetCarDetails();
+        return carDal.GetCarDetailsAsync(cancellationToken);
     }
 }

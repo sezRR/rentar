@@ -9,6 +9,8 @@ using Rentar.Modules.Identity.Application.Auth.Queries;
 using Rentar.Modules.Identity.Domain;
 using Rentar.Shared.Application.UseCases;
 using Rentar.Shared.Presentation.Endpoints;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Rentar.Modules.Identity.Presentation.Endpoints.V2;
 
@@ -29,12 +31,13 @@ public class AuthEndpoints : IEndpoint
     /// Bad credentials answer 401 with the same detail whatever was wrong, so the response does not reveal which
     /// accounts exist.
     /// </summary>
-    private static Ok<AccessToken> CreateToken(
+    private static async Task<Ok<AccessToken>> CreateToken(
         IQueryHandler<VerifyCredentialsQuery, User> verifyCredentials,
         ICommandHandler<CreateAccessTokenCommand, AccessToken> createAccessToken,
-        VerifyCredentialsQuery credentials)
+        VerifyCredentialsQuery credentials,
+        CancellationToken cancellationToken)
     {
-        var user = verifyCredentials.Handle(credentials);
-        return TypedResults.Ok(createAccessToken.Handle(new CreateAccessTokenCommand(user)));
+        var user = await verifyCredentials.HandleAsync(credentials, cancellationToken);
+        return TypedResults.Ok(await createAccessToken.HandleAsync(new CreateAccessTokenCommand(user), cancellationToken));
     }
 }

@@ -3,6 +3,8 @@ using Rentar.Modules.Identity.Application.Security;
 using Rentar.Modules.Identity.Domain;
 using Rentar.Shared.Application.UseCases;
 using Rentar.Shared.Kernel.Exceptions;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Rentar.Modules.Identity.Application.Auth.Queries;
 
@@ -14,9 +16,9 @@ public sealed record VerifyCredentialsQuery(string Email, string Password);
 
 public sealed class VerifyCredentialsQueryHandler(IUserDal userDal) : IQueryHandler<VerifyCredentialsQuery, User>
 {
-    public User Handle(VerifyCredentialsQuery query)
+    public async Task<User> HandleAsync(VerifyCredentialsQuery query, CancellationToken cancellationToken = default)
     {
-        var user = userDal.Get(u => u.Email == query.Email)
+        var user = await userDal.GetAsync(u => u.Email == query.Email, cancellationToken)
             ?? throw new InvalidCredentialsException(Messages.UserNotFound);
 
         if (!HashingHelper.VerifyPasswordHash(query.Password, user.PasswordHash, user.PasswordSalt))

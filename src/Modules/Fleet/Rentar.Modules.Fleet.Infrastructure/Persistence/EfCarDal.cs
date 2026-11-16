@@ -1,49 +1,56 @@
 using Microsoft.EntityFrameworkCore;
+using Rentar.Modules.Fleet.Application.Common.Interfaces;
+using Rentar.Modules.Fleet.Application.Common.Models;
 using Rentar.Modules.Fleet.Domain;
 using Rentar.Shared.Infrastructure.Persistence;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
-using Rentar.Modules.Fleet.Application.Common.Interfaces;
-using Rentar.Modules.Fleet.Application.Common.Models;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Rentar.Modules.Fleet.Infrastructure.Persistence;
 
 public class EfCarDal(IDbContextFactory<FleetDbContext> contextFactory) : EfEntityRepositoryBase<Car, FleetDbContext>(contextFactory), ICarDal
 {
-    public List<CarDetailResponse> GetCarDetails(Expression<Func<Car, bool>> filter = null)
+    public async Task<List<CarDetailResponse>> GetCarDetailsAsync(CancellationToken cancellationToken = default)
     {
-        using var context = ContextFactory.CreateDbContext();
-        return QueryDetails(context, filter).ToList();
+        await using var context = await ContextFactory.CreateDbContextAsync(cancellationToken);
+        return await ToDetails(context.Cars).ToListAsync(cancellationToken);
     }
 
-    public CarDetailResponse GetCarDetailsById(Expression<Func<Car, bool>> filter)
+    public async Task<List<CarDetailResponse>> GetCarDetailsAsync(Expression<Func<Car, bool>> filter, CancellationToken cancellationToken = default)
     {
-        using var context = ContextFactory.CreateDbContext();
-        return QueryDetails(context, filter).FirstOrDefault();
+        await using var context = await ContextFactory.CreateDbContextAsync(cancellationToken);
+        return await ToDetails(context.Cars.Where(filter)).ToListAsync(cancellationToken);
     }
 
-    private static IQueryable<CarDetailResponse> QueryDetails(FleetDbContext context, Expression<Func<Car, bool>> filter)
+    public async Task<CarDetailResponse> GetCarDetailsByIdAsync(int id, CancellationToken cancellationToken = default)
     {
-        return from c in filter is null ? context.Cars : context.Cars.Where(filter)
-               join b in context.Brands
-               on c.BrandId equals b.Id
-               join co in context.Colors
-               on c.ColorId equals co.Id
-               select new CarDetailResponse
-               {
-                   Id = c.Id,
-                   CarId = c.Id,
-                   BrandId = c.BrandId,
-                   BrandName = b.BrandName,
-                   ColorId = c.ColorId,
-                   Description = c.Description,
-                   ModelYear = c.ModelYear,
-                   ColorName = co.ColorName,
-                   DailyPrice = c.DailyPrice,
-                   MinimumFindeksRating = c.MinimumFindeksRating,
-                   ImagePath = (from a in context.CarImages where a.CarId == c.Id select a.ImagePath).FirstOrDefault()
-               };
+        await using var context = await ContextFactory.CreateDbContextAsync(cancellationToken);
+        return await ToDetails(context.Cars.Where(car => car.Id == id)).SingleOrDefaultAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Follows the navigations, which EF turns into joins: the required brand and color, and the first image uploaded.
+    /// Only the columns the response needs are read.
+    /// </summary>
+    private static IQueryable<CarDetailResponse> ToDetails(IQueryable<Car> cars)
+    {
+        return cars.Select(car => new CarDetailResponse
+        {
+            Id = car.Id,
+            CarId = car.Id,
+            BrandId = car.BrandId,
+            BrandName = car.Brand.BrandName,
+            ColorId = car.ColorId,
+            ColorName = car.Color.ColorName,
+            Description = car.Description,
+            ModelYear = car.ModelYear,
+            DailyPrice = car.DailyPrice,
+            MinimumFindeksRating = car.MinimumFindeksRating,
+            ImagePath = car.Images.OrderBy(image => image.Id).Select(image => image.ImagePath).FirstOrDefault()
+        });
     }
 }

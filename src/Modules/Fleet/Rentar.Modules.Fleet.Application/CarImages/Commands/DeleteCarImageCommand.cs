@@ -2,6 +2,8 @@ using Rentar.Modules.Fleet.Application.Common.Interfaces;
 using Rentar.Shared.Application.Aspects.Transaction;
 using Rentar.Shared.Application.UseCases;
 using Rentar.Shared.Kernel.Exceptions;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Rentar.Modules.Fleet.Application.CarImages.Commands;
 
@@ -11,12 +13,12 @@ public sealed record DeleteCarImageCommand(int Id);
 public sealed class DeleteCarImageCommandHandler(ICarImageDal carImageDal, IImageStorage imageStorage) : ICommandHandler<DeleteCarImageCommand>
 {
     [TransactionScopeAspect]
-    public void Handle(DeleteCarImageCommand command)
+    public async Task HandleAsync(DeleteCarImageCommand command, CancellationToken cancellationToken = default)
     {
-        var carImage = carImageDal.Get(c => c.Id == command.Id)
+        var carImage = await carImageDal.GetAsync(c => c.Id == command.Id, cancellationToken)
             ?? throw new NotFoundException(Messages.CarImageNotFound);
 
-        carImageDal.Delete(carImage);
+        await carImageDal.DeleteAsync(carImage, cancellationToken);
         imageStorage.Delete(carImage.ImagePath);
     }
 }

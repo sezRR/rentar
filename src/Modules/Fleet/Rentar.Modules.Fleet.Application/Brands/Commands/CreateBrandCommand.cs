@@ -2,6 +2,8 @@ using Rentar.Modules.Fleet.Application.Common.Interfaces;
 using Rentar.Modules.Fleet.Domain;
 using Rentar.Shared.Application.UseCases;
 using Rentar.Shared.Application.Validation;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Rentar.Modules.Fleet.Application.Brands.Commands;
 
@@ -18,10 +20,10 @@ public sealed class CreateBrandCommandValidator : UseCaseValidator<CreateBrandCo
 
 public sealed class CreateBrandCommandHandler(IBrandDal brandDal) : ICommandHandler<CreateBrandCommand, Brand>
 {
-    public Brand Handle(CreateBrandCommand command)
+    public async Task<Brand> HandleAsync(CreateBrandCommand command, CancellationToken cancellationToken = default)
     {
         var brand = new Brand { BrandName = command.BrandName };
-        brandDal.Add(brand);
+        await brandDal.AddAsync(brand, cancellationToken);
         return brand;
     }
 }

@@ -10,6 +10,8 @@ using Rentar.Modules.Fleet.Domain;
 using Rentar.Shared.Application.UseCases;
 using Rentar.Shared.Presentation.Endpoints;
 using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Rentar.Modules.Fleet.Presentation.Endpoints.V2;
 
@@ -28,7 +30,8 @@ public class CarImagesEndpoints : IEndpoint
             .ProducesProblem(StatusCodes.Status404NotFound);
         images.MapPost("/", Upload)
             .DisableAntiforgery()
-            .ProducesProblem(StatusCodes.Status400BadRequest);
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status404NotFound);
         images.MapPut("/{imageId:int}", Replace)
             .DisableAntiforgery()
             .ProducesProblem(StatusCodes.Status400BadRequest)
@@ -41,89 +44,106 @@ public class CarImagesEndpoints : IEndpoint
             .MapGet("/", GetAll);
     }
 
-    private static Ok<List<CarImage>> GetAll(IQueryHandler<GetCarImagesQuery, List<CarImage>> getCarImages)
+    private static async Task<Ok<List<CarImage>>> GetAll(
+        IQueryHandler<GetCarImagesQuery, List<CarImage>> getCarImages,
+        CancellationToken cancellationToken)
     {
-        return TypedResults.Ok(getCarImages.Handle(new GetCarImagesQuery()));
+        return TypedResults.Ok(await getCarImages.HandleAsync(new GetCarImagesQuery(), cancellationToken));
     }
 
-    private static Ok<List<CarImage>> GetByCar(IQueryHandler<GetCarImagesByCarQuery, List<CarImage>> getCarImagesByCar, int carId)
+    private static async Task<Ok<List<CarImage>>> GetByCar(
+        IQueryHandler<GetCarImagesByCarQuery, List<CarImage>> getCarImagesByCar,
+        int carId,
+        CancellationToken cancellationToken)
     {
-        return TypedResults.Ok(getCarImagesByCar.Handle(new GetCarImagesByCarQuery(carId)));
+        return TypedResults.Ok(await getCarImagesByCar.HandleAsync(new GetCarImagesByCarQuery(carId), cancellationToken));
     }
 
-    private static Results<Ok<CarImage>, ProblemHttpResult> GetById(
+    private static async Task<Results<Ok<CarImage>, ProblemHttpResult>> GetById(
         IQueryHandler<GetCarImageByIdQuery, CarImage> getCarImageById,
         int carId,
-        int imageId)
+        int imageId,
+        CancellationToken cancellationToken)
     {
-        var carImage = Find(getCarImageById, carId, imageId);
+        var carImage = await FindAsync(getCarImageById, carId, imageId, cancellationToken);
         return carImage is null ? RestResults.NotFound("Car image", imageId) : TypedResults.Ok(carImage);
     }
 
     /// <summary>
-    /// Stores a PNG or JPEG sent as the <c>file</c> form field; without one the car gets the default image.
+    /// Stores a PNG or JPEG sent as the <c>file</c> form field; without one the car gets the default image. A car that
+    /// is not stored answers 404.
     /// </summary>
-    private static Created<CarImage> Upload(
+    private static async Task<Created<CarImage>> Upload(
         ICommandHandler<AddCarImageCommand, CarImage> addCarImage,
         HttpRequest request,
         int carId,
-        IFormFile? file)
+        IFormFile? file,
+        CancellationToken cancellationToken)
     {
-        var carImage = addCarImage.Handle(new AddCarImageCommand(carId, ToUpload(file)));
+        var carImage = await addCarImage.HandleAsync(new AddCarImageCommand(carId, ToUpload(file)), cancellationToken);
         return RestResults.Created(request, carImage.Id, carImage);
     }
 
     /// <summary>
     /// Replaces the image's file with the PNG or JPEG sent as the <c>file</c> form field.
     /// </summary>
-    private static Results<NoContent, ProblemHttpResult> Replace(
+    private static async Task<Results<NoContent, ProblemHttpResult>> Replace(
         IQueryHandler<GetCarImageByIdQuery, CarImage> getCarImageById,
         ICommandHandler<ReplaceCarImageCommand> replaceCarImage,
         int carId,
         int imageId,
-        IFormFile? file)
+        IFormFile? file,
+        CancellationToken cancellationToken)
     {
-        if (Find(getCarImageById, carId, imageId) is null)
+        if (await FindAsync(getCarImageById, carId, imageId, cancellationToken) is null)
         {
             return RestResults.NotFound("Car image", imageId);
         }
 
         // A missing file is turned down by the use case with the same message as an unsupported one.
-        replaceCarImage.Handle(new ReplaceCarImageCommand(imageId, carId, ToUpload(file)));
+        await replaceCarImage.HandleAsync(new ReplaceCarImageCommand(imageId, ToUpload(file)), cancellationToken);
         return TypedResults.NoContent();
     }
 
-    private static Results<NoContent, ProblemHttpResult> Delete(
+    private static async Task<Results<NoContent, ProblemHttpResult>> Delete(
         IQueryHandler<GetCarImageByIdQuery, CarImage> getCarImageById,
         ICommandHandler<DeleteCarImageCommand> deleteCarImage,
         int carId,
-        int imageId)
+        int imageId,
+        CancellationToken cancellationToken)
     {
-        if (Find(getCarImageById, carId, imageId) is null)
+        if (await FindAsync(getCarImageById, carId, imageId, cancellationToken) is null)
         {
             return RestResults.NotFound("Car image", imageId);
         }
 
-        deleteCarImage.Handle(new DeleteCarImageCommand(imageId));
+        await deleteCarImage.HandleAsync(new DeleteCarImageCommand(imageId), cancellationToken);
         return TypedResults.NoContent();
     }
 
     /// <summary>
     /// Deletes every image of the car. A car without images is already in that state, so this also answers 204.
     /// </summary>
-    private static NoContent DeleteAll(ICommandHandler<DeleteCarImagesOfCarCommand> deleteCarImagesOfCar, int carId)
+    private static async Task<NoContent> DeleteAll(
+        ICommandHandler<DeleteCarImagesOfCarCommand> deleteCarImagesOfCar,
+        int carId,
+        CancellationToken cancellationToken)
     {
-        deleteCarImagesOfCar.Handle(new DeleteCarImagesOfCarCommand(carId));
+        await deleteCarImagesOfCar.HandleAsync(new DeleteCarImagesOfCarCommand(carId), cancellationToken);
         return TypedResults.NoContent();
     }
 
     /// <summary>
     /// An image is only found under the car it belongs to.
     /// </summary>
-    private static CarImage? Find(IQueryHandler<GetCarImageByIdQuery, CarImage> getCarImageById, int carId, int imageId)
+    private static async Task<CarImage?> FindAsync(
+        IQueryHandler<GetCarImageByIdQuery, CarImage> getCarImageById,
+        int carId,
+        int imageId,
+        CancellationToken cancellationToken)
     {
-        var carImage = getCarImageById.Handle(new GetCarImageByIdQuery(imageId));
-        return carImage.CarId == carId ? carImage : null;
+        var carImage = await getCarImageById.HandleAsync(new GetCarImageByIdQuery(imageId), cancellationToken);
+        return carImage?.CarId == carId ? carImage : null;
     }
 
     private static FileUpload? ToUpload(IFormFile? file)

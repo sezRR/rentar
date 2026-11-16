@@ -5,6 +5,8 @@ using Rentar.Modules.Rentals.Domain;
 using Rentar.Shared.Application.UseCases;
 using Rentar.Shared.Application.Validation;
 using System;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Rentar.Modules.Rentals.Application.Commands;
 
@@ -25,7 +27,7 @@ public sealed class CreateRentalCommandValidator : UseCaseValidator<CreateRental
 
 public sealed class CreateRentalCommandHandler(IRentalDal rentalDal) : ICommandHandler<CreateRentalCommand, Rental>
 {
-    public Rental Handle(CreateRentalCommand command)
+    public async Task<Rental> HandleAsync(CreateRentalCommand command, CancellationToken cancellationToken = default)
     {
         var rental = new Rental
         {
@@ -35,7 +37,7 @@ public sealed class CreateRentalCommandHandler(IRentalDal rentalDal) : ICommandH
             ReturnDate = command.ReturnDate
         };
 
-        rentalDal.Add(rental);
+        await rentalDal.AddAsync(rental, cancellationToken);
         return rental;
     }
 }

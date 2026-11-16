@@ -7,6 +7,8 @@ using Rentar.Modules.Payments.Application;
 using Rentar.Modules.Payments.Application.Commands;
 using Rentar.Shared.Application.UseCases;
 using Rentar.Shared.Presentation.Endpoints;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Rentar.Modules.Payments.Presentation.Endpoints.V2;
 
@@ -23,9 +25,11 @@ public class PaymentsEndpoints : IEndpoint
     /// <summary>
     /// Takes a payment. A declined payment answers 402 Payment Required.
     /// </summary>
-    private static Results<NoContent, ProblemHttpResult> Create(ICommandHandler<TakePaymentCommand, bool> takePayment)
+    private static async Task<Results<NoContent, ProblemHttpResult>> Create(
+        ICommandHandler<TakePaymentCommand, bool> takePayment,
+        CancellationToken cancellationToken)
     {
-        return takePayment.Handle(new TakePaymentCommand())
+        return await takePayment.HandleAsync(new TakePaymentCommand(), cancellationToken)
             ? TypedResults.NoContent()
             : TypedResults.Problem(detail: Messages.PaymentFailed, statusCode: StatusCodes.Status402PaymentRequired);
     }

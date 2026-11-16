@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using Rentar.Modules.Customers.Contracts;
 using Rentar.Modules.Fleet.Contracts;
 using Rentar.Modules.Identity.Contracts;
@@ -24,21 +26,21 @@ public sealed class GetRentalDetailsQueryHandler(
     IFleetModuleApi fleetModule,
     TimeProvider timeProvider) : IQueryHandler<GetRentalDetailsQuery, List<RentalDetailResponse>>
 {
-    public List<RentalDetailResponse> Handle(GetRentalDetailsQuery query)
+    public async Task<List<RentalDetailResponse>> HandleAsync(GetRentalDetailsQuery query, CancellationToken cancellationToken = default)
     {
         if (timeProvider.GetLocalNow().Hour == 22)
         {
             throw new UnavailableException(Messages.MaintenanceTime);
         }
 
-        var rentals = rentalDal.GetAll();
+        var rentals = await rentalDal.GetAllAsync(cancellationToken);
 
         // A rental only holds the ids of other modules' records, so their details come through those modules' public APIs.
-        var customers = customersModule.GetCustomers(rentals.Select(r => r.CustomerId).Distinct().ToList())
+        var customers = (await customersModule.GetCustomersAsync(rentals.Select(r => r.CustomerId).Distinct().ToList(), cancellationToken))
             .ToDictionary(c => c.CustomerId);
-        var users = identityModule.GetUsers(customers.Values.Select(c => c.UserId).Distinct().ToList())
+        var users = (await identityModule.GetUsersAsync(customers.Values.Select(c => c.UserId).Distinct().ToList(), cancellationToken))
             .ToDictionary(u => u.UserId);
-        var cars = fleetModule.GetCars(rentals.Select(r => r.CarId).Distinct().ToList())
+        var cars = (await fleetModule.GetCarsAsync(rentals.Select(r => r.CarId).Distinct().ToList(), cancellationToken))
             .ToDictionary(c => c.CarId);
 
         var details = new List<RentalDetailResponse>();

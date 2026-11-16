@@ -9,6 +9,8 @@ using Rentar.Modules.Fleet.Domain;
 using Rentar.Shared.Application.UseCases;
 using Rentar.Shared.Presentation.Endpoints;
 using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Rentar.Modules.Fleet.Presentation.Endpoints.V2;
 
@@ -27,52 +29,65 @@ public class BrandsEndpoints : IEndpoint
             .ProducesValidationProblem()
             .ProducesProblem(StatusCodes.Status404NotFound);
         group.MapDelete("/{id:int}", Delete)
-            .ProducesProblem(StatusCodes.Status404NotFound);
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict);
     }
 
-    private static Ok<List<Brand>> GetAll(IQueryHandler<GetBrandsQuery, List<Brand>> getBrands)
+    private static async Task<Ok<List<Brand>>> GetAll(IQueryHandler<GetBrandsQuery, List<Brand>> getBrands, CancellationToken cancellationToken)
     {
-        return TypedResults.Ok(getBrands.Handle(new GetBrandsQuery()));
+        return TypedResults.Ok(await getBrands.HandleAsync(new GetBrandsQuery(), cancellationToken));
     }
 
-    private static Results<Ok<Brand>, ProblemHttpResult> GetById(IQueryHandler<GetBrandByIdQuery, Brand> getBrandById, int id)
+    private static async Task<Results<Ok<Brand>, ProblemHttpResult>> GetById(
+        IQueryHandler<GetBrandByIdQuery, Brand> getBrandById,
+        int id,
+        CancellationToken cancellationToken)
     {
-        var brand = getBrandById.Handle(new GetBrandByIdQuery(id));
+        var brand = await getBrandById.HandleAsync(new GetBrandByIdQuery(id), cancellationToken);
         return brand is null ? RestResults.NotFound("Brand", id) : TypedResults.Ok(brand);
     }
 
-    private static Created<Brand> Create(ICommandHandler<CreateBrandCommand, Brand> createBrand, HttpRequest request, BrandRequest body)
+    private static async Task<Created<Brand>> Create(
+        ICommandHandler<CreateBrandCommand, Brand> createBrand,
+        HttpRequest request,
+        BrandRequest body,
+        CancellationToken cancellationToken)
     {
-        var brand = createBrand.Handle(new CreateBrandCommand(body.BrandName));
+        var brand = await createBrand.HandleAsync(new CreateBrandCommand(body.BrandName), cancellationToken);
         return RestResults.Created(request, brand.Id, brand);
     }
 
-    private static Results<NoContent, ProblemHttpResult> Update(
+    private static async Task<Results<NoContent, ProblemHttpResult>> Update(
         IQueryHandler<GetBrandByIdQuery, Brand> getBrandById,
         ICommandHandler<UpdateBrandCommand> updateBrand,
         int id,
-        BrandRequest body)
+        BrandRequest body,
+        CancellationToken cancellationToken)
     {
-        if (getBrandById.Handle(new GetBrandByIdQuery(id)) is null)
+        if (await getBrandById.HandleAsync(new GetBrandByIdQuery(id), cancellationToken) is null)
         {
             return RestResults.NotFound("Brand", id);
         }
 
-        updateBrand.Handle(new UpdateBrandCommand(id, body.BrandName));
+        await updateBrand.HandleAsync(new UpdateBrandCommand(id, body.BrandName), cancellationToken);
         return TypedResults.NoContent();
     }
 
-    private static Results<NoContent, ProblemHttpResult> Delete(
+    /// <summary>
+    /// Deletes the brand; a brand that cars still have answers 409.
+    /// </summary>
+    private static async Task<Results<NoContent, ProblemHttpResult>> Delete(
         IQueryHandler<GetBrandByIdQuery, Brand> getBrandById,
         ICommandHandler<DeleteBrandCommand> deleteBrand,
-        int id)
+        int id,
+        CancellationToken cancellationToken)
     {
-        if (getBrandById.Handle(new GetBrandByIdQuery(id)) is null)
+        if (await getBrandById.HandleAsync(new GetBrandByIdQuery(id), cancellationToken) is null)
         {
             return RestResults.NotFound("Brand", id);
         }
 
-        deleteBrand.Handle(new DeleteBrandCommand(id));
+        await deleteBrand.HandleAsync(new DeleteBrandCommand(id), cancellationToken);
         return TypedResults.NoContent();
     }
 }

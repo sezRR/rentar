@@ -15,6 +15,7 @@ public class IdentityDbContext(DbContextOptions<IdentityDbContext> options) : Db
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema(Schema);
+        modelBuilder.ApplyConfigurationsFromAssembly(typeof(IdentityDbContext).Assembly);
         modelBuilder.UseTimestampWithoutTimeZone();
     }
 }

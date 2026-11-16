@@ -11,6 +11,8 @@ using Rentar.Shared.Application.UseCases;
 using Rentar.Shared.Presentation.Endpoints;
 using System;
 using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Rentar.Modules.Rentals.Presentation.Endpoints.V2;
 
@@ -33,21 +35,25 @@ public class RentalsEndpoints : IEndpoint
     /// <summary>
     /// Lists rentals, optionally only those of a car.
     /// </summary>
-    private static Ok<List<Rental>> GetAll(
+    private static async Task<Ok<List<Rental>>> GetAll(
         IQueryHandler<GetRentalsQuery, List<Rental>> getRentals,
         IQueryHandler<GetRentalsByCarQuery, List<Rental>> getRentalsByCar,
-        int? carId)
+        int? carId,
+        CancellationToken cancellationToken)
     {
         var rentals = carId is { } car
-            ? getRentalsByCar.Handle(new GetRentalsByCarQuery(car))
-            : getRentals.Handle(new GetRentalsQuery());
+            ? await getRentalsByCar.HandleAsync(new GetRentalsByCarQuery(car), cancellationToken)
+            : await getRentals.HandleAsync(new GetRentalsQuery(), cancellationToken);
 
         return TypedResults.Ok(rentals);
     }
 
-    private static Results<Ok<Rental>, ProblemHttpResult> GetById(IQueryHandler<GetRentalByIdQuery, Rental> getRentalById, int id)
+    private static async Task<Results<Ok<Rental>, ProblemHttpResult>> GetById(
+        IQueryHandler<GetRentalByIdQuery, Rental> getRentalById,
+        int id,
+        CancellationToken cancellationToken)
     {
-        var rental = getRentalById.Handle(new GetRentalByIdQuery(id));
+        var rental = await getRentalById.HandleAsync(new GetRentalByIdQuery(id), cancellationToken);
         return rental is null ? RestResults.NotFound("Rental", id) : TypedResults.Ok(rental);
     }
 
@@ -55,24 +61,31 @@ public class RentalsEndpoints : IEndpoint
     /// Rentals together with their car, customer and user; a rental whose car, customer or user is gone is left out.
     /// Closed during the 22:00 maintenance hour.
     /// </summary>
-    private static Ok<List<RentalDetailResponse>> GetDetails(IQueryHandler<GetRentalDetailsQuery, List<RentalDetailResponse>> getRentalDetails)
+    private static async Task<Ok<List<RentalDetailResponse>>> GetDetails(
+        IQueryHandler<GetRentalDetailsQuery, List<RentalDetailResponse>> getRentalDetails,
+        CancellationToken cancellationToken)
     {
-        return TypedResults.Ok(getRentalDetails.Handle(new GetRentalDetailsQuery()));
+        return TypedResults.Ok(await getRentalDetails.HandleAsync(new GetRentalDetailsQuery(), cancellationToken));
     }
 
-    private static Ok<RentalAvailabilityResponse> GetAvailability(
+    private static async Task<Ok<RentalAvailabilityResponse>> GetAvailability(
         IQueryHandler<CheckCarAvailabilityQuery, bool> checkCarAvailability,
         int carId,
         DateTime rentDate,
-        DateTime returnDate)
+        DateTime returnDate,
+        CancellationToken cancellationToken)
     {
-        var available = checkCarAvailability.Handle(new CheckCarAvailabilityQuery(carId, rentDate, returnDate));
+        var available = await checkCarAvailability.HandleAsync(new CheckCarAvailabilityQuery(carId, rentDate, returnDate), cancellationToken);
         return TypedResults.Ok(new RentalAvailabilityResponse(carId, rentDate, returnDate, available));
     }
 
-    private static Created<Rental> Create(ICommandHandler<CreateRentalCommand, Rental> createRental, HttpRequest request, CreateRentalCommand command)
+    private static async Task<Created<Rental>> Create(
+        ICommandHandler<CreateRentalCommand, Rental> createRental,
+        HttpRequest request,
+        CreateRentalCommand command,
+        CancellationToken cancellationToken)
     {
-        var rental = createRental.Handle(command);
+        var rental = await createRental.HandleAsync(command, cancellationToken);
         return RestResults.Created(request, rental.Id, rental);
     }
 }

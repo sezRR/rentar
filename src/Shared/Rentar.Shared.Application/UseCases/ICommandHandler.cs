@@ -1,4 +1,6 @@
 using JetBrains.Annotations;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Rentar.Shared.Application.UseCases;
 
@@ -8,14 +10,14 @@ namespace Rentar.Shared.Application.UseCases;
 [UsedImplicitly(ImplicitUseKindFlags.InstantiatedNoFixedConstructorSignature, ImplicitUseTargetFlags.WithInheritors)]
 public interface ICommandHandler<in TCommand>
 {
-    void Handle(TCommand command);
+    Task HandleAsync(TCommand command, CancellationToken cancellationToken = default);
 }
 
 /// <summary>
 /// Carries out one use case that changes state and hands back what the caller needs from it, e.g. the created record.
 /// </summary>
 [UsedImplicitly(ImplicitUseKindFlags.InstantiatedNoFixedConstructorSignature, ImplicitUseTargetFlags.WithInheritors)]
-public interface ICommandHandler<in TCommand, out TResult>
+public interface ICommandHandler<in TCommand, TResult>
 {
-    TResult Handle(TCommand command);
+    Task<TResult> HandleAsync(TCommand command, CancellationToken cancellationToken = default);
 }

@@ -1,4 +1,6 @@
 using System;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Rentar.Modules.Rentals.Contracts;
 
@@ -8,5 +10,5 @@ namespace Rentar.Modules.Rentals.Contracts;
 public interface IRentalsModuleApi
 {
     /// <summary>Whether no rental of the car overlaps the given period.</summary>
-    bool IsCarAvailable(int carId, DateTime rentDate, DateTime returnDate);
+    Task<bool> IsCarAvailableAsync(int carId, DateTime rentDate, DateTime returnDate, CancellationToken cancellationToken = default);
 }

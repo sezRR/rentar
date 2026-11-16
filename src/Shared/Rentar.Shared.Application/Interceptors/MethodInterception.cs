@@ -1,8 +1,12 @@
 using Castle.DynamicProxy;
 using System;
+using System.Threading.Tasks;
 
 namespace Rentar.Shared.Application.Interceptors;
 
+/// <summary>
+/// An aspect made of hooks around the handler: before it starts, and once it has succeeded or failed.
+/// </summary>
 public abstract class MethodInterception : MethodInterceptionBaseAttribute
 {
     protected virtual void OnBefore(IInvocation invocation) { }
@@ -10,27 +14,23 @@ public abstract class MethodInterception : MethodInterceptionBaseAttribute
     protected virtual void OnException(IInvocation invocation, Exception e) { }
     protected virtual void OnSuccess(IInvocation invocation) { }
 
-    public override void Intercept(IInvocation invocation)
+    protected override async Task<object> InterceptAsync(IInvocation invocation, Func<Task<object>> proceed)
     {
-        var isSuccess = true;
         OnBefore(invocation);
+
+        object result;
         try
         {
-            invocation.Proceed();
+            result = await proceed();
         }
         catch (Exception e)
         {
-            isSuccess = false;
             OnException(invocation, e);
             throw;
         }
-        finally
-        {
-            if (isSuccess)
-            {
-                OnSuccess(invocation);
-            }
-        }
+
+        OnSuccess(invocation);
         OnAfter(invocation);
+        return result;
     }
 }

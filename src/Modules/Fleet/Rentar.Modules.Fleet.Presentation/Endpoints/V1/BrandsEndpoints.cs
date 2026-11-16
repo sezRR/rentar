@@ -8,6 +8,8 @@ using Rentar.Modules.Fleet.Domain;
 using Rentar.Shared.Application.UseCases;
 using Rentar.Shared.Presentation.Endpoints;
 using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Rentar.Modules.Fleet.Presentation.Endpoints.V1;
 
@@ -24,31 +26,31 @@ public class BrandsEndpoints : IEndpoint
         group.MapPost("/delete", Delete);
     }
 
-    private static Ok<V1Response<List<Brand>>> GetAll(IQueryHandler<GetBrandsQuery, List<Brand>> getBrands)
+    private static async Task<Ok<V1Response<List<Brand>>>> GetAll(IQueryHandler<GetBrandsQuery, List<Brand>> getBrands, CancellationToken cancellationToken)
     {
-        return V1Results.Ok(getBrands.Handle(new GetBrandsQuery()), Messages.BrandsListed);
+        return V1Results.Ok(await getBrands.HandleAsync(new GetBrandsQuery(), cancellationToken), Messages.BrandsListed);
     }
 
-    private static Ok<V1Response<Brand>> GetById(IQueryHandler<GetBrandByIdQuery, Brand> getBrandById, int id)
+    private static async Task<Ok<V1Response<Brand>>> GetById(IQueryHandler<GetBrandByIdQuery, Brand> getBrandById, int id, CancellationToken cancellationToken)
     {
-        return V1Results.Ok(getBrandById.Handle(new GetBrandByIdQuery(id)), null);
+        return V1Results.Ok(await getBrandById.HandleAsync(new GetBrandByIdQuery(id), cancellationToken), null);
     }
 
-    private static Ok<V1Response> Add(ICommandHandler<CreateBrandCommand, Brand> createBrand, CreateBrandCommand command)
+    private static async Task<Ok<V1Response>> Add(ICommandHandler<CreateBrandCommand, Brand> createBrand, CreateBrandCommand command, CancellationToken cancellationToken)
     {
-        createBrand.Handle(command);
+        await createBrand.HandleAsync(command, cancellationToken);
         return V1Results.Ok(Messages.BrandAdded);
     }
 
-    private static Ok<V1Response> Update(ICommandHandler<UpdateBrandCommand> updateBrand, UpdateBrandCommand command)
+    private static async Task<Ok<V1Response>> Update(ICommandHandler<UpdateBrandCommand> updateBrand, UpdateBrandCommand command, CancellationToken cancellationToken)
     {
-        updateBrand.Handle(command);
+        await updateBrand.HandleAsync(command, cancellationToken);
         return V1Results.Ok(Messages.BrandUpdated);
     }
 
-    private static Ok<V1Response> Delete(ICommandHandler<DeleteBrandCommand> deleteBrand, DeleteBrandCommand command)
+    private static async Task<Ok<V1Response>> Delete(ICommandHandler<DeleteBrandCommand> deleteBrand, DeleteBrandCommand command, CancellationToken cancellationToken)
     {
-        deleteBrand.Handle(command);
+        await deleteBrand.HandleAsync(command, cancellationToken);
         return V1Results.Ok(Messages.BrandDeleted);
     }
 }

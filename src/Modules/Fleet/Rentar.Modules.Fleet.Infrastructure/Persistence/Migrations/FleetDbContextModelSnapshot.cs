@@ -32,6 +32,7 @@ namespace Rentar.Modules.Fleet.Infrastructure.Persistence.Migrations
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<string>("BrandName")
+                        .IsRequired()
                         .HasColumnType("text");
 
                     b.HasKey("Id");
@@ -57,6 +58,7 @@ namespace Rentar.Modules.Fleet.Infrastructure.Persistence.Migrations
                         .HasColumnType("numeric");
 
                     b.Property<string>("Description")
+                        .IsRequired()
                         .HasColumnType("text");
 
                     b.Property<int>("MinimumFindeksRating")
@@ -66,6 +68,10 @@ namespace Rentar.Modules.Fleet.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("BrandId");
+
+                    b.HasIndex("ColorId");
 
                     b.ToTable("Cars", "fleet");
                 });
@@ -85,9 +91,12 @@ namespace Rentar.Modules.Fleet.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp without time zone");
 
                     b.Property<string>("ImagePath")
+                        .IsRequired()
                         .HasColumnType("text");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("CarId");
 
                     b.ToTable("CarImages", "fleet");
                 });
@@ -101,11 +110,57 @@ namespace Rentar.Modules.Fleet.Infrastructure.Persistence.Migrations
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<string>("ColorName")
+                        .IsRequired()
                         .HasColumnType("text");
 
                     b.HasKey("Id");
 
                     b.ToTable("Colors", "fleet");
+                });
+
+            modelBuilder.Entity("Rentar.Modules.Fleet.Domain.Car", b =>
+                {
+                    b.HasOne("Rentar.Modules.Fleet.Domain.Brand", "Brand")
+                        .WithMany("Cars")
+                        .HasForeignKey("BrandId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Rentar.Modules.Fleet.Domain.Color", "Color")
+                        .WithMany("Cars")
+                        .HasForeignKey("ColorId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Brand");
+
+                    b.Navigation("Color");
+                });
+
+            modelBuilder.Entity("Rentar.Modules.Fleet.Domain.CarImage", b =>
+                {
+                    b.HasOne("Rentar.Modules.Fleet.Domain.Car", "Car")
+                        .WithMany("Images")
+                        .HasForeignKey("CarId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Car");
+                });
+
+            modelBuilder.Entity("Rentar.Modules.Fleet.Domain.Brand", b =>
+                {
+                    b.Navigation("Cars");
+                });
+
+            modelBuilder.Entity("Rentar.Modules.Fleet.Domain.Car", b =>
+                {
+                    b.Navigation("Images");
+                });
+
+            modelBuilder.Entity("Rentar.Modules.Fleet.Domain.Color", b =>
+                {
+                    b.Navigation("Cars");
                 });
 #pragma warning restore 612, 618
         }

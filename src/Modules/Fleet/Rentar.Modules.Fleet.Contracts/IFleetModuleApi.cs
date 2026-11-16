@@ -1,4 +1,6 @@
 using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Rentar.Modules.Fleet.Contracts;
 
@@ -8,5 +10,5 @@ namespace Rentar.Modules.Fleet.Contracts;
 public interface IFleetModuleApi
 {
     /// <summary>Cars with the given ids, with their brand and color; unknown ids are left out.</summary>
-    IReadOnlyList<CarSummary> GetCars(IReadOnlyCollection<int> carIds);
+    Task<IReadOnlyList<CarSummary>> GetCarsAsync(IReadOnlyCollection<int> carIds, CancellationToken cancellationToken = default);
 }

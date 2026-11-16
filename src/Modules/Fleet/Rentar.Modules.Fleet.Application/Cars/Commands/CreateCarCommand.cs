@@ -4,10 +4,16 @@ using Rentar.Modules.Fleet.Domain;
 using Rentar.Shared.Application.Aspects.Caching;
 using Rentar.Shared.Application.UseCases;
 using Rentar.Shared.Application.Validation;
+using Rentar.Shared.Kernel.Exceptions;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Rentar.Modules.Fleet.Application.Cars.Commands;
 
-/// <summary>Stores a new car and answers it with its id set.</summary>
+/// <summary>
+/// Stores a new car and answers it with its id set. Throws <see cref="BusinessRuleException"/> when its brand or
+/// color is not stored.
+/// </summary>
 public sealed record CreateCarCommand(
     int BrandId,
     int ColorId,
@@ -26,7 +32,7 @@ public sealed class CreateCarCommandValidator : UseCaseValidator<CreateCarComman
     }
 }
 
-public sealed class CreateCarCommandHandler(ICarDal carDal) : ICommandHandler<CreateCarCommand, Car>
+public sealed class CreateCarCommandHandler(ICarDal carDal, IBrandDal brandDal, IColorDal colorDal) : ICommandHandler<CreateCarCommand, Car>
 {
     /// <summary>
     /// Matches the cache keys of the car queries, e.g. <see cref="GetCarsByBrandQueryHandler"/>, so a new car shows up at once.
@@ -34,8 +40,10 @@ public sealed class CreateCarCommandHandler(ICarDal carDal) : ICommandHandler<Cr
     private const string CarQueries = @"Rentar\.Modules\.Fleet\.Application\.Cars\.Queries\.";
 
     [CacheRemoveAspect(CarQueries)]
-    public Car Handle(CreateCarCommand command)
+    public async Task<Car> HandleAsync(CreateCarCommand command, CancellationToken cancellationToken = default)
     {
+        await CarReferences.EnsureExistAsync(brandDal, colorDal, command.BrandId, command.ColorId, cancellationToken);
+
         var car = new Car
         {
             BrandId = command.BrandId,
@@ -46,7 +54,7 @@ public sealed class CreateCarCommandHandler(ICarDal carDal) : ICommandHandler<Cr
             MinimumFindeksRating = command.MinimumFindeksRating
         };
 
-        carDal.Add(car);
+        await carDal.AddAsync(car, cancellationToken);
         return car;
     }
 }

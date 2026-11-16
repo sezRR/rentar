@@ -1,9 +1,11 @@
-using System;
-using System.Collections.Generic;
 using Rentar.Modules.Identity.Application.Common.Interfaces;
 using Rentar.Modules.Identity.Domain;
 using Rentar.Shared.Application.UseCases;
 using Rentar.Shared.Kernel.Exceptions;
+using System;
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Rentar.Modules.Identity.Application.Users.Queries;
 
@@ -12,13 +14,13 @@ public sealed record GetUsersQuery;
 
 public sealed class GetUsersQueryHandler(IUserDal userDal, TimeProvider timeProvider) : IQueryHandler<GetUsersQuery, List<User>>
 {
-    public List<User> Handle(GetUsersQuery query)
+    public async Task<List<User>> HandleAsync(GetUsersQuery query, CancellationToken cancellationToken = default)
     {
         if (timeProvider.GetLocalNow().Hour == 22)
         {
             throw new UnavailableException(Messages.MaintenanceTime);
         }
 
-        return userDal.GetAll();
+        return await userDal.GetAllAsync(cancellationToken);
     }
 }

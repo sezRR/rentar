@@ -16,6 +16,7 @@ public class FleetDbContext(DbContextOptions<FleetDbContext> options) : DbContex
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema(Schema);
+        modelBuilder.ApplyConfigurationsFromAssembly(typeof(FleetDbContext).Assembly);
         modelBuilder.UseTimestampWithoutTimeZone();
     }
 }

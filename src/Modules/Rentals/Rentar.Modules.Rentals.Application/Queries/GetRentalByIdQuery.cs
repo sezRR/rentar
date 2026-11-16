@@ -1,6 +1,8 @@
 using Rentar.Modules.Rentals.Application.Common.Interfaces;
 using Rentar.Modules.Rentals.Domain;
 using Rentar.Shared.Application.UseCases;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Rentar.Modules.Rentals.Application.Queries;
 
@@ -9,8 +11,8 @@ public sealed record GetRentalByIdQuery(int Id);
 
 public sealed class GetRentalByIdQueryHandler(IRentalDal rentalDal) : IQueryHandler<GetRentalByIdQuery, Rental>
 {
-    public Rental Handle(GetRentalByIdQuery query)
+    public Task<Rental> HandleAsync(GetRentalByIdQuery query, CancellationToken cancellationToken = default)
     {
-        return rentalDal.Get(r => r.Id == query.Id);
+        return rentalDal.GetAsync(r => r.Id == query.Id, cancellationToken);
     }
 }

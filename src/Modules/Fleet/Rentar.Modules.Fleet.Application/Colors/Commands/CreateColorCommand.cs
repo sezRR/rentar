@@ -3,6 +3,8 @@ using Rentar.Modules.Fleet.Application.Common.Interfaces;
 using Rentar.Modules.Fleet.Domain;
 using Rentar.Shared.Application.UseCases;
 using Rentar.Shared.Application.Validation;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Rentar.Modules.Fleet.Application.Colors.Commands;
 
@@ -19,10 +21,10 @@ public sealed class CreateColorCommandValidator : UseCaseValidator<CreateColorCo
 
 public sealed class CreateColorCommandHandler(IColorDal colorDal) : ICommandHandler<CreateColorCommand, Color>
 {
-    public Color Handle(CreateColorCommand command)
+    public async Task<Color> HandleAsync(CreateColorCommand command, CancellationToken cancellationToken = default)
     {
         var color = new Color { ColorName = command.ColorName };
-        colorDal.Add(color);
+        await colorDal.AddAsync(color, cancellationToken);
         return color;
     }
 }

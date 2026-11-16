@@ -1,4 +1,6 @@
 using JetBrains.Annotations;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Rentar.Shared.Application.UseCases;
 
@@ -6,7 +8,7 @@ namespace Rentar.Shared.Application.UseCases;
 /// Answers one use case that only reads, described by <typeparamref name="TQuery"/>. It changes nothing.
 /// </summary>
 [UsedImplicitly(ImplicitUseKindFlags.InstantiatedNoFixedConstructorSignature, ImplicitUseTargetFlags.WithInheritors)]
-public interface IQueryHandler<in TQuery, out TResult>
+public interface IQueryHandler<in TQuery, TResult>
 {
-    TResult Handle(TQuery query);
+    Task<TResult> HandleAsync(TQuery query, CancellationToken cancellationToken = default);
 }

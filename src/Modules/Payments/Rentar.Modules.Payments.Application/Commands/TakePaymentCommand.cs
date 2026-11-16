@@ -1,5 +1,7 @@
-using System;
 using Rentar.Shared.Application.UseCases;
+using System;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Rentar.Modules.Payments.Application.Commands;
 
@@ -8,9 +10,10 @@ public sealed record TakePaymentCommand;
 
 public sealed class TakePaymentCommandHandler : ICommandHandler<TakePaymentCommand, bool>
 {
-    public bool Handle(TakePaymentCommand command)
+    /// <remarks>Simulated in memory, so it completes at once; a real payment provider would be awaited here.</remarks>
+    public Task<bool> HandleAsync(TakePaymentCommand command, CancellationToken cancellationToken = default)
     {
         // No card data is kept, so the outcome of a payment is simulated.
-        return Random.Shared.Next(2) == 1;
+        return Task.FromResult(Random.Shared.Next(2) == 1);
     }
 }

@@ -99,6 +99,46 @@ public class CarsEndpointsTests(RentarApiFactory factory) : V2TestBase(factory)
         await AssertValidationProblemAsync(response, "dailyPrice", "description");
     }
 
+    [Theory]
+    [InlineData(true, false, "Brand not found")]
+    [InlineData(false, true, "Color not found")]
+    public async Task Create_WithABrandOrColorThatIsNotStored_IsABadRequest(bool unknownBrand, bool unknownColor, string detail)
+    {
+        var brand = await CreateBrandAsync();
+        var color = await CreateColorAsync();
+
+        var response = await Client.PostJsonAsync("/api/v2/cars",
+            new CarRequest(unknownBrand ? 404 : brand.Id, unknownColor ? 404 : color.Id, 2021, 950m, "Corolla 1.6", 700));
+
+        await AssertProblemAsync(response, HttpStatusCode.BadRequest, detail);
+        Assert.Empty(await (await Client.GetJsonAsync("/api/v2/cars")).ReadAsAsync<List<CarResponse>>());
+    }
+
+    [Fact]
+    public async Task Update_WithABrandThatIsNotStored_IsABadRequest_AndKeepsTheCar()
+    {
+        var car = await CreateCarAsync();
+
+        var response = await Client.PutJsonAsync($"/api/v2/cars/{car.Id}", new CarRequest(404, car.ColorId, 2024, 1200m, "Corolla Hybrid", 800));
+
+        await AssertProblemAsync(response, HttpStatusCode.BadRequest, "Brand not found");
+        Assert.Equal(car, await (await Client.GetJsonAsync($"/api/v2/cars/{car.Id}")).ReadAsAsync<CarResponse>());
+    }
+
+    [Fact]
+    public async Task GetById_AnswersTheFirstImageUploaded()
+    {
+        var car = await CreateCarAsync();
+        var first = await (await UploadImageAsync(car.Id, "first.png", PngBytes)).ReadAsAsync<CarImage>();
+        await UploadImageAsync(car.Id, "second.jpg", JpegBytes);
+
+        var fetched = await (await Client.GetJsonAsync($"/api/v2/cars/{car.Id}")).ReadAsAsync<CarResponse>();
+
+        Assert.Equal(first.ImagePath, fetched.ImagePath);
+
+        await Client.DeleteResourceAsync($"/api/v2/cars/{car.Id}/images");
+    }
+
     private async Task<List<string>> DescriptionsAsync(string url)
     {
         var response = await Client.GetJsonAsync(url);

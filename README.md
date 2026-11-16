@@ -61,6 +61,11 @@ dotnet ef migrations add <Name> --project $project --startup-project $project --
 > Upgrading a database created before the modular monolith: its tables live in `public` and are not moved.
 > Recreate it (`docker compose down -v && docker compose up -d`) so each module creates its own schema.
 
+> Upgrading a database from before the relationships were mapped: the `AddFleetRelationships` and
+> `AddUserOperationClaimsManyToMany` migrations add foreign keys and a unique index on `Users.Email`, so they stop on
+> rows that break them: car images of a deleted car, cars whose brand or color is gone, users sharing an email, or a
+> claim granted to a user twice. Fix or delete those rows first. Required text columns that hold `NULL` are set to `''`.
+
 **Tests**
 
 - `src/Tests/Rentar.Api.IntegrationTests` drives the API in memory (`WebApplicationFactory`) against a throwaway
@@ -89,7 +94,9 @@ versions in a dropdown, and their OpenAPI documents are at `/openapi/v1.json` an
 Bruno requests for both versions are in `api-docs/`.
 
 - **v1** is the original API and is unchanged, except that it now also refuses input its validators reject (e.g. an
-  update with an empty brand name), with the same error body as before. It uses action-style routes (`/brands/getall`, `/brands/add`,
+  update with an empty brand name), with the same error body as before, and refuses what the database's relationships
+  forbid with `400 { success: false, message }`: a car whose brand or color is not stored, an image of a car that is not
+  stored, deleting a brand or color that cars still have, and an email another user already has. It uses action-style routes (`/brands/getall`, `/brands/add`,
   `POST /brands/delete`), answers 200 or 400, and wraps every body in `{ success, message, data }`.
 - **v2** is RESTful:
   - Routes name resources, and the HTTP method says what to do with them.
@@ -154,6 +161,29 @@ schema, so modules migrate independently. Data in another module is referenced b
 foreign keys or joins. For example, rental details are put together by the `GetRentalDetailsQuery` use case from the
 Customers, Identity and Fleet contracts.
 
+Inside a module, relationships are mapped as EF Core navigations backed by foreign keys:
+
+| Relationship | Kind | Foreign key | On delete |
+|---|---|---|---|
+| `Brand.Cars` / `Car.Brand` | one-to-many | `Cars.BrandId` | restrict: a brand goes once no car has it |
+| `Color.Cars` / `Car.Color` | one-to-many | `Cars.ColorId` | restrict |
+| `Car.Images` / `CarImage.Car` | one-to-many | `CarImages.CarId` | cascade: the rows go with the car, `DeleteCarCommand` deletes the files |
+| `User.OperationClaims` / `OperationClaim.Users` | many-to-many through `UserOperationClaim` | `UserOperationClaims.(UserId, OperationClaimId)`, also its key | cascade |
+
+There is no one-to-one relationship: nothing in the model has exactly one of something else. References across
+modules (`Customer.UserId`, `Rental.CarId`, `Rental.CustomerId`) are plain ids, indexed where they are looked up.
+
+- Each module's `Persistence/Configurations` holds an `IEntityTypeConfiguration<T>` per entity that needs more than the
+  conventions, and its context applies them with `ApplyConfigurationsFromAssembly`. Domain projects compile with
+  `<Nullable>annotations</Nullable>`, so a `string` property is a required column and only a `string?` may be `NULL`.
+- Queries follow navigations instead of writing joins, e.g. `car.Brand.BrandName` in `EfCarDal`, and
+  `u.OperationClaims` reads through the join table. Contexts live for one operation, so queries run without tracking.
+- A handler checks what it needs from stored data before writing, so a request the keys would refuse gets an answer
+  instead of a database error.
+- Navigations are never written to JSON (`AddApiJson`): entities keep the shape v1 clients know, and a response that
+  needs related data uses a `<Name>Response` model.
+- `ModuleSchemasTests` checks the database holds exactly these foreign keys.
+
 Boundary rules (checked by `Rentar.ArchitectureTests` on the compiled assemblies):
 
 - Domain uses only the Kernel. Contracts use nothing but the Kernel.
@@ -181,12 +211,17 @@ public sealed class CreateBrandCommandValidator : UseCaseValidator<CreateBrandCo
 
 public sealed class CreateBrandCommandHandler(IBrandDal brandDal) : ICommandHandler<CreateBrandCommand, Brand>
 {
-    public Brand Handle(CreateBrandCommand command) { ... }
+    public async Task<Brand> HandleAsync(CreateBrandCommand command, CancellationToken cancellationToken = default) { ... }
 }
 ```
 
 - Commands change state and implement `ICommandHandler<TCommand>`, or `ICommandHandler<TCommand, TResult>` when the
   caller needs something back (e.g. the created record). Queries only read and implement `IQueryHandler<TQuery, TResult>`.
+- Everything that waits on I/O is asynchronous, from the endpoint down: `HandleAsync`, repositories, module APIs, image
+  storage and validation return a `Task` and take the request's `CancellationToken`, which every endpoint passes on.
+  Work that never waits (hashing, issuing a token, the simulated payment and Findeks rating) stays synchronous inside
+  them, and so does deleting an image file, which has no asynchronous API. A handler that only forwards a call
+  returns its task; one with any logic of its own is `async`, so even a refusal arrives through the task.
 - Naming follows the kind: `<UseCase>Command` in a `Commands` folder (`CreateCustomerCommand`), `<UseCase>Query` in a
   `Queries` folder (`GetCustomersQuery`), with `<UseCase>Command|QueryHandler` and `...Validator` next to the record.
   The folders sit inside the entity folder where a module has one (`Fleet.Application/Cars/Queries`), and the
@@ -198,11 +233,14 @@ public sealed class CreateBrandCommandHandler(IBrandDal brandDal) : ICommandHand
   no mediator.
 - Handlers don't call each other; they use repositories, and endpoints combine use cases where needed (v1 login =
   `VerifyCredentialsQuery` + `CreateAccessTokenCommand`).
-- `RegisterUseCases` registers every handler behind a Castle proxy, so aspect attributes on `Handle` run around it.
+- `RegisterUseCases` registers every handler behind a Castle proxy, so aspect attributes on `HandleAsync` run around
+  it. Castle calls an interceptor synchronously, so an aspect implements `InterceptAsync` and awaits the handler: the
+  cache stores the finished result, the transaction commits once the task succeeds, and the timing covers all of it.
 - `Rentar.ArchitectureTests` checks that no managers or services are left, that every handler is sealed and named
   after its record, that every command and query is named and filed after its kind, that every use case has exactly
   one handler, that every handler is registered, and the same for validators. It also checks that Application
-  interfaces live in `Common.Interfaces`, that no type is named `*Dto`, and that entity properties are `init`-only.
+  interfaces live in `Common.Interfaces`, that no type is named `*Dto`, that entity properties are `init`-only, and that
+  every repository and module API method returns a `Task` and takes a `CancellationToken`.
 
 <br>
 
@@ -213,7 +251,7 @@ Each rule has one home, chosen by what it needs:
 | Rule | Lives in | Fails with |
 | --- | --- | --- |
 | About the input alone: required, length, format, how fields relate (return date after rent date) | The use case's validator, a `UseCaseValidator<TUseCase>` next to its record | `ValidationException`: 400 with every failure, grouped by field |
-| Needs stored data: unique email, record exists, at most 5 images per car | The handler | A Kernel exception (`ConflictException`, `NotFoundException`, `BusinessRuleException`, ...) |
+| Needs stored data: unique email, record exists (a car's brand and color, an image's car), a brand or color no car has before it is deleted, at most 5 images per car | The handler, backed by the database's keys and unique indexes | A Kernel exception (`ConflictException`, `NotFoundException`, `BusinessRuleException`, ...) |
 | Must hold for an entity however it is changed | The domain, once entities have behavior. Today they are plain data, so none live there yet | |
 
 - Validators run on their own. `RegisterUseCases` registers them, and a decorator (`RegisterUseCaseValidation`, called
@@ -235,7 +273,8 @@ Each rule has one home, chosen by what it needs:
   `{ success, message, data }` body for v1. `V1ContractTests` pins every v1 response.
 - Aspects on use case handlers, run by Autofac/Castle interceptors: caching, transaction scope, performance, secured
   operation. Cache keys are named after the handler class, e.g.
-  `...Cars.Queries.GetCarsByBrandQueryHandler.Handle(GetCarsByBrandQuery { BrandId = 1 })`
+  `...Cars.Queries.GetCarsByBrandQueryHandler.HandleAsync(GetCarsByBrandQuery { BrandId = 1 })`; the cancellation
+  token is not part of the key. The transaction scope flows across awaits (`TransactionScopeAsyncFlowOption.Enabled`).
 - Security: HMACSHA512 password hashing, JWT access tokens (Identity module)
 - Uploaded car images are stored under `src/Bootstrapper/Rentar.Api/wwwroot/uploads` (`Paths:DefaultCarImagePath`)
 

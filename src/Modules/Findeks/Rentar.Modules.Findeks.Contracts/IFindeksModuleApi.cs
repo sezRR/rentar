@@ -1,3 +1,6 @@
+using System.Threading;
+using System.Threading.Tasks;
+
 namespace Rentar.Modules.Findeks.Contracts;
 
 /// <summary>
@@ -6,5 +9,5 @@ namespace Rentar.Modules.Findeks.Contracts;
 public interface IFindeksModuleApi
 {
     /// <summary>A Findeks credit rating between 0 and 1900.</summary>
-    int CalculateFindeksRating();
+    Task<int> CalculateFindeksRatingAsync(CancellationToken cancellationToken = default);
 }

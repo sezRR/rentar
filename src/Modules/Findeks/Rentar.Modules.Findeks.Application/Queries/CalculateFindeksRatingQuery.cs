@@ -1,6 +1,8 @@
-using System;
 using Rentar.Modules.Findeks.Domain;
 using Rentar.Shared.Application.UseCases;
+using System;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Rentar.Modules.Findeks.Application.Queries;
 
@@ -9,7 +11,8 @@ public sealed record CalculateFindeksRatingQuery;
 
 public sealed class CalculateFindeksRatingQueryHandler : IQueryHandler<CalculateFindeksRatingQuery, int>
 {
-    public int Handle(CalculateFindeksRatingQuery query)
+    /// <remarks>Simulated in memory, so it completes at once; a real bureau would be awaited here.</remarks>
+    public Task<int> HandleAsync(CalculateFindeksRatingQuery query, CancellationToken cancellationToken = default)
     {
         // Each factor is simulated up to its maximum.
         var report = new FindeksReport
@@ -27,6 +30,6 @@ public sealed class CalculateFindeksRatingQueryHandler : IQueryHandler<Calculate
             + report.NewLoansTaken
             + report.OtherFactors;
 
-        return findeksRating;
+        return Task.FromResult(findeksRating);
     }
 }

@@ -1,3 +1,4 @@
+using Rentar.Modules.Fleet.Application;
 using Rentar.Modules.Fleet.Domain;
 using Rentar.Modules.Fleet.Presentation.Endpoints.V2;
 using System.Collections.Generic;
@@ -59,6 +60,17 @@ public class BrandsEndpointsTests(RentarApiFactory factory) : V2TestBase(factory
 
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
         await AssertProblemAsync(await Client.GetJsonAsync($"/api/v2/brands/{brand.Id}"), HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task Delete_OfABrandCarsStillHave_IsAConflict_AndKeepsTheBrand()
+    {
+        var car = await CreateCarAsync("Toyota");
+
+        var response = await Client.DeleteResourceAsync($"/api/v2/brands/{car.BrandId}");
+
+        await AssertProblemAsync(response, HttpStatusCode.Conflict, Messages.BrandHasCars);
+        Assert.Equal(HttpStatusCode.OK, (await Client.GetJsonAsync($"/api/v2/brands/{car.BrandId}")).StatusCode);
     }
 
     [Theory]

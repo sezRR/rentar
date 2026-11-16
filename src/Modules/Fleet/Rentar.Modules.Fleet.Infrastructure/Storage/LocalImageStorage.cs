@@ -3,6 +3,8 @@ using Microsoft.Extensions.Options;
 using Rentar.Modules.Fleet.Application.CarImages;
 using System;
 using System.IO;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Transactions;
 using Rentar.Modules.Fleet.Application.Common.Interfaces;
 
@@ -15,17 +17,27 @@ public class LocalImageStorage(IOptions<ImageStorageOptions> options, IHostEnvir
 {
     public string UploadsPath { get; } = Path.GetFullPath(options.Value.DefaultCarImagePath, environment.ContentRootPath);
 
-    public string Save(FileUpload file)
+    public async Task<string> SaveAsync(FileUpload file, CancellationToken cancellationToken = default)
     {
         Directory.CreateDirectory(UploadsPath);
 
         var fileName = NewFileName(file);
         var fullPath = Path.Combine(UploadsPath, fileName);
 
-        using (var target = new FileStream(fullPath, FileMode.CreateNew))
-        using (var source = file.OpenReadStream())
+        var target = new FileStream(fullPath, FileMode.CreateNew, FileAccess.Write, FileShare.None, bufferSize: 4096, useAsync: true);
+        try
         {
-            source.CopyTo(target);
+            await using (target)
+            await using (var source = file.OpenReadStream())
+            {
+                await source.CopyToAsync(target, cancellationToken);
+            }
+        }
+        catch
+        {
+            // A copy cut short, e.g. by a cancelled request, leaves no partial file behind.
+            File.Delete(fullPath);
+            throw;
         }
 
         OnTransactionEnd(committed =>
@@ -39,9 +51,9 @@ public class LocalImageStorage(IOptions<ImageStorageOptions> options, IHostEnvir
         return fileName;
     }
 
-    public string Replace(FileUpload file, string oldFileName)
+    public async Task<string> ReplaceAsync(FileUpload file, string oldFileName, CancellationToken cancellationToken = default)
     {
-        var fileName = Save(file);
+        var fileName = await SaveAsync(file, cancellationToken);
 
         Delete(oldFileName);
 

@@ -9,6 +9,8 @@ using Rentar.Modules.Fleet.Domain;
 using Rentar.Shared.Application.UseCases;
 using Rentar.Shared.Presentation.Endpoints;
 using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Rentar.Modules.Fleet.Presentation.Endpoints.V2;
 
@@ -27,52 +29,65 @@ public class ColorsEndpoints : IEndpoint
             .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status404NotFound);
         group.MapDelete("/{id:int}", Delete)
-            .ProducesProblem(StatusCodes.Status404NotFound);
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict);
     }
 
-    private static Ok<List<Color>> GetAll(IQueryHandler<GetColorsQuery, List<Color>> getColors)
+    private static async Task<Ok<List<Color>>> GetAll(IQueryHandler<GetColorsQuery, List<Color>> getColors, CancellationToken cancellationToken)
     {
-        return TypedResults.Ok(getColors.Handle(new GetColorsQuery()));
+        return TypedResults.Ok(await getColors.HandleAsync(new GetColorsQuery(), cancellationToken));
     }
 
-    private static Results<Ok<Color>, ProblemHttpResult> GetById(IQueryHandler<GetColorByIdQuery, Color> getColorById, int id)
+    private static async Task<Results<Ok<Color>, ProblemHttpResult>> GetById(
+        IQueryHandler<GetColorByIdQuery, Color> getColorById,
+        int id,
+        CancellationToken cancellationToken)
     {
-        var color = getColorById.Handle(new GetColorByIdQuery(id));
+        var color = await getColorById.HandleAsync(new GetColorByIdQuery(id), cancellationToken);
         return color is null ? RestResults.NotFound("Color", id) : TypedResults.Ok(color);
     }
 
-    private static Created<Color> Create(ICommandHandler<CreateColorCommand, Color> createColor, HttpRequest request, ColorRequest body)
+    private static async Task<Created<Color>> Create(
+        ICommandHandler<CreateColorCommand, Color> createColor,
+        HttpRequest request,
+        ColorRequest body,
+        CancellationToken cancellationToken)
     {
-        var color = createColor.Handle(new CreateColorCommand(body.ColorName));
+        var color = await createColor.HandleAsync(new CreateColorCommand(body.ColorName), cancellationToken);
         return RestResults.Created(request, color.Id, color);
     }
 
-    private static Results<NoContent, ProblemHttpResult> Update(
+    private static async Task<Results<NoContent, ProblemHttpResult>> Update(
         IQueryHandler<GetColorByIdQuery, Color> getColorById,
         ICommandHandler<UpdateColorCommand> updateColor,
         int id,
-        ColorRequest body)
+        ColorRequest body,
+        CancellationToken cancellationToken)
     {
-        if (getColorById.Handle(new GetColorByIdQuery(id)) is null)
+        if (await getColorById.HandleAsync(new GetColorByIdQuery(id), cancellationToken) is null)
         {
             return RestResults.NotFound("Color", id);
         }
 
-        updateColor.Handle(new UpdateColorCommand(id, body.ColorName));
+        await updateColor.HandleAsync(new UpdateColorCommand(id, body.ColorName), cancellationToken);
         return TypedResults.NoContent();
     }
 
-    private static Results<NoContent, ProblemHttpResult> Delete(
+    /// <summary>
+    /// Deletes the color; a color that cars still have answers 409.
+    /// </summary>
+    private static async Task<Results<NoContent, ProblemHttpResult>> Delete(
         IQueryHandler<GetColorByIdQuery, Color> getColorById,
         ICommandHandler<DeleteColorCommand> deleteColor,
-        int id)
+        int id,
+        CancellationToken cancellationToken)
     {
-        if (getColorById.Handle(new GetColorByIdQuery(id)) is null)
+        if (await getColorById.HandleAsync(new GetColorByIdQuery(id), cancellationToken) is null)
         {
             return RestResults.NotFound("Color", id);
         }
 
-        deleteColor.Handle(new DeleteColorCommand(id));
+        await deleteColor.HandleAsync(new DeleteColorCommand(id), cancellationToken);
         return TypedResults.NoContent();
     }
 }

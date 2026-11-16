@@ -3,12 +3,14 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Routing;
 using Rentar.Modules.Rentals.Application;
 using Rentar.Modules.Rentals.Application.Commands;
+using Rentar.Modules.Rentals.Application.Common.Models;
 using Rentar.Modules.Rentals.Application.Queries;
 using Rentar.Modules.Rentals.Domain;
 using Rentar.Shared.Application.UseCases;
 using Rentar.Shared.Presentation.Endpoints;
 using System.Collections.Generic;
-using Rentar.Modules.Rentals.Application.Common.Models;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Rentar.Modules.Rentals.Presentation.Endpoints.V1;
 
@@ -25,34 +27,39 @@ public class RentalsEndpoints : IEndpoint
         group.MapPost("/add", Add);
     }
 
-    private static Ok<V1Response<List<Rental>>> GetAll(IQueryHandler<GetRentalsQuery, List<Rental>> getRentals)
+    private static async Task<Ok<V1Response<List<Rental>>>> GetAll(IQueryHandler<GetRentalsQuery, List<Rental>> getRentals, CancellationToken cancellationToken)
     {
-        return V1Results.Ok(getRentals.Handle(new GetRentalsQuery()), Messages.RentalsListed);
+        return V1Results.Ok(await getRentals.HandleAsync(new GetRentalsQuery(), cancellationToken), Messages.RentalsListed);
     }
 
-    private static Ok<V1Response<Rental>> GetRentalByCarId(IQueryHandler<GetRentalByCarQuery, Rental> getRentalByCar, int carId)
+    private static async Task<Ok<V1Response<Rental>>> GetRentalByCarId(
+        IQueryHandler<GetRentalByCarQuery, Rental> getRentalByCar,
+        int carId,
+        CancellationToken cancellationToken)
     {
-        return V1Results.Ok(getRentalByCar.Handle(new GetRentalByCarQuery(carId)), null);
+        return V1Results.Ok(await getRentalByCar.HandleAsync(new GetRentalByCarQuery(carId), cancellationToken), null);
     }
 
-    private static Ok<V1Response<List<RentalDetailResponse>>> GetRentalDetails(
-        IQueryHandler<GetRentalDetailsQuery, List<RentalDetailResponse>> getRentalDetails)
+    private static async Task<Ok<V1Response<List<RentalDetailResponse>>>> GetRentalDetails(
+        IQueryHandler<GetRentalDetailsQuery, List<RentalDetailResponse>> getRentalDetails,
+        CancellationToken cancellationToken)
     {
-        return V1Results.Ok(getRentalDetails.Handle(new GetRentalDetailsQuery()), null);
+        return V1Results.Ok(await getRentalDetails.HandleAsync(new GetRentalDetailsQuery(), cancellationToken), null);
     }
 
-    private static Results<Ok<V1Response>, BadRequest<V1Response>> IsRentable(
+    private static async Task<Results<Ok<V1Response>, BadRequest<V1Response>>> IsRentable(
         IQueryHandler<CheckCarAvailabilityQuery, bool> checkCarAvailability,
-        CheckCarAvailabilityQuery query)
+        CheckCarAvailabilityQuery query,
+        CancellationToken cancellationToken)
     {
-        return checkCarAvailability.Handle(query)
+        return await checkCarAvailability.HandleAsync(query, cancellationToken)
             ? V1Results.Ok(null)
             : V1Results.Fail(Messages.CarNotAvailable);
     }
 
-    private static Ok<V1Response> Add(ICommandHandler<CreateRentalCommand, Rental> createRental, CreateRentalCommand command)
+    private static async Task<Ok<V1Response>> Add(ICommandHandler<CreateRentalCommand, Rental> createRental, CreateRentalCommand command, CancellationToken cancellationToken)
     {
-        createRental.Handle(command);
+        await createRental.HandleAsync(command, cancellationToken);
         return V1Results.Ok(Messages.RentalAdded);
     }
 }

@@ -1,7 +1,9 @@
-using System.Collections.Generic;
 using Rentar.Modules.Fleet.Application.Common.Interfaces;
 using Rentar.Modules.Fleet.Domain;
 using Rentar.Shared.Application.UseCases;
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Rentar.Modules.Fleet.Application.CarImages.Queries;
 
@@ -10,8 +12,8 @@ public sealed record GetCarImagesQuery;
 
 public sealed class GetCarImagesQueryHandler(ICarImageDal carImageDal) : IQueryHandler<GetCarImagesQuery, List<CarImage>>
 {
-    public List<CarImage> Handle(GetCarImagesQuery query)
+    public Task<List<CarImage>> HandleAsync(GetCarImagesQuery query, CancellationToken cancellationToken = default)
     {
-        return carImageDal.GetAll();
+        return carImageDal.GetAllAsync(cancellationToken);
     }
 }

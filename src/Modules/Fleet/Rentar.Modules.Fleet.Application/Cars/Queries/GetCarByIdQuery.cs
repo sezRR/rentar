@@ -1,6 +1,8 @@
 using Rentar.Modules.Fleet.Application.Common.Interfaces;
 using Rentar.Modules.Fleet.Domain;
 using Rentar.Shared.Application.UseCases;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Rentar.Modules.Fleet.Application.Cars.Queries;
 
@@ -9,8 +11,8 @@ public sealed record GetCarByIdQuery(int Id);
 
 public sealed class GetCarByIdQueryHandler(ICarDal carDal) : IQueryHandler<GetCarByIdQuery, Car>
 {
-    public Car Handle(GetCarByIdQuery query)
+    public Task<Car> HandleAsync(GetCarByIdQuery query, CancellationToken cancellationToken = default)
     {
-        return carDal.Get(c => c.Id == query.Id);
+        return carDal.GetAsync(c => c.Id == query.Id, cancellationToken);
     }
 }

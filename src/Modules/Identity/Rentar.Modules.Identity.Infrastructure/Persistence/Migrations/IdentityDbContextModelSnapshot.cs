@@ -36,6 +36,9 @@ namespace Rentar.Modules.Identity.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("Name")
+                        .IsUnique();
+
                     b.ToTable("OperationClaims", "identity");
                 });
 
@@ -75,26 +78,40 @@ namespace Rentar.Modules.Identity.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("Email")
+                        .IsUnique();
+
                     b.ToTable("Users", "identity");
                 });
 
             modelBuilder.Entity("Rentar.Modules.Identity.Domain.UserOperationClaim", b =>
                 {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
+                    b.Property<int>("UserId")
                         .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<int>("OperationClaimId")
                         .HasColumnType("integer");
 
-                    b.Property<int>("UserId")
-                        .HasColumnType("integer");
+                    b.HasKey("UserId", "OperationClaimId");
 
-                    b.HasKey("Id");
+                    b.HasIndex("OperationClaimId");
 
                     b.ToTable("UserOperationClaims", "identity");
+                });
+
+            modelBuilder.Entity("Rentar.Modules.Identity.Domain.UserOperationClaim", b =>
+                {
+                    b.HasOne("Rentar.Modules.Identity.Domain.OperationClaim", null)
+                        .WithMany()
+                        .HasForeignKey("OperationClaimId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Rentar.Modules.Identity.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 #pragma warning restore 612, 618
         }

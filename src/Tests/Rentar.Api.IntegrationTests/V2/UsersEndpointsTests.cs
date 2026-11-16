@@ -3,6 +3,8 @@ using Rentar.Modules.Identity.Application.Auth;
 using Rentar.Modules.Identity.Application.Auth.Queries;
 using Rentar.Modules.Identity.Presentation.Endpoints.V2;
 using System.Collections.Generic;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
@@ -97,6 +99,32 @@ public class UsersEndpointsTests(RentarApiFactory factory) : V2TestBase(factory)
         var withOldPassword = await Client.PostJsonAsync("/api/v2/auth/tokens", new VerifyCredentialsQuery(Email, Password));
         Assert.Equal(HttpStatusCode.OK, withNewPassword.StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, withOldPassword.StatusCode);
+    }
+
+    [Fact]
+    public async Task Update_ToAnEmailAnotherUserHas_IsAConflict()
+    {
+        await CreateUserAsync("taken@example.com");
+        var user = await CreateUserAsync(Email);
+
+        var response = await Client.PutJsonAsync($"/api/v2/users/{user.Id}", new UserRequest("Sezer", "Tetik", "taken@example.com", Password, 900));
+
+        await AssertProblemAsync(response, HttpStatusCode.Conflict, Messages.UserAlreadyExists);
+        Assert.Equal(Email, (await (await Client.GetJsonAsync($"/api/v2/users/{user.Id}")).ReadAsAsync<UserResponse>()).Email);
+    }
+
+    [Fact]
+    public async Task CreateToken_CarriesTheOperationClaimsGrantedToTheUser()
+    {
+        var user = await CreateUserAsync(Email);
+        var other = await CreateUserAsync("other@example.com");
+        await Factory.GrantAsync(user.Id, "admin", "car.add");
+        await Factory.GrantAsync(other.Id, "admin", "customer");
+
+        var response = await Client.PostJsonAsync("/api/v2/auth/tokens", new VerifyCredentialsQuery(Email, Password));
+        var token = new JwtSecurityTokenHandler().ReadJwtToken((await response.ReadAsAsync<AccessToken>()).Token);
+
+        Assert.Equal(["admin", "car.add"], token.Claims.Where(c => c.Type is "role" or ClaimTypes.Role).Select(c => c.Value).Order());
     }
 
     [Fact]

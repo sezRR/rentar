@@ -1,6 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Rentar.Modules.Fleet.Application.CarImages;
 
@@ -20,7 +23,7 @@ public static class ImageFileValidator
         [".jpeg"] = JpegSignature
     };
 
-    public static bool IsSupportedImage(FileUpload file)
+    public static async Task<bool> IsSupportedImageAsync(FileUpload file, CancellationToken cancellationToken = default)
     {
         if (file == null || file.Length == 0)
         {
@@ -34,8 +37,8 @@ public static class ImageFileValidator
         }
 
         var header = new byte[signature.Length];
-        using var stream = file.OpenReadStream();
-        var read = stream.ReadAtLeast(header, header.Length, throwOnEndOfStream: false);
+        await using var stream = file.OpenReadStream();
+        var read = await stream.ReadAtLeastAsync(header, header.Length, throwOnEndOfStream: false, cancellationToken);
 
         return read == header.Length && header.SequenceEqual(signature);
     }

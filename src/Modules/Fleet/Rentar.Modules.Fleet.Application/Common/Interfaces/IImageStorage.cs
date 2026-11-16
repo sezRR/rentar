@@ -1,4 +1,6 @@
 using Rentar.Modules.Fleet.Application.CarImages;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Rentar.Modules.Fleet.Application.Common.Interfaces;
 
@@ -12,10 +14,11 @@ public interface IImageStorage
     const string DefaultImageName = "default.png";
 
     /// <summary>Stores the file under a new unique name and returns that name.</summary>
-    string Save(FileUpload file);
+    Task<string> SaveAsync(FileUpload file, CancellationToken cancellationToken = default);
 
     /// <summary>Stores the file and removes the one it replaces; returns the new name.</summary>
-    string Replace(FileUpload file, string oldFileName);
+    Task<string> ReplaceAsync(FileUpload file, string oldFileName, CancellationToken cancellationToken = default);
 
+    /// <summary>Synchronous: file systems offer no asynchronous delete.</summary>
     void Delete(string fileName);
 }

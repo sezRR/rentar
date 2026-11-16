@@ -165,20 +165,55 @@ public class CarImagesEndpointsTests(RentarApiFactory factory) : IntegrationTest
     [Fact]
     public async Task DeletingCar_WhenCarDeleteFails_KeepsItsImagesAndFiles()
     {
-        // Images are not tied to cars by a foreign key, so they can exist for a car that is not stored.
-        // Deleting that car removes its images first and then fails, which must roll the images back.
-        const int missingCarId = 999;
-        await UploadAsync(missingCarId, "car.png", PngBytes);
-        var stored = UploadedFile(Assert.Single(await GetImagesAsync(missingCarId)).ImagePath);
+        var carId = await AddCarAsync();
+        await UploadAsync(carId, "car.png", PngBytes);
+        var stored = UploadedFile(Assert.Single(await GetImagesAsync(carId)).ImagePath);
 
-        var response = await Client.PostJsonAsync("/api/v1/cars/delete", new Car { Id = missingCarId });
+        HttpResponseMessage response;
+        await using (await Factory.RefuseAsync("fleet", "Cars", "DELETE"))
+        {
+            response = await Client.PostJsonAsync("/api/v1/cars/delete", new Car { Id = carId });
+        }
 
         Assert.NotEqual(HttpStatusCode.OK, response.StatusCode);
-        Assert.Single(await GetImagesAsync(missingCarId));
+        Assert.Single(await GetImagesAsync(carId));
         Assert.True(File.Exists(stored));
 
-        await DeleteImagesAsync(missingCarId);
+        await DeleteImagesAsync(carId);
         Assert.False(File.Exists(stored));
+    }
+
+    [Fact]
+    public async Task Add_WhenStoringTheImageFails_RemovesItsFileAgain()
+    {
+        var carId = await AddCarAsync();
+        var filesBefore = UploadedFiles();
+
+        HttpResponseMessage response;
+        await using (await Factory.RefuseAsync("fleet", "CarImages", "INSERT"))
+        {
+            response = await UploadAsync(carId, "car.png", PngBytes);
+        }
+
+        // The file was written before the row failed; the rolled back transaction takes it away again.
+        Assert.NotEqual(HttpStatusCode.OK, response.StatusCode);
+        Assert.Empty(await GetImagesAsync(carId));
+        Assert.Equal(filesBefore, UploadedFiles());
+    }
+
+    [Fact]
+    public async Task Add_ForACarThatIsNotStored_IsRejected()
+    {
+        var response = await UploadAsync(999, "car.png", PngBytes);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal(Messages.TheCarNotFound, (await response.ReadAsAsync<V1Response>()).Message);
+        Assert.Empty(await GetImagesAsync(999));
+    }
+
+    private string[] UploadedFiles()
+    {
+        return Directory.GetFiles(Path.GetDirectoryName(UploadedFile(IImageStorage.DefaultImageName))!).Order().ToArray();
     }
 
     private string UploadedFile(string fileName)

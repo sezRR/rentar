@@ -1,15 +1,15 @@
+using Rentar.Modules.Fleet.Application.Common.Interfaces;
 using Rentar.Modules.Fleet.Contracts;
 using System.Collections.Generic;
 using System.Linq;
-using Rentar.Modules.Fleet.Application.Common.Interfaces;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Rentar.Modules.Fleet.Application;
 
 public class FleetModuleApi(ICarDal carDal) : IFleetModuleApi
 {
-    private readonly ICarDal _carDal = carDal;
-
-    public IReadOnlyList<CarSummary> GetCars(IReadOnlyCollection<int> carIds)
+    public async Task<IReadOnlyList<CarSummary>> GetCarsAsync(IReadOnlyCollection<int> carIds, CancellationToken cancellationToken = default)
     {
         if (carIds.Count == 0)
         {
@@ -17,8 +17,7 @@ public class FleetModuleApi(ICarDal carDal) : IFleetModuleApi
         }
 
         var ids = carIds.ToArray();
-        return _carDal.GetCarDetails(c => ids.Contains(c.Id))
-            .Select(c => new CarSummary(c.CarId, c.BrandName, c.ColorName, c.ModelYear, c.DailyPrice, c.Description))
-            .ToList();
+        var cars = await carDal.GetCarDetailsAsync(c => ids.Contains(c.Id), cancellationToken);
+        return cars.ConvertAll(c => new CarSummary(c.CarId, c.BrandName, c.ColorName, c.ModelYear, c.DailyPrice, c.Description));
     }
 }

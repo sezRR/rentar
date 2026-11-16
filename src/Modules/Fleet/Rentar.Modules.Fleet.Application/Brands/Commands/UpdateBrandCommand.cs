@@ -2,6 +2,8 @@ using Rentar.Modules.Fleet.Application.Common.Interfaces;
 using Rentar.Modules.Fleet.Domain;
 using Rentar.Shared.Application.UseCases;
 using Rentar.Shared.Application.Validation;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Rentar.Modules.Fleet.Application.Brands.Commands;
 
@@ -17,8 +19,8 @@ public sealed class UpdateBrandCommandValidator : UseCaseValidator<UpdateBrandCo
 
 public sealed class UpdateBrandCommandHandler(IBrandDal brandDal) : ICommandHandler<UpdateBrandCommand>
 {
-    public void Handle(UpdateBrandCommand command)
+    public Task HandleAsync(UpdateBrandCommand command, CancellationToken cancellationToken = default)
     {
-        brandDal.Update(new Brand { Id = command.Id, BrandName = command.BrandName });
+        return brandDal.UpdateAsync(new Brand { Id = command.Id, BrandName = command.BrandName }, cancellationToken);
     }
 }

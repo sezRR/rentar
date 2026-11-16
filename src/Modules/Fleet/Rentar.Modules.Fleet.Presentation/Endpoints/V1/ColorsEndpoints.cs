@@ -8,6 +8,8 @@ using Rentar.Modules.Fleet.Domain;
 using Rentar.Shared.Application.UseCases;
 using Rentar.Shared.Presentation.Endpoints;
 using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Rentar.Modules.Fleet.Presentation.Endpoints.V1;
 
@@ -24,31 +26,31 @@ public class ColorsEndpoints : IEndpoint
         group.MapPost("/delete", Delete);
     }
 
-    private static Ok<V1Response<List<Color>>> GetAll(IQueryHandler<GetColorsQuery, List<Color>> getColors)
+    private static async Task<Ok<V1Response<List<Color>>>> GetAll(IQueryHandler<GetColorsQuery, List<Color>> getColors, CancellationToken cancellationToken)
     {
-        return V1Results.Ok(getColors.Handle(new GetColorsQuery()), Messages.ColorsListed);
+        return V1Results.Ok(await getColors.HandleAsync(new GetColorsQuery(), cancellationToken), Messages.ColorsListed);
     }
 
-    private static Ok<V1Response<Color>> GetById(IQueryHandler<GetColorByIdQuery, Color> getColorById, int id)
+    private static async Task<Ok<V1Response<Color>>> GetById(IQueryHandler<GetColorByIdQuery, Color> getColorById, int id, CancellationToken cancellationToken)
     {
-        return V1Results.Ok(getColorById.Handle(new GetColorByIdQuery(id)), null);
+        return V1Results.Ok(await getColorById.HandleAsync(new GetColorByIdQuery(id), cancellationToken), null);
     }
 
-    private static Ok<V1Response> Add(ICommandHandler<CreateColorCommand, Color> createColor, CreateColorCommand command)
+    private static async Task<Ok<V1Response>> Add(ICommandHandler<CreateColorCommand, Color> createColor, CreateColorCommand command, CancellationToken cancellationToken)
     {
-        createColor.Handle(command);
+        await createColor.HandleAsync(command, cancellationToken);
         return V1Results.Ok(Messages.ColorAdded);
     }
 
-    private static Ok<V1Response> Update(ICommandHandler<UpdateColorCommand> updateColor, UpdateColorCommand command)
+    private static async Task<Ok<V1Response>> Update(ICommandHandler<UpdateColorCommand> updateColor, UpdateColorCommand command, CancellationToken cancellationToken)
     {
-        updateColor.Handle(command);
+        await updateColor.HandleAsync(command, cancellationToken);
         return V1Results.Ok(Messages.ColorUpdated);
     }
 
-    private static Ok<V1Response> Delete(ICommandHandler<DeleteColorCommand> deleteColor, DeleteColorCommand command)
+    private static async Task<Ok<V1Response>> Delete(ICommandHandler<DeleteColorCommand> deleteColor, DeleteColorCommand command, CancellationToken cancellationToken)
     {
-        deleteColor.Handle(command);
+        await deleteColor.HandleAsync(command, cancellationToken);
         return V1Results.Ok(Messages.ColorDeleted);
     }
 }

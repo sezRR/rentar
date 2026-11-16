@@ -71,8 +71,11 @@ public class V1ContractTests(RentarApiFactory factory) : IntegrationTestBase(fac
         "cars/getcarsbycolorid => 200 {data: [{brandId: number, brandName: string, carId: number, colorId: number, colorName: string, dailyPrice: number, description: string, id: number, imagePath: null, minimumFindeksRating: number, modelYear: number}], message: \"Cars Listed\", success: true}",
         "cars/getcarsbybrandidandcolorid => 200 {data: [{brandId: number, brandName: string, carId: number, colorId: number, colorName: string, dailyPrice: number, description: string, id: number, imagePath: null, minimumFindeksRating: number, modelYear: number}], message: null, success: true}",
         "cars/update => 200 {message: \"Car Updated\", success: true}",
+        "cars/add unknown brand => 400 {message: \"Brand not found\", success: false}",
+        "cars/update unknown color => 400 {message: \"Color not found\", success: false}",
         "carimages/add without file => 200 {message: null, success: true}",
         "carimages/add invalid file => 400 {message: \"Only PNG and JPEG images (.png, .jpg, .jpeg) can be uploaded\", success: false}",
+        "carimages/add unknown car => 400 {message: \"Desired car is not on the database\", success: false}",
         "carimages/getall => 200 {data: [{carId: number, date: string, id: number, imagePath: string}], message: null, success: true}",
         "carimages/getbyid => 200 {data: {carId: number, date: string, id: number, imagePath: string}, message: null, success: true}",
         "carimages/getbycarid => 200 {data: [{carId: number, date: string, id: number, imagePath: string}], message: null, success: true}",
@@ -94,6 +97,9 @@ public class V1ContractTests(RentarApiFactory factory) : IntegrationTestBase(fac
         "findeks/calculate => 200 {data: number, message: \"Findeks rating calculated successfully\", success: true}",
         "cars/delete => 200 {message: \"Car Deleted\", success: true}",
         "cars/delete unknown car => 500 {Message: string, StatusCode: 500}",
+        "colors/delete in use => 400 {message: \"Color can not be deleted while cars use it\", success: false}",
+        "brands/delete in use => 400 {message: \"Brand can not be deleted while cars use it\", success: false}",
+        "cars/delete last car => 200 {message: \"Car Deleted\", success: true}",
         "colors/delete => 200 {message: \"Color Deleted\", success: true}",
         "brands/delete => 200 {message: \"Brand Deleted\", success: true}",
     ];
@@ -153,12 +159,15 @@ public class V1ContractTests(RentarApiFactory factory) : IntegrationTestBase(fac
         await Get("cars/getcarsbycolorid", "/api/v1/cars/getcarsbycolorid?colorId=1");
         await Get("cars/getcarsbybrandidandcolorid", "/api/v1/cars/getcarsbybrandidandcolorid?brandId=1&colorId=1");
         await Post("cars/update", "/api/v1/cars/update", new { id = 2, brandId = 1, colorId = 1, modelYear = 2022, dailyPrice = 990m, description = "Civic 1.5", minimumFindeksRating = 700 });
+        await Post("cars/add unknown brand", "/api/v1/cars/add", car with { brandId = 999 });
+        await Post("cars/update unknown color", "/api/v1/cars/update", new { id = 2, brandId = 1, colorId = 999, modelYear = 2022, dailyPrice = 990m, description = "Civic 1.5", minimumFindeksRating = 700 });
     }
 
     private async Task CarImagesAsync()
     {
         await Form("carimages/add without file", HttpMethod.Post, "/api/v1/carimages/add", ("carId", "1"));
         await Form("carimages/add invalid file", HttpMethod.Post, "/api/v1/carimages/add", ("carId", "1"), ("file", "notes.md", Encoding.UTF8.GetBytes("# notes")));
+        await Form("carimages/add unknown car", HttpMethod.Post, "/api/v1/carimages/add", ("carId", "999"));
         await Get("carimages/getall", "/api/v1/carimages/getall");
         await Get("carimages/getbyid", "/api/v1/carimages/getbyid?id=1");
         await Get("carimages/getbycarid", "/api/v1/carimages/getbycarid?carId=1");
@@ -197,6 +206,10 @@ public class V1ContractTests(RentarApiFactory factory) : IntegrationTestBase(fac
     {
         await Post("cars/delete", "/api/v1/cars/delete", new { id = 2 });
         await Post("cars/delete unknown car", "/api/v1/cars/delete", new { id = 999 });
+        // Car 1 still has the brand and the color, so they can not go before it.
+        await Post("colors/delete in use", "/api/v1/colors/delete", new { id = 1, colorName = "Red" });
+        await Post("brands/delete in use", "/api/v1/brands/delete", new { id = 1, brandName = "Toyota" });
+        await Post("cars/delete last car", "/api/v1/cars/delete", new { id = 1 });
         await Post("colors/delete", "/api/v1/colors/delete", new { id = 1, colorName = "Red" });
         await Post("brands/delete", "/api/v1/brands/delete", new { id = 1, brandName = "Toyota" });
     }

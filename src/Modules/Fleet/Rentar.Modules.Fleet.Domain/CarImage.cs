@@ -9,4 +9,6 @@ public class CarImage : IEntity
     public int CarId { get; init; }
     public string ImagePath { get; init; }
     public DateTime Date { get; init; }
+
+    public Car Car { get; init; }
 }

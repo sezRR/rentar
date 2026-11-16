@@ -13,6 +13,7 @@ public class RentalsDbContext(DbContextOptions<RentalsDbContext> options) : DbCo
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema(Schema);
+        modelBuilder.ApplyConfigurationsFromAssembly(typeof(RentalsDbContext).Assembly);
         modelBuilder.UseTimestampWithoutTimeZone();
     }
 }

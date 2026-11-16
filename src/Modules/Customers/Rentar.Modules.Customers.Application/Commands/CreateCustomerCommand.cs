@@ -3,6 +3,8 @@ using Rentar.Modules.Customers.Application.Common.Interfaces;
 using Rentar.Modules.Customers.Domain;
 using Rentar.Shared.Application.UseCases;
 using Rentar.Shared.Application.Validation;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Rentar.Modules.Customers.Application.Commands;
 
@@ -19,10 +21,10 @@ public sealed class CreateCustomerCommandValidator : UseCaseValidator<CreateCust
 
 public sealed class CreateCustomerCommandHandler(ICustomerDal customerDal) : ICommandHandler<CreateCustomerCommand, Customer>
 {
-    public Customer Handle(CreateCustomerCommand command)
+    public async Task<Customer> HandleAsync(CreateCustomerCommand command, CancellationToken cancellationToken = default)
     {
         var customer = new Customer { UserId = command.UserId, CompanyName = command.CompanyName };
-        customerDal.Add(customer);
+        await customerDal.AddAsync(customer, cancellationToken);
         return customer;
     }
 }

@@ -1,6 +1,8 @@
 using Rentar.Modules.Identity.Application.Common.Interfaces;
 using Rentar.Modules.Identity.Domain;
 using Rentar.Shared.Application.UseCases;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Rentar.Modules.Identity.Application.Users.Queries;
 
@@ -9,8 +11,8 @@ public sealed record GetUserByIdQuery(int Id);
 
 public sealed class GetUserByIdQueryHandler(IUserDal userDal) : IQueryHandler<GetUserByIdQuery, User>
 {
-    public User Handle(GetUserByIdQuery query)
+    public Task<User> HandleAsync(GetUserByIdQuery query, CancellationToken cancellationToken = default)
     {
-        return userDal.Get(u => u.Id == query.Id);
+        return userDal.GetAsync(u => u.Id == query.Id, cancellationToken);
     }
 }

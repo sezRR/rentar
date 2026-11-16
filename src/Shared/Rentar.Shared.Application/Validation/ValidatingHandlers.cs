@@ -1,7 +1,9 @@
 using FluentValidation;
+using FluentValidation.Results;
 using Rentar.Shared.Application.UseCases;
 using System.Collections.Generic;
-using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Rentar.Shared.Application.Validation;
 
@@ -11,11 +13,17 @@ namespace Rentar.Shared.Application.Validation;
 /// </summary>
 internal static class UseCaseValidation
 {
-    public static void Validate<TUseCase>(IEnumerable<IValidator<TUseCase>> validators, TUseCase useCase)
+    public static async Task ValidateAsync<TUseCase>(
+        IEnumerable<IValidator<TUseCase>> validators,
+        TUseCase useCase,
+        CancellationToken cancellationToken)
     {
-        var failures = validators
-            .SelectMany(validator => validator.Validate(useCase).Errors)
-            .ToList();
+        var failures = new List<ValidationFailure>();
+        foreach (var validator in validators)
+        {
+            var result = await validator.ValidateAsync(useCase, cancellationToken);
+            failures.AddRange(result.Errors);
+        }
 
         if (failures.Count > 0)
         {
@@ -29,10 +37,10 @@ public sealed class ValidatingCommandHandler<TCommand>(
     ICommandHandler<TCommand> inner,
     IEnumerable<IValidator<TCommand>> validators) : ICommandHandler<TCommand>
 {
-    public void Handle(TCommand command)
+    public async Task HandleAsync(TCommand command, CancellationToken cancellationToken = default)
     {
-        UseCaseValidation.Validate(validators, command);
-        inner.Handle(command);
+        await UseCaseValidation.ValidateAsync(validators, command, cancellationToken);
+        await inner.HandleAsync(command, cancellationToken);
     }
 }
 
@@ -41,10 +49,10 @@ public sealed class ValidatingCommandHandler<TCommand, TResult>(
     ICommandHandler<TCommand, TResult> inner,
     IEnumerable<IValidator<TCommand>> validators) : ICommandHandler<TCommand, TResult>
 {
-    public TResult Handle(TCommand command)
+    public async Task<TResult> HandleAsync(TCommand command, CancellationToken cancellationToken = default)
     {
-        UseCaseValidation.Validate(validators, command);
-        return inner.Handle(command);
+        await UseCaseValidation.ValidateAsync(validators, command, cancellationToken);
+        return await inner.HandleAsync(command, cancellationToken);
     }
 }
 
@@ -53,9 +61,9 @@ public sealed class ValidatingQueryHandler<TQuery, TResult>(
     IQueryHandler<TQuery, TResult> inner,
     IEnumerable<IValidator<TQuery>> validators) : IQueryHandler<TQuery, TResult>
 {
-    public TResult Handle(TQuery query)
+    public async Task<TResult> HandleAsync(TQuery query, CancellationToken cancellationToken = default)
     {
-        UseCaseValidation.Validate(validators, query);
-        return inner.Handle(query);
+        await UseCaseValidation.ValidateAsync(validators, query, cancellationToken);
+        return await inner.HandleAsync(query, cancellationToken);
     }
 }

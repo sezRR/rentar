@@ -1,7 +1,9 @@
-using System.Collections.Generic;
 using Rentar.Modules.Rentals.Application.Common.Interfaces;
 using Rentar.Modules.Rentals.Domain;
 using Rentar.Shared.Application.UseCases;
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Rentar.Modules.Rentals.Application.Queries;
 
@@ -10,8 +12,8 @@ public sealed record GetRentalsByCarQuery(int CarId);
 
 public sealed class GetRentalsByCarQueryHandler(IRentalDal rentalDal) : IQueryHandler<GetRentalsByCarQuery, List<Rental>>
 {
-    public List<Rental> Handle(GetRentalsByCarQuery query)
+    public Task<List<Rental>> HandleAsync(GetRentalsByCarQuery query, CancellationToken cancellationToken = default)
     {
-        return rentalDal.GetAll(r => r.CarId == query.CarId);
+        return rentalDal.GetAllAsync(r => r.CarId == query.CarId, cancellationToken);
     }
 }

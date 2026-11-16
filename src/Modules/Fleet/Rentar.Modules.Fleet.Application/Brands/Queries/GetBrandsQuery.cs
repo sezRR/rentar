@@ -1,7 +1,9 @@
-using System.Collections.Generic;
 using Rentar.Modules.Fleet.Application.Common.Interfaces;
 using Rentar.Modules.Fleet.Domain;
 using Rentar.Shared.Application.UseCases;
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Rentar.Modules.Fleet.Application.Brands.Queries;
 
@@ -9,8 +11,8 @@ public sealed record GetBrandsQuery;
 
 public sealed class GetBrandsQueryHandler(IBrandDal brandDal) : IQueryHandler<GetBrandsQuery, List<Brand>>
 {
-    public List<Brand> Handle(GetBrandsQuery query)
+    public Task<List<Brand>> HandleAsync(GetBrandsQuery query, CancellationToken cancellationToken = default)
     {
-        return brandDal.GetAll();
+        return brandDal.GetAllAsync(cancellationToken);
     }
 }

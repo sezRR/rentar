@@ -5,6 +5,8 @@ using Rentar.Modules.Payments.Application;
 using Rentar.Modules.Payments.Application.Commands;
 using Rentar.Shared.Application.UseCases;
 using Rentar.Shared.Presentation.Endpoints;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Rentar.Modules.Payments.Presentation.Endpoints.V1;
 
@@ -17,9 +19,11 @@ public class PaymentsEndpoints : IEndpoint
         group.MapGet("/pay", Pay);
     }
 
-    private static Results<Ok<V1Response>, BadRequest<V1Response>> Pay(ICommandHandler<TakePaymentCommand, bool> takePayment)
+    private static async Task<Results<Ok<V1Response>, BadRequest<V1Response>>> Pay(
+        ICommandHandler<TakePaymentCommand, bool> takePayment,
+        CancellationToken cancellationToken)
     {
-        return takePayment.Handle(new TakePaymentCommand())
+        return await takePayment.HandleAsync(new TakePaymentCommand(), cancellationToken)
             ? V1Results.Ok(Messages.PaymentSuccessful)
             : V1Results.Fail(Messages.PaymentFailed);
     }

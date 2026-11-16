@@ -8,6 +8,8 @@ using Rentar.Modules.Identity.Domain;
 using Rentar.Shared.Application.UseCases;
 using Rentar.Shared.Presentation.Endpoints;
 using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Rentar.Modules.Identity.Presentation.Endpoints.V1;
 
@@ -25,36 +27,44 @@ public class UsersEndpoints : IEndpoint
         group.MapPost("/update", Update);
     }
 
-    private static Ok<V1Response<List<User>>> GetAll(IQueryHandler<GetUsersQuery, List<User>> getUsers)
+    private static async Task<Ok<V1Response<List<User>>>> GetAll(IQueryHandler<GetUsersQuery, List<User>> getUsers, CancellationToken cancellationToken)
     {
-        return V1Results.Ok(getUsers.Handle(new GetUsersQuery()), Messages.UsersListed);
+        return V1Results.Ok(await getUsers.HandleAsync(new GetUsersQuery(), cancellationToken), Messages.UsersListed);
     }
 
-    private static Ok<V1Response<User>> GetByMail(IQueryHandler<GetUserByEmailQuery, User> getUserByEmail, string email)
+    private static async Task<Ok<V1Response<User>>> GetByMail(
+        IQueryHandler<GetUserByEmailQuery, User> getUserByEmail,
+        string email,
+        CancellationToken cancellationToken)
     {
-        return V1Results.Ok(getUserByEmail.Handle(new GetUserByEmailQuery(email)), null);
+        return V1Results.Ok(await getUserByEmail.HandleAsync(new GetUserByEmailQuery(email), cancellationToken), null);
     }
 
-    private static Ok<V1Response<List<User>>> GetUserFindeksRating(
+    private static async Task<Ok<V1Response<List<User>>>> GetUserFindeksRating(
         IQueryHandler<GetUsersByMinFindeksRatingQuery, List<User>> getUsersByMinFindeksRating,
-        int findeksRating)
+        int findeksRating,
+        CancellationToken cancellationToken)
     {
-        return V1Results.Ok(getUsersByMinFindeksRating.Handle(new GetUsersByMinFindeksRatingQuery(findeksRating)), null);
+        var users = await getUsersByMinFindeksRating.HandleAsync(new GetUsersByMinFindeksRatingQuery(findeksRating), cancellationToken);
+        return V1Results.Ok(users, null);
     }
 
-    private static Ok<V1Response<User>> GetUserById(IQueryHandler<GetUserByIdQuery, User> getUserById, int id)
+    private static async Task<Ok<V1Response<User>>> GetUserById(IQueryHandler<GetUserByIdQuery, User> getUserById, int id, CancellationToken cancellationToken)
     {
-        return V1Results.Ok(getUserById.Handle(new GetUserByIdQuery(id)), null);
+        return V1Results.Ok(await getUserById.HandleAsync(new GetUserByIdQuery(id), cancellationToken), null);
     }
 
-    private static Ok<V1Response> Add(ICommandHandler<AddUserCommand> addUser, AddUserCommand command)
+    private static async Task<Ok<V1Response>> Add(ICommandHandler<AddUserCommand> addUser, AddUserCommand command, CancellationToken cancellationToken)
     {
-        addUser.Handle(command);
+        await addUser.HandleAsync(command, cancellationToken);
         return V1Results.Ok(Messages.UserAdded);
     }
 
-    private static Ok<V1Response<User>> Update(ICommandHandler<UpdateUserCommand, User> updateUser, UpdateUserCommand command)
+    private static async Task<Ok<V1Response<User>>> Update(
+        ICommandHandler<UpdateUserCommand, User> updateUser,
+        UpdateUserCommand command,
+        CancellationToken cancellationToken)
     {
-        return V1Results.Ok(updateUser.Handle(command), Messages.UserUpdated);
+        return V1Results.Ok(await updateUser.HandleAsync(command, cancellationToken), Messages.UserUpdated);
     }
 }

@@ -12,9 +12,15 @@ public static class ModuleDbContextOptions
     /// Points a module context at PostgreSQL and keeps its migration history inside the module's own schema,
     /// so each module migrates independently of the others.
     /// </summary>
+    /// <remarks>
+    /// A context lives for one operation and writes set each entity's state themselves, so nothing a query loads is
+    /// ever changed through it: queries skip change tracking.
+    /// </remarks>
     public static DbContextOptionsBuilder UseModuleNpgsql(this DbContextOptionsBuilder builder, string connectionString, string schema)
     {
-        return builder.UseNpgsql(connectionString, npgsql => npgsql.MigrationsHistoryTable(HistoryRepository.DefaultTableName, schema));
+        return builder
+            .UseNpgsql(connectionString, npgsql => npgsql.MigrationsHistoryTable(HistoryRepository.DefaultTableName, schema))
+            .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking);
     }
 
     /// <summary>

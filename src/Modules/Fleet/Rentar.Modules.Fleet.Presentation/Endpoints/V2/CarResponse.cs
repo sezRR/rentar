@@ -1,5 +1,4 @@
 using Rentar.Modules.Fleet.Application.Common.Models;
-using Rentar.Modules.Fleet.Domain;
 
 namespace Rentar.Modules.Fleet.Presentation.Endpoints.V2;
 
@@ -31,23 +30,5 @@ public sealed record CarResponse(
             car.Description,
             car.MinimumFindeksRating,
             car.ImagePath);
-    }
-
-    /// <summary>
-    /// Used when the car's brand or color is not stored, so there are no names to show.
-    /// </summary>
-    internal static CarResponse From(Car car)
-    {
-        return new CarResponse(
-            car.Id,
-            car.BrandId,
-            null,
-            car.ColorId,
-            null,
-            car.ModelYear,
-            car.DailyPrice,
-            car.Description,
-            car.MinimumFindeksRating,
-            null);
     }
 }

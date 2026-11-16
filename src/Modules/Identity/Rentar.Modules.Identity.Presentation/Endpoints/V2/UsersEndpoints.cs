@@ -10,6 +10,8 @@ using Rentar.Modules.Identity.Domain;
 using Rentar.Shared.Application.UseCases;
 using Rentar.Shared.Presentation.Endpoints;
 using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Rentar.Modules.Identity.Presentation.Endpoints.V2;
 
@@ -27,23 +29,25 @@ public class UsersEndpoints : IEndpoint
             .ProducesValidationProblem()
             .ProducesProblem(StatusCodes.Status409Conflict);
         group.MapPut("/{id:int}", Update)
-            .ProducesProblem(StatusCodes.Status404NotFound);
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict);
     }
 
     /// <summary>
     /// Lists users, optionally only the one with an email and/or those with at least a Findeks rating.
     /// The full list is closed during the 22:00 maintenance hour.
     /// </summary>
-    private static Ok<List<UserResponse>> GetAll(
+    private static async Task<Ok<List<UserResponse>>> GetAll(
         IQueryHandler<GetUsersQuery, List<User>> getUsers,
         IQueryHandler<GetUserByEmailQuery, User> getUserByEmail,
         IQueryHandler<GetUsersByMinFindeksRatingQuery, List<User>> getUsersByMinFindeksRating,
         string? email,
-        int? minFindeksRating)
+        int? minFindeksRating,
+        CancellationToken cancellationToken)
     {
         if (email is not null)
         {
-            var user = getUserByEmail.Handle(new GetUserByEmailQuery(email));
+            var user = await getUserByEmail.HandleAsync(new GetUserByEmailQuery(email), cancellationToken);
             var matches = new List<UserResponse>();
 
             if (user is not null && user.FindeksRating >= (minFindeksRating ?? int.MinValue))
@@ -55,15 +59,18 @@ public class UsersEndpoints : IEndpoint
         }
 
         var users = minFindeksRating is { } rating
-            ? getUsersByMinFindeksRating.Handle(new GetUsersByMinFindeksRatingQuery(rating))
-            : getUsers.Handle(new GetUsersQuery());
+            ? await getUsersByMinFindeksRating.HandleAsync(new GetUsersByMinFindeksRatingQuery(rating), cancellationToken)
+            : await getUsers.HandleAsync(new GetUsersQuery(), cancellationToken);
 
         return TypedResults.Ok(users.ConvertAll(UserResponse.From));
     }
 
-    private static Results<Ok<UserResponse>, ProblemHttpResult> GetById(IQueryHandler<GetUserByIdQuery, User> getUserById, int id)
+    private static async Task<Results<Ok<UserResponse>, ProblemHttpResult>> GetById(
+        IQueryHandler<GetUserByIdQuery, User> getUserById,
+        int id,
+        CancellationToken cancellationToken)
     {
-        var user = getUserById.Handle(new GetUserByIdQuery(id));
+        var user = await getUserById.HandleAsync(new GetUserByIdQuery(id), cancellationToken);
         return user is null ? RestResults.NotFound("User", id) : TypedResults.Ok(UserResponse.From(user));
     }
 
@@ -71,24 +78,36 @@ public class UsersEndpoints : IEndpoint
     /// Creates an account; an email that is already registered answers 409. Log in through
     /// <c>POST /auth/tokens</c> to get an access token for it.
     /// </summary>
-    private static Created<UserResponse> Create(ICommandHandler<RegisterUserCommand, User> registerUser, HttpRequest request, UserRequest body)
+    private static async Task<Created<UserResponse>> Create(
+        ICommandHandler<RegisterUserCommand, User> registerUser,
+        HttpRequest request,
+        UserRequest body,
+        CancellationToken cancellationToken)
     {
-        var user = registerUser.Handle(new RegisterUserCommand(body.FirstName, body.LastName, body.Email, body.Password, body.FindeksRating));
+        var user = await registerUser.HandleAsync(
+            new RegisterUserCommand(body.FirstName, body.LastName, body.Email, body.Password, body.FindeksRating),
+            cancellationToken);
         return RestResults.Created(request, user.Id, UserResponse.From(user));
     }
 
-    private static Results<NoContent, ProblemHttpResult> Update(
+    /// <summary>
+    /// Replaces the user; an email another user already has answers 409.
+    /// </summary>
+    private static async Task<Results<NoContent, ProblemHttpResult>> Update(
         IQueryHandler<GetUserByIdQuery, User> getUserById,
         ICommandHandler<UpdateUserCommand, User> updateUser,
         int id,
-        UserRequest body)
+        UserRequest body,
+        CancellationToken cancellationToken)
     {
-        if (getUserById.Handle(new GetUserByIdQuery(id)) is null)
+        if (await getUserById.HandleAsync(new GetUserByIdQuery(id), cancellationToken) is null)
         {
             return RestResults.NotFound("User", id);
         }
 
-        updateUser.Handle(new UpdateUserCommand(id, body.FirstName, body.LastName, body.Email, body.Password, body.FindeksRating));
+        await updateUser.HandleAsync(
+            new UpdateUserCommand(id, body.FirstName, body.LastName, body.Email, body.Password, body.FindeksRating),
+            cancellationToken);
         return TypedResults.NoContent();
     }
 }

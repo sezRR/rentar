@@ -30,6 +30,17 @@ public class ColorsEndpointsTests(RentarApiFactory factory) : V2TestBase(factory
     }
 
     [Fact]
+    public async Task Delete_OfAColorCarsStillHave_IsAConflict_AndKeepsTheColor()
+    {
+        var car = await CreateCarAsync(colorName: "Red");
+
+        var response = await Client.DeleteResourceAsync($"/api/v2/colors/{car.ColorId}");
+
+        await AssertProblemAsync(response, HttpStatusCode.Conflict, Messages.ColorHasCars);
+        Assert.Equal(HttpStatusCode.OK, (await Client.GetJsonAsync($"/api/v2/colors/{car.ColorId}")).StatusCode);
+    }
+
+    [Fact]
     public async Task Update_WithNameShorterThanTwoCharacters_ReturnsProblemWithTheServiceMessage()
     {
         var color = await CreateColorAsync("Red");

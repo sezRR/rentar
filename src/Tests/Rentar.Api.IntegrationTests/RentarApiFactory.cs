@@ -58,6 +58,63 @@ public class RentarApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     }
 
     /// <summary>
+    /// Makes the database refuse every <paramref name="operation"/> (<c>INSERT</c>, <c>UPDATE</c> or <c>DELETE</c>) on a
+    /// table until the result is disposed, to see what a use case leaves behind when a write fails halfway.
+    /// </summary>
+    public async Task<IAsyncDisposable> RefuseAsync(string schema, string table, string operation)
+    {
+        var function = $"\"{schema}\".refuse_for_test";
+        var trigger = $"refuse_{operation.ToLowerInvariant()}_for_test";
+        var target = $"\"{schema}\".\"{table}\"";
+
+        await ExecuteAsync(
+            $"CREATE FUNCTION {function}() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'refused by test'; END $$;" +
+            $"CREATE TRIGGER {trigger} BEFORE {operation} ON {target} FOR EACH ROW EXECUTE FUNCTION {function}();");
+
+        return new AsyncDisposable(() => ExecuteAsync($"DROP TRIGGER {trigger} ON {target}; DROP FUNCTION {function}();"));
+    }
+
+    /// <summary>
+    /// Grants the user the named operation claims, creating the claims that do not exist yet. No endpoint grants claims.
+    /// </summary>
+    public async Task GrantAsync(int userId, params string[] claims)
+    {
+        await using var connection = new NpgsqlConnection(ConnectionString);
+        await connection.OpenAsync();
+
+        foreach (var claim in claims)
+        {
+            await using var command = new NpgsqlCommand(
+                """
+                INSERT INTO identity."OperationClaims" ("Name") VALUES (@claim) ON CONFLICT ("Name") DO NOTHING;
+                INSERT INTO identity."UserOperationClaims" ("UserId", "OperationClaimId")
+                SELECT @userId, "Id" FROM identity."OperationClaims" WHERE "Name" = @claim;
+                """,
+                connection);
+            command.Parameters.AddWithValue("claim", claim);
+            command.Parameters.AddWithValue("userId", userId);
+            await command.ExecuteNonQueryAsync();
+        }
+    }
+
+    private async Task ExecuteAsync(string sql)
+    {
+        await using var connection = new NpgsqlConnection(ConnectionString);
+        await connection.OpenAsync();
+
+        await using var command = new NpgsqlCommand(sql, connection);
+        await command.ExecuteNonQueryAsync();
+    }
+
+    private sealed class AsyncDisposable(Func<Task> dispose) : IAsyncDisposable
+    {
+        public async ValueTask DisposeAsync()
+        {
+            await dispose();
+        }
+    }
+
+    /// <summary>
     /// Empties every module's tables, the in-process cache and the clock so each test starts from a known state.
     /// </summary>
     public async Task ResetAsync()

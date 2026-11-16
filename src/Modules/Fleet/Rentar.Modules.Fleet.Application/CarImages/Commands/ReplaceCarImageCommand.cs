@@ -1,40 +1,42 @@
-using System;
 using Rentar.Modules.Fleet.Application.Common.Interfaces;
 using Rentar.Modules.Fleet.Domain;
 using Rentar.Shared.Application.Aspects.Transaction;
 using Rentar.Shared.Application.UseCases;
 using Rentar.Shared.Kernel.Exceptions;
+using System;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Rentar.Modules.Fleet.Application.CarImages.Commands;
 
 /// <summary>
-/// Replaces the stored file of image <see cref="Id"/> with <see cref="File"/>. Throws
+/// Replaces the stored file of image <see cref="Id"/> with <see cref="File"/>; the image stays with its car. Throws
 /// <see cref="BusinessRuleException"/> when the file is missing or not a PNG or JPEG, and
 /// <see cref="NotFoundException"/> when there is no such image.
 /// </summary>
-public sealed record ReplaceCarImageCommand(int Id, int CarId, FileUpload File);
+public sealed record ReplaceCarImageCommand(int Id, FileUpload File);
 
 public sealed class ReplaceCarImageCommandHandler(ICarImageDal carImageDal, IImageStorage imageStorage, TimeProvider timeProvider)
     : ICommandHandler<ReplaceCarImageCommand>
 {
     [TransactionScopeAspect]
-    public void Handle(ReplaceCarImageCommand command)
+    public async Task HandleAsync(ReplaceCarImageCommand command, CancellationToken cancellationToken = default)
     {
-        if (!ImageFileValidator.IsSupportedImage(command.File))
+        if (!await ImageFileValidator.IsSupportedImageAsync(command.File, cancellationToken))
         {
             throw new BusinessRuleException(Messages.CarImageInvalidFile);
         }
 
         // The stored path is used, not one sent by the client, so only this image's file is replaced.
-        var existing = carImageDal.Get(c => c.Id == command.Id)
+        var existing = await carImageDal.GetAsync(c => c.Id == command.Id, cancellationToken)
             ?? throw new NotFoundException(Messages.CarImageNotFound);
 
-        carImageDal.Update(new CarImage
+        await carImageDal.UpdateAsync(new CarImage
         {
-            Id = command.Id,
-            CarId = command.CarId,
-            ImagePath = imageStorage.Replace(command.File, existing.ImagePath),
+            Id = existing.Id,
+            CarId = existing.CarId,
+            ImagePath = await imageStorage.ReplaceAsync(command.File, existing.ImagePath, cancellationToken),
             Date = timeProvider.GetLocalNow().DateTime
-        });
+        }, cancellationToken);
     }
 }

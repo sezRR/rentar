@@ -31,12 +31,15 @@ namespace Rentar.Modules.Customers.Infrastructure.Persistence.Migrations
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<string>("CompanyName")
+                        .IsRequired()
                         .HasColumnType("text");
 
                     b.Property<int>("UserId")
                         .HasColumnType("integer");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("UserId");
 
                     b.ToTable("Customers", "customers");
                 });

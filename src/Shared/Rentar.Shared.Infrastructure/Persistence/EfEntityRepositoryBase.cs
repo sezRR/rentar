@@ -5,6 +5,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Rentar.Shared.Infrastructure.Persistence;
 
@@ -13,44 +15,66 @@ namespace Rentar.Shared.Infrastructure.Persistence;
 /// ambient <see cref="System.Transactions.TransactionScope"/> Npgsql hands every context the same physical
 /// connection, which keeps a multi-step operation in one local transaction.
 /// </summary>
+/// <remarks>
+/// Entities are built once and never edited, so a write states what happens to exactly the entity it is given:
+/// its navigations are left alone, and an update or delete of an entity that is not stored fails rather than
+/// inserting it.
+/// </remarks>
 public abstract class EfEntityRepositoryBase<TEntity, TContext>(IDbContextFactory<TContext> contextFactory) : IEntityRepository<TEntity>
     where TEntity : class, IEntity, new()
     where TContext : DbContext
 {
     protected IDbContextFactory<TContext> ContextFactory { get; } = contextFactory;
 
-    public void Add(TEntity entity)
+    public async Task<List<TEntity>> GetAllAsync(CancellationToken cancellationToken = default)
     {
-        using var context = ContextFactory.CreateDbContext();
-        context.Entry(entity).State = EntityState.Added;
-        context.SaveChanges();
+        await using var context = await ContextFactory.CreateDbContextAsync(cancellationToken);
+        return await context.Set<TEntity>().ToListAsync(cancellationToken);
     }
 
-    public void Delete(TEntity entity)
+    public async Task<List<TEntity>> GetAllAsync(Expression<Func<TEntity, bool>> filter, CancellationToken cancellationToken = default)
     {
-        using var context = ContextFactory.CreateDbContext();
-        context.Entry(entity).State = EntityState.Deleted;
-        context.SaveChanges();
+        await using var context = await ContextFactory.CreateDbContextAsync(cancellationToken);
+        return await context.Set<TEntity>().Where(filter).ToListAsync(cancellationToken);
     }
 
-    public TEntity Get(Expression<Func<TEntity, bool>> filter)
+    public async Task<TEntity> GetAsync(Expression<Func<TEntity, bool>> filter, CancellationToken cancellationToken = default)
     {
-        using var context = ContextFactory.CreateDbContext();
-        return context.Set<TEntity>().SingleOrDefault(filter);
+        await using var context = await ContextFactory.CreateDbContextAsync(cancellationToken);
+        return await context.Set<TEntity>().SingleOrDefaultAsync(filter, cancellationToken);
     }
 
-    public List<TEntity> GetAll(Expression<Func<TEntity, bool>> filter = null)
+    public async Task<bool> AnyAsync(Expression<Func<TEntity, bool>> filter, CancellationToken cancellationToken = default)
     {
-        using var context = ContextFactory.CreateDbContext();
-        return filter == null
-            ? context.Set<TEntity>().ToList()
-            : context.Set<TEntity>().Where(filter).ToList();
+        await using var context = await ContextFactory.CreateDbContextAsync(cancellationToken);
+        return await context.Set<TEntity>().AnyAsync(filter, cancellationToken);
     }
 
-    public void Update(TEntity entity)
+    public async Task<int> CountAsync(Expression<Func<TEntity, bool>> filter, CancellationToken cancellationToken = default)
     {
-        using var context = ContextFactory.CreateDbContext();
-        context.Entry(entity).State = EntityState.Modified;
-        context.SaveChanges();
+        await using var context = await ContextFactory.CreateDbContextAsync(cancellationToken);
+        return await context.Set<TEntity>().CountAsync(filter, cancellationToken);
+    }
+
+    public Task AddAsync(TEntity entity, CancellationToken cancellationToken = default)
+    {
+        return SaveAsync(entity, EntityState.Added, cancellationToken);
+    }
+
+    public Task UpdateAsync(TEntity entity, CancellationToken cancellationToken = default)
+    {
+        return SaveAsync(entity, EntityState.Modified, cancellationToken);
+    }
+
+    public Task DeleteAsync(TEntity entity, CancellationToken cancellationToken = default)
+    {
+        return SaveAsync(entity, EntityState.Deleted, cancellationToken);
+    }
+
+    private async Task SaveAsync(TEntity entity, EntityState state, CancellationToken cancellationToken)
+    {
+        await using var context = await ContextFactory.CreateDbContextAsync(cancellationToken);
+        context.Entry(entity).State = state;
+        await context.SaveChangesAsync(cancellationToken);
     }
 }

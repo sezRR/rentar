@@ -13,6 +13,7 @@ public class CustomersDbContext(DbContextOptions<CustomersDbContext> options) : 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema(Schema);
+        modelBuilder.ApplyConfigurationsFromAssembly(typeof(CustomersDbContext).Assembly);
         modelBuilder.UseTimestampWithoutTimeZone();
     }
 }

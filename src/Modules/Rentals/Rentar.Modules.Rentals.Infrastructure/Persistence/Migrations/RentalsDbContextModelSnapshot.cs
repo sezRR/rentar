@@ -45,6 +45,8 @@ namespace Rentar.Modules.Rentals.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("CarId");
+
                     b.ToTable("Rentals", "rentals");
                 });
 #pragma warning restore 612, 618
