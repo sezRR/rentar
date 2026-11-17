@@ -111,6 +111,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Rentar.Modules.Companies.In
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Rentar.Modules.Companies.Presentation", "src\Modules\Companies\Rentar.Modules.Companies.Presentation\Rentar.Modules.Companies.Presentation.csproj", "{6227D4F6-4DD7-4848-98DD-1DDAA7A363B6}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Rentar.Domain.UnitTests", "src\Tests\Rentar.Domain.UnitTests\Rentar.Domain.UnitTests.csproj", "{32428D8F-3C56-4B5D-81A2-371D24261F47}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -625,6 +627,18 @@ Global
 		{6227D4F6-4DD7-4848-98DD-1DDAA7A363B6}.Release|x64.Build.0 = Release|Any CPU
 		{6227D4F6-4DD7-4848-98DD-1DDAA7A363B6}.Release|x86.ActiveCfg = Release|Any CPU
 		{6227D4F6-4DD7-4848-98DD-1DDAA7A363B6}.Release|x86.Build.0 = Release|Any CPU
+		{32428D8F-3C56-4B5D-81A2-371D24261F47}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{32428D8F-3C56-4B5D-81A2-371D24261F47}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{32428D8F-3C56-4B5D-81A2-371D24261F47}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{32428D8F-3C56-4B5D-81A2-371D24261F47}.Debug|x64.Build.0 = Debug|Any CPU
+		{32428D8F-3C56-4B5D-81A2-371D24261F47}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{32428D8F-3C56-4B5D-81A2-371D24261F47}.Debug|x86.Build.0 = Debug|Any CPU
+		{32428D8F-3C56-4B5D-81A2-371D24261F47}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{32428D8F-3C56-4B5D-81A2-371D24261F47}.Release|Any CPU.Build.0 = Release|Any CPU
+		{32428D8F-3C56-4B5D-81A2-371D24261F47}.Release|x64.ActiveCfg = Release|Any CPU
+		{32428D8F-3C56-4B5D-81A2-371D24261F47}.Release|x64.Build.0 = Release|Any CPU
+		{32428D8F-3C56-4B5D-81A2-371D24261F47}.Release|x86.ActiveCfg = Release|Any CPU
+		{32428D8F-3C56-4B5D-81A2-371D24261F47}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -683,5 +697,6 @@ Global
 		{BA5DB3F2-1A7F-4881-8B6C-F2E5B6FEAB2C} = {CACCE3FB-8D6F-1C95-AA38-02772A5E7D5C}
 		{CF42CE54-30E4-4678-BE3A-C6DCE1279F55} = {CACCE3FB-8D6F-1C95-AA38-02772A5E7D5C}
 		{6227D4F6-4DD7-4848-98DD-1DDAA7A363B6} = {CACCE3FB-8D6F-1C95-AA38-02772A5E7D5C}
+		{32428D8F-3C56-4B5D-81A2-371D24261F47} = {CEA09484-30F6-4D44-02F6-822E06DBC57C}
 	EndGlobalSection
 EndGlobal

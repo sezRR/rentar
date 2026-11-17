@@ -87,8 +87,12 @@ dotnet ef migrations add <Name> --project $project --startup-project $project --
   which takes every payment unless a test makes it decline, in place of the simulated gateway's coin toss. The
   background delivery is off: a test calls `DeliverEventsAsync()` to let the modules react, so it knows when they have.
 - `src/Tests/Rentar.ArchitectureTests` enforces the module boundaries and schema ownership described below. No Docker needed.
+- `src/Tests/Rentar.Domain.UnitTests` checks each entity's invariants on the domain alone: what its constructor and
+  copy methods (`Confirmed()`, `Renamed()`, `NewImage()`, …) refuse, with which `DomainMessages` message, and what
+  they keep. It references only the domain projects, so it needs neither the host nor Docker.
 
 ```bash
+dotnet test --project src/Tests/Rentar.Domain.UnitTests
 dotnet test --project src/Tests/Rentar.ArchitectureTests
 dotnet test --project src/Tests/Rentar.Api.IntegrationTests
 ```
