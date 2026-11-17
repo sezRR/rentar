@@ -31,7 +31,8 @@ public class CarsEndpoints : IEndpoint
             .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status404NotFound);
         group.MapDelete("/{id:int}", Delete)
-            .ProducesProblem(StatusCodes.Status404NotFound);
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict);
     }
 
     /// <summary>
@@ -106,7 +107,7 @@ public class CarsEndpoints : IEndpoint
     }
 
     /// <summary>
-    /// Deletes the car together with its images and their files.
+    /// Deletes the car together with its images and their files; a car that has rentals answers 409.
     /// </summary>
     private static async Task<Results<NoContent, ProblemHttpResult>> Delete(
         IQueryHandler<GetCarByIdQuery, Car> getCarById,

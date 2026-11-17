@@ -8,7 +8,9 @@ internal sealed class RentalConfiguration : IEntityTypeConfiguration<Rental>
 {
     public void Configure(EntityTypeBuilder<Rental> builder)
     {
-        // The car lives in the Fleet schema, so there is no foreign key to index it; rentals are looked up by car.
+        // The car and the customer live in other schemas, so there are no foreign keys to index them; rentals are
+        // looked up by car, and by customer for a company's rentals.
         builder.HasIndex(rental => rental.CarId);
+        builder.HasIndex(rental => rental.CustomerId);
     }
 }

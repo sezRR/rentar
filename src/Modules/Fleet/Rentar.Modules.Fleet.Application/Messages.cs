@@ -14,6 +14,7 @@ public static class Messages
     public const string CarUpdated = "Car Updated";
     public const string CarDeleted = "Car Deleted";
     public const string TheCarNotFound = "Desired car is not on the database";
+    public const string CarHasRentals = "Car can not be deleted while it has rentals";
 
     public const string ColorsListed = "Colors Listed";
     public const string ColorAdded = "Color Added";

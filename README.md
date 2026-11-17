@@ -175,7 +175,7 @@ src/
 | Module    | Owns                                   | Schema      | Uses contracts of            |
 |-----------|----------------------------------------|-------------|------------------------------|
 | Identity  | users, operation claims, auth (JWT)    | `identity`  | -                            |
-| Fleet     | brands, colors, cars, car images       | `fleet`     | -                            |
+| Fleet     | brands, colors, cars, car images       | `fleet`     | Rentals                      |
 | Companies | companies, employees, roles (company IAM) | `companies` | Identity                  |
 | Customers | customer accounts                      | `customers` | Identity, Companies          |
 | Rentals   | rentals                                | `rentals`   | Customers, Identity, Fleet, Companies |
@@ -205,7 +205,8 @@ modules (`Customer.UserId`, `Customer.CompanyId`, `Employee.UserId`, `CustomerSc
 indexed where they are looked up. With no foreign key to guard them, creating a customer asks Identity whether its user
 exists and is active and, for a company customer, Companies whether the user works there; registering a company or
 adding an employee asks Identity about the user; creating a rental asks Fleet and Customers whether its car and customer
-exist. Otherwise the request answers `400`. Calculating a score asks Customers whether the customer exists, and answers
+exist. Otherwise the request answers `400`. Deleting a car asks Rentals whether any rental is of it, and answers `409`
+while one is, so no rental is left pointing at a car that is gone. Calculating a score asks Customers whether the customer exists, and answers
 `404` when it does not, since the customer is in the path.
 
 - Each module's `Persistence/Configurations` holds an `IEntityTypeConfiguration<T>` per entity that needs more than the

@@ -99,9 +99,9 @@ public class V1ContractTests(RentarApiFactory factory) : IntegrationTestBase(fac
         "findeks/calculate => 200 {data: number, message: \"Findeks rating calculated successfully\", success: true}",
         "cars/delete => 200 {message: \"Car Deleted\", success: true}",
         "cars/delete unknown car => 500 {Message: string, StatusCode: 500}",
+        "cars/delete rented car => 400 {message: \"Car can not be deleted while it has rentals\", success: false}",
         "colors/delete in use => 400 {message: \"Color can not be deleted while cars use it\", success: false}",
         "brands/delete in use => 400 {message: \"Brand can not be deleted while cars use it\", success: false}",
-        "cars/delete last car => 200 {message: \"Car Deleted\", success: true}",
         "colors/delete => 200 {message: \"Color Deleted\", success: true}",
         "brands/delete => 200 {message: \"Brand Deleted\", success: true}",
     ];
@@ -212,12 +212,15 @@ public class V1ContractTests(RentarApiFactory factory) : IntegrationTestBase(fac
     {
         await Post("cars/delete", "/api/v1/cars/delete", new { id = 2 });
         await Post("cars/delete unknown car", "/api/v1/cars/delete", new { id = 999 });
-        // Car 1 still has the brand and the color, so they can not go before it.
+        // Car 1 is rented, so it stays, and with it the brand and the color it has.
+        await Post("cars/delete rented car", "/api/v1/cars/delete", new { id = 1 });
         await Post("colors/delete in use", "/api/v1/colors/delete", new { id = 1, colorName = "Red" });
         await Post("brands/delete in use", "/api/v1/brands/delete", new { id = 1, brandName = "Toyota" });
-        await Post("cars/delete last car", "/api/v1/cars/delete", new { id = 1 });
-        await Post("colors/delete", "/api/v1/colors/delete", new { id = 1, colorName = "Red" });
-        await Post("brands/delete", "/api/v1/brands/delete", new { id = 1, brandName = "Toyota" });
+        // A brand and a color no car has go at once.
+        await Client.PostJsonAsync("/api/v1/brands/add", new { brandName = "Fiat" });
+        await Client.PostJsonAsync("/api/v1/colors/add", new { colorName = "White" });
+        await Post("colors/delete", "/api/v1/colors/delete", new { id = 2, colorName = "White" });
+        await Post("brands/delete", "/api/v1/brands/delete", new { id = 2, brandName = "Fiat" });
     }
 
     private async Task Get(string name, string url)

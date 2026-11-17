@@ -1,5 +1,8 @@
+using Rentar.Modules.Fleet.Application;
 using Rentar.Modules.Fleet.Domain;
 using Rentar.Modules.Fleet.Presentation.Endpoints.V2;
+using Rentar.Modules.Rentals.Application.Commands;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -73,6 +76,28 @@ public class CarsEndpointsTests(RentarApiFactory factory) : V2TestBase(factory)
         await AssertProblemAsync(await Client.GetJsonAsync($"/api/v2/cars/{car.Id}"), HttpStatusCode.NotFound);
         Assert.Empty(await (await Client.GetJsonAsync($"/api/v2/cars/{car.Id}/images")).ReadAsAsync<List<CarImage>>());
         Assert.False(File.Exists(stored));
+    }
+
+    [Fact]
+    public async Task Delete_OfACarWithRentals_IsAConflict_AndKeepsTheCarAndItsImages()
+    {
+        var car = await CreateCarAsync();
+        var image = await (await UploadImageAsync(car.Id, "car.png", PngBytes)).ReadAsAsync<CarImage>();
+        var customer = await CreateCustomerAsync();
+        var rented = await Client.PostJsonAsync(
+            "/api/v2/rentals",
+            new CreateRentalCommand(car.Id, customer.Id, new DateTime(2026, 9, 18, 10, 0, 0), new DateTime(2026, 9, 20, 10, 0, 0)));
+        Assert.Equal(HttpStatusCode.Created, rented.StatusCode);
+
+        var response = await Client.DeleteResourceAsync($"/api/v2/cars/{car.Id}");
+
+        await AssertProblemAsync(response, HttpStatusCode.Conflict, Messages.CarHasRentals);
+        Assert.Equal(HttpStatusCode.OK, (await Client.GetJsonAsync($"/api/v2/cars/{car.Id}")).StatusCode);
+        Assert.Equal([image.Id], (await (await Client.GetJsonAsync($"/api/v2/cars/{car.Id}/images")).ReadAsAsync<List<CarImage>>()).Select(i => i.Id));
+        Assert.True(File.Exists(UploadedFile(image.ImagePath)));
+
+        // Removes the stored file again so the test leaves wwwroot/uploads untouched.
+        await Client.DeleteResourceAsync($"/api/v2/cars/{car.Id}/images");
     }
 
     [Theory]

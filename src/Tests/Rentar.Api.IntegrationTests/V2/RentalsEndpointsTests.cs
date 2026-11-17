@@ -122,12 +122,9 @@ public class RentalsEndpointsTests(RentarApiFactory factory) : V2TestBase(factor
         var customer = await CreateAsync<Customer>("/api/v2/customers", new CreateCustomerCommand(owner.Id, company.Id));
         FreezeClockAtNoon();
         var car = await CreateCarAsync("Toyota", "Red", "Corolla 1.6");
-        var deletedCar = await CreateCarAsync("Fiat", "Blue", "Egea 1.4");
         await CreateRentalAsync(car.Id, customer.Id);
-        await CreateRentalAsync(deletedCar.Id, customer.Id);
-        // Fleet no longer knows this car, so its rental has no details to show.
-        var delete = await Client.DeleteAsync($"/api/v2/cars/{deletedCar.Id}", TestContext.Current.CancellationToken);
-        Assert.Equal(HttpStatusCode.NoContent, delete.StatusCode);
+        // Fleet does not know this car, so its rental has no details to show.
+        await Factory.StoreRentalOfMissingCarAsync(car.Id + 1, customer.Id, RentDate, ReturnDate);
 
         var response = await Client.GetJsonAsync("/api/v2/rentals/details");
 

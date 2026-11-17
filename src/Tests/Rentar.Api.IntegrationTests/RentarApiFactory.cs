@@ -108,6 +108,28 @@ public class RentarApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         await command.ExecuteNonQueryAsync();
     }
 
+    /// <summary>
+    /// Stores a rental of a car Fleet does not know, as deleting a rented car left behind before it asked Rentals.
+    /// No endpoint does: creating a rental asks Fleet for its car, and a rented car can not be deleted.
+    /// </summary>
+    public async Task StoreRentalOfMissingCarAsync(int carId, int customerId, DateTime rentDate, DateTime returnDate)
+    {
+        await using var connection = new NpgsqlConnection(ConnectionString);
+        await connection.OpenAsync();
+
+        await using var command = new NpgsqlCommand(
+            """
+            INSERT INTO rentals."Rentals" ("CarId", "CustomerId", "RentDate", "ReturnDate")
+            VALUES (@carId, @customerId, @rentDate, @returnDate)
+            """,
+            connection);
+        command.Parameters.AddWithValue("carId", carId);
+        command.Parameters.AddWithValue("customerId", customerId);
+        command.Parameters.AddWithValue("rentDate", rentDate);
+        command.Parameters.AddWithValue("returnDate", returnDate);
+        await command.ExecuteNonQueryAsync();
+    }
+
     private async Task ExecuteAsync(string sql)
     {
         await using var connection = new NpgsqlConnection(ConnectionString);

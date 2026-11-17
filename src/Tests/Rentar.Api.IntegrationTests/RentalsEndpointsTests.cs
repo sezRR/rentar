@@ -80,13 +80,10 @@ public class RentalsEndpointsTests(RentarApiFactory factory) : IntegrationTestBa
         var userId = await RegisterUserAsync("Sezer", "renter@example.com");
         var customerId = await AddCustomerAsync(userId);
         var carId = await AddCarAsync("Toyota", "Red", "Corolla 1.6");
-        var deletedCarId = await AddCarAsync("Fiat", "Blue", "Egea 1.4");
 
         await Client.PostJsonAsync("/api/v1/rentals/add", NewRental(carId, customerId));
-        await Client.PostJsonAsync("/api/v1/rentals/add", NewRental(deletedCarId, customerId));
-        // Fleet no longer knows this car, so its rental has no details to show.
-        var delete = await Client.PostJsonAsync("/api/v1/cars/delete", new Car { Id = deletedCarId });
-        Assert.Equal(HttpStatusCode.OK, delete.StatusCode);
+        // Fleet does not know this car, so its rental has no details to show.
+        await Factory.StoreRentalOfMissingCarAsync(carId + 1, customerId, RentDate, ReturnDate);
 
         var response = await Client.GetJsonAsync("/api/v1/rentals/getrentaldetails");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
