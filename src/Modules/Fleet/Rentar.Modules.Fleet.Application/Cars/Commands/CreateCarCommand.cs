@@ -44,15 +44,13 @@ public sealed class CreateCarCommandHandler(ICarDal carDal, IBrandDal brandDal, 
     {
         await CarReferences.EnsureExistAsync(brandDal, colorDal, command.BrandId, command.ColorId, cancellationToken);
 
-        var car = new Car
-        {
-            BrandId = command.BrandId,
-            ColorId = command.ColorId,
-            ModelYear = command.ModelYear,
-            DailyPrice = command.DailyPrice,
-            Description = command.Description,
-            MinimumFindeksRating = command.MinimumFindeksRating
-        };
+        var car = new Car(
+            command.BrandId,
+            command.ColorId,
+            command.ModelYear,
+            command.DailyPrice,
+            command.Description,
+            command.MinimumFindeksRating);
 
         await carDal.AddAsync(car, cancellationToken);
         return car;

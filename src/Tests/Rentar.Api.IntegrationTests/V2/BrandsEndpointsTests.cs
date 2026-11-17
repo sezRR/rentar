@@ -16,13 +16,13 @@ public class BrandsEndpointsTests(RentarApiFactory factory) : V2TestBase(factory
         var response = await Client.PostJsonAsync("/api/v2/brands", new BrandRequest("Toyota"));
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-        var created = await response.ReadAsAsync<Brand>();
+        var created = await response.ReadAsAsync<BrandBody>();
         Assert.Equal("Toyota", created.BrandName);
         Assert.Equal($"/api/v2/brands/{created.Id}", response.Headers.Location?.OriginalString);
 
         var fetched = await Client.GetJsonAsync(response.Headers.Location!.OriginalString);
         Assert.Equal(HttpStatusCode.OK, fetched.StatusCode);
-        Assert.Equal("Toyota", (await fetched.ReadAsAsync<Brand>()).BrandName);
+        Assert.Equal("Toyota", (await fetched.ReadAsAsync<BrandBody>()).BrandName);
     }
 
     [Fact]
@@ -35,7 +35,7 @@ public class BrandsEndpointsTests(RentarApiFactory factory) : V2TestBase(factory
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.StartsWith("[", await response.ReadTextAsync());
-        var brands = await response.ReadAsAsync<List<Brand>>();
+        var brands = await response.ReadAsAsync<List<BrandBody>>();
         Assert.Equal(["Honda", "Renault"], brands.ConvertAll(b => b.BrandName));
     }
 
@@ -48,7 +48,7 @@ public class BrandsEndpointsTests(RentarApiFactory factory) : V2TestBase(factory
 
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
         var fetched = await Client.GetJsonAsync($"/api/v2/brands/{brand.Id}");
-        Assert.Equal("Opel", (await fetched.ReadAsAsync<Brand>()).BrandName);
+        Assert.Equal("Opel", (await fetched.ReadAsAsync<BrandBody>()).BrandName);
     }
 
     [Fact]
@@ -95,7 +95,7 @@ public class BrandsEndpointsTests(RentarApiFactory factory) : V2TestBase(factory
         var response = await Client.PostJsonAsync("/api/v2/brands", new BrandRequest("A"));
 
         await AssertValidationProblemAsync(response, "brandName");
-        var brands = await (await Client.GetJsonAsync("/api/v2/brands")).ReadAsAsync<List<Brand>>();
+        var brands = await (await Client.GetJsonAsync("/api/v2/brands")).ReadAsAsync<List<BrandBody>>();
         Assert.Empty(brands);
     }
 
@@ -107,7 +107,7 @@ public class BrandsEndpointsTests(RentarApiFactory factory) : V2TestBase(factory
         var response = await Client.PutJsonAsync($"/api/v2/brands/{brand.Id}", new BrandRequest("A"));
 
         await AssertValidationProblemAsync(response, "brandName");
-        var fetched = await (await Client.GetJsonAsync($"/api/v2/brands/{brand.Id}")).ReadAsAsync<Brand>();
+        var fetched = await (await Client.GetJsonAsync($"/api/v2/brands/{brand.Id}")).ReadAsAsync<BrandBody>();
         Assert.Equal("Toyota", fetched.BrandName);
     }
 }

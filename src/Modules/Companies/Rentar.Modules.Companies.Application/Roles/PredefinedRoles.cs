@@ -32,6 +32,6 @@ internal sealed record PredefinedRole(string Name, string[] Permissions)
     /// <summary>A new role of this kind; the company it belongs to is set when the company is stored with it.</summary>
     public Role ToRole()
     {
-        return new Role { Name = Name, Permissions = [.. Permissions], IsPredefined = true };
+        return new Role(Name, Permissions, isPredefined: true);
     }
 }

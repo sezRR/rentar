@@ -40,14 +40,9 @@ public sealed class AddUserCommandHandler(IUserDal userDal) : ICommandHandler<Ad
             throw new ConflictException(Messages.UserAlreadyExists);
         }
 
-        await userDal.AddAsync(new User
-        {
-            FirstName = command.FirstName,
-            LastName = command.LastName,
-            Email = command.Email,
-            PasswordHash = command.PasswordHash,
-            PasswordSalt = command.PasswordSalt,
-            Status = command.Status
-        }, cancellationToken);
+        var user = new User(
+            command.FirstName, command.LastName, command.Email, command.PasswordHash, command.PasswordSalt, command.Status);
+
+        await userDal.AddAsync(user, cancellationToken);
     }
 }

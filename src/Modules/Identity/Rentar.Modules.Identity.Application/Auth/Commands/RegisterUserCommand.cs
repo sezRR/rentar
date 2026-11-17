@@ -38,15 +38,7 @@ public sealed class RegisterUserCommandHandler(IUserDal userDal) : ICommandHandl
 
         HashingHelper.CreatePasswordHash(command.Password, out var passwordHash, out var passwordSalt);
 
-        var user = new User
-        {
-            FirstName = command.FirstName,
-            LastName = command.LastName,
-            Email = command.Email,
-            PasswordHash = passwordHash,
-            PasswordSalt = passwordSalt,
-            Status = true,
-        };
+        var user = new User(command.FirstName, command.LastName, command.Email, passwordHash, passwordSalt, status: true);
 
         await userDal.AddAsync(user, cancellationToken);
         return user;

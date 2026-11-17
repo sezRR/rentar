@@ -16,4 +16,7 @@ public interface ICarDal : IEntityRepository<Car>
 
     /// <summary>The car's details, or <c>null</c> when there is no car with that id.</summary>
     Task<CarDetailResponse> GetCarDetailsByIdAsync(int id, CancellationToken cancellationToken = default);
+
+    /// <summary>The car with its <see cref="Car.Images"/>, or <c>null</c> when there is no car with that id.</summary>
+    Task<Car> GetWithImagesAsync(int id, CancellationToken cancellationToken = default);
 }

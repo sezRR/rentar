@@ -1,5 +1,4 @@
 using Rentar.Modules.Fleet.Application.Common.Interfaces;
-using Rentar.Modules.Fleet.Domain;
 using Rentar.Shared.Application.UseCases;
 using Rentar.Shared.Kernel.Exceptions;
 using System.Linq;
@@ -21,6 +20,6 @@ public sealed class DeleteBrandCommandHandler(IBrandDal brandDal) : ICommandHand
             throw new ConflictException(Messages.BrandHasCars);
         }
 
-        await brandDal.DeleteAsync(new Brand { Id = command.Id }, cancellationToken);
+        await brandDal.DeleteAsync(b => b.Id == command.Id, cancellationToken);
     }
 }

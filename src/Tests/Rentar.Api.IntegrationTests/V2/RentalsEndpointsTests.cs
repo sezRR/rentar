@@ -29,11 +29,11 @@ public class RentalsEndpointsTests(RentarApiFactory factory) : V2TestBase(factor
         var response = await Client.PostJsonAsync("/api/v2/rentals", new CreateRentalCommand(car.Id, customer.Id, RentDate, ReturnDate));
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-        var rental = await response.ReadAsAsync<Rental>();
+        var rental = await response.ReadAsAsync<RentalBody>();
         Assert.Equal($"/api/v2/rentals/{rental.Id}", response.Headers.Location?.OriginalString);
         Assert.Equal(RentalStatus.Pending, rental.Status);
 
-        var fetched = await (await Client.GetJsonAsync($"/api/v2/rentals/{rental.Id}")).ReadAsAsync<Rental>();
+        var fetched = await (await Client.GetJsonAsync($"/api/v2/rentals/{rental.Id}")).ReadAsAsync<RentalBody>();
         Assert.Equal(car.Id, fetched.CarId);
         Assert.Equal(customer.Id, fetched.CustomerId);
         Assert.Equal(RentDate, fetched.RentDate);
@@ -116,7 +116,7 @@ public class RentalsEndpointsTests(RentarApiFactory factory) : V2TestBase(factor
         var response = await Client.PostJsonAsync("/api/v2/rentals", new CreateRentalCommand(404, customer.Id, RentDate, ReturnDate));
 
         await AssertProblemAsync(response, HttpStatusCode.BadRequest, Messages.CarNotFound);
-        Assert.Empty(await (await Client.GetJsonAsync("/api/v2/rentals")).ReadAsAsync<List<Rental>>());
+        Assert.Empty(await (await Client.GetJsonAsync("/api/v2/rentals")).ReadAsAsync<List<RentalBody>>());
     }
 
     [Fact]
@@ -127,7 +127,7 @@ public class RentalsEndpointsTests(RentarApiFactory factory) : V2TestBase(factor
         var response = await Client.PostJsonAsync("/api/v2/rentals", new CreateRentalCommand(car.Id, 404, RentDate, ReturnDate));
 
         await AssertProblemAsync(response, HttpStatusCode.BadRequest, Messages.CustomerNotFound);
-        Assert.Empty(await (await Client.GetJsonAsync("/api/v2/rentals")).ReadAsAsync<List<Rental>>());
+        Assert.Empty(await (await Client.GetJsonAsync("/api/v2/rentals")).ReadAsAsync<List<RentalBody>>());
     }
 
     [Fact]
@@ -145,8 +145,8 @@ public class RentalsEndpointsTests(RentarApiFactory factory) : V2TestBase(factor
         await CreateRentalAsync(secondCar.Id, first.Id, RentDate.AddDays(10), ReturnDate.AddDays(10));
         await CreateRentalAsync(secondCar.Id, second.Id, RentDate.AddDays(20), ReturnDate.AddDays(20));
 
-        var all = await (await Client.GetJsonAsync("/api/v2/rentals")).ReadAsAsync<List<Rental>>();
-        var ofCar = await (await Client.GetJsonAsync($"/api/v2/rentals?carId={secondCar.Id}")).ReadAsAsync<List<Rental>>();
+        var all = await (await Client.GetJsonAsync("/api/v2/rentals")).ReadAsAsync<List<RentalBody>>();
+        var ofCar = await (await Client.GetJsonAsync($"/api/v2/rentals?carId={secondCar.Id}")).ReadAsAsync<List<RentalBody>>();
 
         Assert.Equal(3, all.Count);
         Assert.Equal([first.Id, second.Id], ofCar.Select(r => r.CustomerId).Order());
@@ -188,7 +188,7 @@ public class RentalsEndpointsTests(RentarApiFactory factory) : V2TestBase(factor
         // Signed in before the clock is frozen: the access token's times come from the clock.
         var owner = await SignInAsNewUserAsync("renter@example.com");
         var company = await RegisterCompanyAsync();
-        var customer = await CreateAsync<Customer>("/api/v2/customers", new CreateCustomerCommand(owner.Id, company.Id));
+        var customer = await CreateAsync<CustomerBody>("/api/v2/customers", new CreateCustomerCommand(owner.Id, company.Id));
         FreezeClockAtNoon();
         var car = await CreateCarAsync();
         await CreateRentalAsync(car.Id, customer.Id);
@@ -248,14 +248,14 @@ public class RentalsEndpointsTests(RentarApiFactory factory) : V2TestBase(factor
         await AssertProblemAsync(response, HttpStatusCode.NotFound, "Rental 404 was not found.");
     }
 
-    private async Task<Rental> RentalAsync(int rentalId)
+    private async Task<RentalBody> RentalAsync(int rentalId)
     {
-        return await (await Client.GetJsonAsync($"/api/v2/rentals/{rentalId}")).ReadAsAsync<Rental>();
+        return await (await Client.GetJsonAsync($"/api/v2/rentals/{rentalId}")).ReadAsAsync<RentalBody>();
     }
 
-    private Task<Rental> CreateRentalAsync(int carId, int customerId, DateTime? rentDate = null, DateTime? returnDate = null)
+    private Task<RentalBody> CreateRentalAsync(int carId, int customerId, DateTime? rentDate = null, DateTime? returnDate = null)
     {
-        return CreateAsync<Rental>("/api/v2/rentals", new CreateRentalCommand(carId, customerId, rentDate ?? RentDate, returnDate ?? ReturnDate));
+        return CreateAsync<RentalBody>("/api/v2/rentals", new CreateRentalCommand(carId, customerId, rentDate ?? RentDate, returnDate ?? ReturnDate));
     }
 
     [Fact]
@@ -263,16 +263,16 @@ public class RentalsEndpointsTests(RentarApiFactory factory) : V2TestBase(factor
     {
         var owner = await SignInAsNewUserAsync("owner@example.com");
         var company = await RegisterCompanyAsync();
-        var companyCustomer = await CreateAsync<Customer>("/api/v2/customers", new CreateCustomerCommand(owner.Id, company.Id));
+        var companyCustomer = await CreateAsync<CustomerBody>("/api/v2/customers", new CreateCustomerCommand(owner.Id, company.Id));
         var privateCustomer = await CreateCustomerAsync("private@example.com");
         var car = await CreateCarAsync();
-        var companyRental = await CreateAsync<Rental>("/api/v2/rentals", new CreateRentalCommand(car.Id, companyCustomer.Id, RentDate, ReturnDate));
-        await CreateAsync<Rental>("/api/v2/rentals", new CreateRentalCommand(car.Id, privateCustomer.Id, RentDate.AddDays(5), ReturnDate.AddDays(5)));
+        var companyRental = await CreateAsync<RentalBody>("/api/v2/rentals", new CreateRentalCommand(car.Id, companyCustomer.Id, RentDate, ReturnDate));
+        await CreateAsync<RentalBody>("/api/v2/rentals", new CreateRentalCommand(car.Id, privateCustomer.Id, RentDate.AddDays(5), ReturnDate.AddDays(5)));
 
         var response = await Client.GetJsonAsync($"/api/v2/companies/{company.Id}/rentals");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var rentals = await response.ReadAsAsync<List<Rental>>();
+        var rentals = await response.ReadAsAsync<List<RentalBody>>();
         Assert.Equal([companyRental.Id], rentals.Select(r => r.Id));
     }
 

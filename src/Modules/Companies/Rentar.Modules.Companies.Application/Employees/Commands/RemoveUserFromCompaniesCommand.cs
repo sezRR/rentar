@@ -40,9 +40,7 @@ public sealed class RemoveUserFromCompaniesCommandHandler(IEmployeeDal employeeD
             }
 
             // The database removes the role grants with the employee.
-            await employeeDal.DeleteAsync(
-                new Employee { Id = employment.Id, CompanyId = employment.CompanyId, UserId = employment.UserId },
-                cancellationToken);
+            await employeeDal.DeleteAsync(e => e.Id == employment.Id, cancellationToken);
 
             await eventPublisher.PublishAsync(new EmployeeRemovedEvent(employment.CompanyId, employment.UserId), cancellationToken);
         }

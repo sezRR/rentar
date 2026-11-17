@@ -30,7 +30,7 @@ public class RentalsEndpointsTests(RentarApiFactory factory) : IntegrationTestBa
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         var rentals = await Client.GetJsonAsync("/api/v1/rentals/getall");
-        var listed = await rentals.ReadAsAsync<V1Response<List<Rental>>>();
+        var listed = await rentals.ReadAsAsync<V1Response<List<RentalBody>>>();
 
         var rental = Assert.Single(listed.Data);
         Assert.Equal(RentDate, rental.RentDate);
@@ -49,7 +49,7 @@ public class RentalsEndpointsTests(RentarApiFactory factory) : IntegrationTestBa
         await Client.PostJsonAsync("/api/v1/rentals/add", NewRental(secondCar, second));
 
         var response = await Client.GetJsonAsync($"/api/v1/rentals/getrentalbycarid?carId={secondCar}");
-        var result = await response.ReadAsAsync<V1Response<Rental>>();
+        var result = await response.ReadAsAsync<V1Response<RentalBody>>();
 
         Assert.Equal(secondCar, result.Data.CarId);
         Assert.Equal(second, result.Data.CustomerId);
@@ -58,7 +58,7 @@ public class RentalsEndpointsTests(RentarApiFactory factory) : IntegrationTestBa
     [Fact]
     public async Task Add_WithoutDates_ReturnsValidationErrors()
     {
-        var response = await Client.PostJsonAsync("/api/v1/rentals/add", new Rental
+        var response = await Client.PostJsonAsync("/api/v1/rentals/add", new RentalBody
         {
             CarId = 1,
             CustomerId = 1
@@ -106,27 +106,27 @@ public class RentalsEndpointsTests(RentarApiFactory factory) : IntegrationTestBa
         await Client.PostJsonAsync("/api/v1/auth/register", new RegisterUserCommand(firstName, "Tetik", email, "Passw0rd!"));
 
         var response = await Client.GetJsonAsync($"/api/v1/users/getbymail?email={email}");
-        return (await response.ReadAsAsync<V1Response<User>>()).Data.Id;
+        return (await response.ReadAsAsync<V1Response<UserBody>>()).Data.Id;
     }
 
     private async Task<int> AddCustomerAsync(int userId)
     {
-        await Client.PostJsonAsync("/api/v1/customers/add", new Customer { UserId = userId });
+        await Client.PostJsonAsync("/api/v1/customers/add", new CustomerBody { UserId = userId });
 
         var response = await Client.GetJsonAsync($"/api/v1/customers/getcustomersbyuserid?userId={userId}");
-        return (await response.ReadAsAsync<V1Response<List<Customer>>>()).Data.Single().Id;
+        return (await response.ReadAsAsync<V1Response<List<CustomerBody>>>()).Data.Single().Id;
     }
 
     /// <summary>Adds a car with a brand and a color of its own and answers its id; the newest records have the highest ids.</summary>
     private async Task<int> AddCarAsync(string brandName = "Toyota", string colorName = "Red", string description = "Corolla 1.6")
     {
-        await Client.PostJsonAsync("/api/v1/brands/add", new Brand { BrandName = brandName });
-        await Client.PostJsonAsync("/api/v1/colors/add", new Color { ColorName = colorName });
+        await Client.PostJsonAsync("/api/v1/brands/add", new BrandBody { BrandName = brandName });
+        await Client.PostJsonAsync("/api/v1/colors/add", new ColorBody { ColorName = colorName });
 
-        var brands = await (await Client.GetJsonAsync("/api/v1/brands/getall")).ReadAsAsync<V1Response<List<Brand>>>();
-        var colors = await (await Client.GetJsonAsync("/api/v1/colors/getall")).ReadAsAsync<V1Response<List<Color>>>();
+        var brands = await (await Client.GetJsonAsync("/api/v1/brands/getall")).ReadAsAsync<V1Response<List<BrandBody>>>();
+        var colors = await (await Client.GetJsonAsync("/api/v1/colors/getall")).ReadAsAsync<V1Response<List<ColorBody>>>();
 
-        await Client.PostJsonAsync("/api/v1/cars/add", new Car
+        await Client.PostJsonAsync("/api/v1/cars/add", new CarBody
         {
             BrandId = brands.Data.Max(b => b.Id),
             ColorId = colors.Data.Max(c => c.Id),
@@ -136,13 +136,13 @@ public class RentalsEndpointsTests(RentarApiFactory factory) : IntegrationTestBa
             MinimumFindeksRating = 700
         });
 
-        var cars = await (await Client.GetJsonAsync("/api/v1/cars/getall")).ReadAsAsync<V1Response<List<Car>>>();
+        var cars = await (await Client.GetJsonAsync("/api/v1/cars/getall")).ReadAsAsync<V1Response<List<CarBody>>>();
         return cars.Data.Max(c => c.Id);
     }
 
-    private static Rental NewRental(int carId = 1, int customerId = 1)
+    private static RentalBody NewRental(int carId = 1, int customerId = 1)
     {
-        return new Rental
+        return new RentalBody
         {
             CarId = carId,
             CustomerId = customerId,

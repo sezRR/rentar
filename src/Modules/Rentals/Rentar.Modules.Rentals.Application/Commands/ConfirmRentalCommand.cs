@@ -22,6 +22,6 @@ public sealed class ConfirmRentalCommandHandler(IRentalDal rentalDal) : ICommand
             return;
         }
 
-        await rentalDal.UpdateAsync(rental.WithStatus(RentalStatus.Confirmed), cancellationToken);
+        await rentalDal.UpdateAsync(rental.Confirmed(), cancellationToken);
     }
 }

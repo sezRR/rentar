@@ -22,7 +22,7 @@ public class CarsEndpointsTests(RentarApiFactory factory) : IntegrationTestBase(
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         var cars = await Client.GetJsonAsync("/api/v1/cars/getall");
-        var listed = await cars.ReadAsAsync<V1Response<List<Car>>>();
+        var listed = await cars.ReadAsAsync<V1Response<List<CarBody>>>();
 
         var car = Assert.Single(listed.Data);
         Assert.Equal("Corolla 1.6", car.Description);
@@ -32,7 +32,7 @@ public class CarsEndpointsTests(RentarApiFactory factory) : IntegrationTestBase(
     [Fact]
     public async Task Add_WithEmptyDescriptionAndZeroPrice_ReturnsValidationErrors()
     {
-        var invalidCar = new Car
+        var invalidCar = new CarBody
         {
             BrandId = 1,
             ColorId = 1,
@@ -105,9 +105,9 @@ public class CarsEndpointsTests(RentarApiFactory factory) : IntegrationTestBase(
         Assert.Equal("Blue car", car.Description);
     }
 
-    private static Car NewCar(int brandId = 1, int colorId = 1, string description = "Corolla 1.6")
+    private static CarBody NewCar(int brandId = 1, int colorId = 1, string description = "Corolla 1.6")
     {
-        return new Car
+        return new CarBody
         {
             BrandId = brandId,
             ColorId = colorId,
@@ -120,20 +120,20 @@ public class CarsEndpointsTests(RentarApiFactory factory) : IntegrationTestBase(
 
     private async Task<int> AddBrandAsync(string brandName)
     {
-        await Client.PostJsonAsync("/api/v1/brands/add", new Brand { BrandName = brandName });
+        await Client.PostJsonAsync("/api/v1/brands/add", new BrandBody { BrandName = brandName });
 
         var brands = await Client.GetJsonAsync("/api/v1/brands/getall");
-        var listed = await brands.ReadAsAsync<V1Response<List<Brand>>>();
+        var listed = await brands.ReadAsAsync<V1Response<List<BrandBody>>>();
 
         return listed.Data.Single(b => b.BrandName == brandName).Id;
     }
 
     private async Task<int> AddColorAsync(string colorName)
     {
-        await Client.PostJsonAsync("/api/v1/colors/add", new Color { ColorName = colorName });
+        await Client.PostJsonAsync("/api/v1/colors/add", new ColorBody { ColorName = colorName });
 
         var colors = await Client.GetJsonAsync("/api/v1/colors/getall");
-        var listed = await colors.ReadAsAsync<V1Response<List<Color>>>();
+        var listed = await colors.ReadAsAsync<V1Response<List<ColorBody>>>();
 
         return listed.Data.Single(c => c.ColorName == colorName).Id;
     }

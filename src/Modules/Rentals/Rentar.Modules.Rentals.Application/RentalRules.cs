@@ -3,7 +3,10 @@ using System;
 
 namespace Rentar.Modules.Rentals.Application;
 
-/// <summary>What a valid rental period looks like, shared by every use case that takes one.</summary>
+/// <summary>
+/// What a valid rental period looks like, shared by every use case that takes one, so the caller hears about every
+/// field that breaks it at once. A <see cref="Domain.Rental"/>'s constructor enforces it again, whoever builds one.
+/// </summary>
 internal static class RentalRules
 {
     /// <summary>A period that ends after it starts; <paramref name="rentDate"/> picks the start from the same use case.</summary>

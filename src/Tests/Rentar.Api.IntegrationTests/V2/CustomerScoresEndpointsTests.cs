@@ -16,11 +16,11 @@ public class CustomerScoresEndpointsTests(RentarApiFactory factory) : V2TestBase
         var response = await Client.PostJsonAsync($"/api/v2/customers/{customer.Id}/score", new { });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var score = await response.ReadAsAsync<CustomerScore>();
+        var score = await response.ReadAsAsync<CustomerScoreBody>();
         Assert.Equal(customer.Id, score.CustomerId);
         Assert.InRange(score.FindeksRating, 0, 1900);
 
-        var fetched = await (await Client.GetJsonAsync($"/api/v2/customers/{customer.Id}/score")).ReadAsAsync<CustomerScore>();
+        var fetched = await (await Client.GetJsonAsync($"/api/v2/customers/{customer.Id}/score")).ReadAsAsync<CustomerScoreBody>();
         Assert.Equal(score.FindeksRating, fetched.FindeksRating);
     }
 
@@ -30,9 +30,9 @@ public class CustomerScoresEndpointsTests(RentarApiFactory factory) : V2TestBase
         var customer = await CreateCustomerAsync();
         await Client.PostJsonAsync($"/api/v2/customers/{customer.Id}/score", new { });
 
-        var latest = await (await Client.PostJsonAsync($"/api/v2/customers/{customer.Id}/score", new { })).ReadAsAsync<CustomerScore>();
+        var latest = await (await Client.PostJsonAsync($"/api/v2/customers/{customer.Id}/score", new { })).ReadAsAsync<CustomerScoreBody>();
 
-        var fetched = await (await Client.GetJsonAsync($"/api/v2/customers/{customer.Id}/score")).ReadAsAsync<CustomerScore>();
+        var fetched = await (await Client.GetJsonAsync($"/api/v2/customers/{customer.Id}/score")).ReadAsAsync<CustomerScoreBody>();
         Assert.Equal(latest.FindeksRating, fetched.FindeksRating);
     }
 
@@ -53,7 +53,7 @@ public class CustomerScoresEndpointsTests(RentarApiFactory factory) : V2TestBase
         var response = await Client.GetJsonAsync($"/api/v2/customers/{customer.Id}/score");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var score = await response.ReadAsAsync<CustomerScore>();
+        var score = await response.ReadAsAsync<CustomerScoreBody>();
         Assert.Equal(customer.Id, score.CustomerId);
         Assert.InRange(score.FindeksRating, 0, 1900);
     }

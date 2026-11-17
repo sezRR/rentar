@@ -38,7 +38,7 @@ public class MessagingTests(RentarApiFactory factory) : V2TestBase(factory)
         }
 
         await AssertProblemAsync(response, HttpStatusCode.InternalServerError);
-        Assert.Empty(await (await Client.GetJsonAsync("/api/v2/customers")).ReadAsAsync<List<Customer>>());
+        Assert.Empty(await (await Client.GetJsonAsync("/api/v2/customers")).ReadAsAsync<List<CustomerBody>>());
     }
 
     [Fact]
@@ -46,7 +46,7 @@ public class MessagingTests(RentarApiFactory factory) : V2TestBase(factory)
     {
         var car = await CreateCarAsync();
         var customer = await CreateCustomerAsync();
-        await CreateAsync<Rental>("/api/v2/rentals", new CreateRentalCommand(car.Id, customer.Id, RentDate, RentDate.AddDays(2)));
+        await CreateAsync<RentalBody>("/api/v2/rentals", new CreateRentalCommand(car.Id, customer.Id, RentDate, RentDate.AddDays(2)));
         await DeliverEventsAsync();
 
         await Factory.MarkOutboxUndeliveredAsync("rentals");
@@ -63,7 +63,7 @@ public class MessagingTests(RentarApiFactory factory) : V2TestBase(factory)
         var company = await RegisterCompanyAsync();
         var customer = await CreateCustomerAsync("member@example.com");
         await AddEmployeeAsync(company.Id, customer.UserId, "Member");
-        var rental = await CreateAsync<Rental>("/api/v2/rentals", new CreateRentalCommand((await CreateCarAsync()).Id, customer.Id, RentDate, RentDate.AddDays(2)));
+        var rental = await CreateAsync<RentalBody>("/api/v2/rentals", new CreateRentalCommand((await CreateCarAsync()).Id, customer.Id, RentDate, RentDate.AddDays(2)));
         await DeliverEventsAsync();
 
         // Both Companies and Rentals react to the deactivation; only Rentals can not store its change.
@@ -89,7 +89,7 @@ public class MessagingTests(RentarApiFactory factory) : V2TestBase(factory)
     public async Task AReactionThatKeepsFailing_IsGivenUpAfterItsAttempts_AndLeftInTheOutbox()
     {
         var start = DateTimeOffset.UtcNow;
-        Customer customer;
+        CustomerBody customer;
 
         await using (await Factory.RefuseAsync("findeks", "CustomerScores", "INSERT"))
         {
@@ -148,15 +148,15 @@ public class MessagingTests(RentarApiFactory factory) : V2TestBase(factory)
         }
     }
 
-    private async Task<Rental> RentalAsync(int rentalId)
+    private async Task<RentalBody> RentalAsync(int rentalId)
     {
-        return await (await Client.GetJsonAsync($"/api/v2/rentals/{rentalId}")).ReadAsAsync<Rental>();
+        return await (await Client.GetJsonAsync($"/api/v2/rentals/{rentalId}")).ReadAsAsync<RentalBody>();
     }
 
-    private async Task<List<EmployeeResponse>> EmployeesAsync(int companyId)
+    private async Task<List<EmployeeBody>> EmployeesAsync(int companyId)
     {
         var response = await Client.GetJsonAsync($"/api/v2/companies/{companyId}/employees");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        return await response.ReadAsAsync<List<EmployeeResponse>>();
+        return await response.ReadAsAsync<List<EmployeeBody>>();
     }
 }

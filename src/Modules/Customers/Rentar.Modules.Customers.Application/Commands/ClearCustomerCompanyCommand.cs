@@ -1,5 +1,4 @@
 using Rentar.Modules.Customers.Application.Common.Interfaces;
-using Rentar.Modules.Customers.Domain;
 using Rentar.Shared.Application.UseCases;
 using System.Threading;
 using System.Threading.Tasks;
@@ -26,6 +25,6 @@ public sealed class ClearCustomerCompanyCommandHandler(ICustomerDal customerDal)
             return;
         }
 
-        await customerDal.UpdateAsync(new Customer { Id = customer.Id, UserId = customer.UserId, CompanyId = null }, cancellationToken);
+        await customerDal.UpdateAsync(customer.WithoutCompany(), cancellationToken);
     }
 }

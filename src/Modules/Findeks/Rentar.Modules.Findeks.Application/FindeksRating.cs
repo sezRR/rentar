@@ -6,22 +6,25 @@ namespace Rentar.Modules.Findeks.Application;
 /// <summary>A Findeks credit rating. No credit bureau is connected, so the rating is simulated.</summary>
 internal static class FindeksRating
 {
-    /// <summary>A rating between 0 and 1900: the sum of the report's factors, each simulated up to its maximum.</summary>
+    /// <summary>
+    /// A rating between 0 and <see cref="FindeksReport.MaxRating"/>: what a report adds up to whose factors are each
+    /// simulated up to their maximum.
+    /// </summary>
     public static int Calculate()
     {
-        var report = new FindeksReport
-        {
-            CreditProductRepayments = Random.Shared.Next(666), // 665
-            CurrentAccountsAndDebts = Random.Shared.Next(666), // 665
-            LoanUsageIntensity = Random.Shared.Next(191),      // 190
-            NewLoansTaken = Random.Shared.Next(210),           // 209
-            OtherFactors = Random.Shared.Next(172),            // 171
-        };
+        var report = new FindeksReport(
+            Simulated(FindeksReport.MaxCreditProductRepayments),
+            Simulated(FindeksReport.MaxCurrentAccountsAndDebts),
+            Simulated(FindeksReport.MaxLoanUsageIntensity),
+            Simulated(FindeksReport.MaxNewLoansTaken),
+            Simulated(FindeksReport.MaxOtherFactors));
 
-        return report.CreditProductRepayments
-            + report.CurrentAccountsAndDebts
-            + report.LoanUsageIntensity
-            + report.NewLoansTaken
-            + report.OtherFactors;
+        return report.Rating;
+    }
+
+    /// <summary>Between 0 and <paramref name="max"/>, both included.</summary>
+    private static int Simulated(int max)
+    {
+        return Random.Shared.Next(max + 1);
     }
 }

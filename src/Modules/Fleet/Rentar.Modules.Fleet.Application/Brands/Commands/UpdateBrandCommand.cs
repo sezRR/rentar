@@ -21,6 +21,6 @@ public sealed class UpdateBrandCommandHandler(IBrandDal brandDal) : ICommandHand
 {
     public Task HandleAsync(UpdateBrandCommand command, CancellationToken cancellationToken = default)
     {
-        return brandDal.UpdateAsync(new Brand { Id = command.Id, BrandName = command.BrandName }, cancellationToken);
+        return brandDal.UpdateAsync(new Brand(command.BrandName) { Id = command.Id }, cancellationToken);
     }
 }

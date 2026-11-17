@@ -36,7 +36,7 @@ public sealed class CancelUpcomingRentalsOfUserCommandHandler(
 
         foreach (var rental in upcoming)
         {
-            await rentalDal.UpdateAsync(rental.WithStatus(RentalStatus.Cancelled), cancellationToken);
+            await rentalDal.UpdateAsync(rental.Cancelled(), cancellationToken);
         }
     }
 }

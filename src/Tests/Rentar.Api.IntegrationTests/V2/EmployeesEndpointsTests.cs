@@ -26,7 +26,7 @@ public class EmployeesEndpointsTests(RentarApiFactory factory) : V2TestBase(fact
         var response = await Client.PostJsonAsync($"/api/v2/companies/{company.Id}/employees", new EmployeeRequest(user.Id, [adminRoleId]));
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-        var employee = await response.ReadAsAsync<EmployeeResponse>();
+        var employee = await response.ReadAsAsync<EmployeeBody>();
         Assert.Equal($"/api/v2/companies/{company.Id}/employees/{employee.Id}", response.Headers.Location?.OriginalString);
         Assert.Equal(user.Id, employee.UserId);
         Assert.Equal(company.Id, employee.CompanyId);
@@ -229,7 +229,7 @@ public class EmployeesEndpointsTests(RentarApiFactory factory) : V2TestBase(fact
         var company = await RegisterCompanyAsync();
         var member = await CreateUserAsync("member@example.com");
         var employee = await AddEmployeeAsync(company.Id, member.Id, "Member");
-        var customer = await CreateAsync<Customer>("/api/v2/customers", new CreateCustomerCommand(member.Id, company.Id));
+        var customer = await CreateAsync<CustomerBody>("/api/v2/customers", new CreateCustomerCommand(member.Id, company.Id));
 
         var response = await Client.DeleteResourceAsync($"/api/v2/companies/{company.Id}/employees/{employee.Id}");
 
@@ -250,7 +250,7 @@ public class EmployeesEndpointsTests(RentarApiFactory factory) : V2TestBase(fact
         var member = await CreateUserAsync("member@example.com");
         await AddEmployeeAsync(rentingFor.Id, member.Id, "Member");
         var otherEmployment = await AddEmployeeAsync(other.Id, member.Id, "Member");
-        var customer = await CreateAsync<Customer>("/api/v2/customers", new CreateCustomerCommand(member.Id, rentingFor.Id));
+        var customer = await CreateAsync<CustomerBody>("/api/v2/customers", new CreateCustomerCommand(member.Id, rentingFor.Id));
 
         await Client.DeleteResourceAsync($"/api/v2/companies/{other.Id}/employees/{otherEmployment.Id}");
         await DeliverEventsAsync();
@@ -265,7 +265,7 @@ public class EmployeesEndpointsTests(RentarApiFactory factory) : V2TestBase(fact
         var company = await RegisterCompanyAsync();
         var member = await CreateUserAsync("member@example.com");
         var employee = await AddEmployeeAsync(company.Id, member.Id, "Member");
-        var customer = await CreateAsync<Customer>("/api/v2/customers", new CreateCustomerCommand(member.Id, company.Id));
+        var customer = await CreateAsync<CustomerBody>("/api/v2/customers", new CreateCustomerCommand(member.Id, company.Id));
 
         // Customers reacts after the removal committed, so its failure leaves the removal in place and is retried.
         await using (await Factory.RefuseAsync("customers", "Customers", "UPDATE"))
@@ -285,17 +285,17 @@ public class EmployeesEndpointsTests(RentarApiFactory factory) : V2TestBase(fact
         Assert.Null((await CustomerAsync(customer.Id)).CompanyId);
     }
 
-    private async Task<Customer> CustomerAsync(int customerId)
+    private async Task<CustomerBody> CustomerAsync(int customerId)
     {
         var response = await Client.GetJsonAsync($"/api/v2/customers/{customerId}");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        return await response.ReadAsAsync<Customer>();
+        return await response.ReadAsAsync<CustomerBody>();
     }
 
-    private async Task<List<EmployeeResponse>> EmployeesAsync(int companyId)
+    private async Task<List<EmployeeBody>> EmployeesAsync(int companyId)
     {
         var response = await Client.GetJsonAsync($"/api/v2/companies/{companyId}/employees");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        return await response.ReadAsAsync<List<EmployeeResponse>>();
+        return await response.ReadAsAsync<List<EmployeeBody>>();
     }
 }

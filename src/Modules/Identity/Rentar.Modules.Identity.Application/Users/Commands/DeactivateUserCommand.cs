@@ -43,16 +43,7 @@ public sealed class DeactivateUserCommandHandler(IUserDal userDal, ICompaniesMod
             throw new ConflictException(Messages.UserIsLastFullAccessEmployee);
         }
 
-        await userDal.UpdateAsync(new User
-        {
-            Id = user.Id,
-            FirstName = user.FirstName,
-            LastName = user.LastName,
-            Email = user.Email,
-            PasswordHash = user.PasswordHash,
-            PasswordSalt = user.PasswordSalt,
-            Status = false
-        }, cancellationToken);
+        await userDal.UpdateAsync(user.Deactivated(), cancellationToken);
 
         await eventPublisher.PublishAsync(new UserDeactivatedEvent(user.Id), cancellationToken);
     }

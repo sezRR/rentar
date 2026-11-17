@@ -14,13 +14,11 @@ public sealed class UpdateColorCommandHandler(IColorDal colorDal) : ICommandHand
 {
     public async Task HandleAsync(UpdateColorCommand command, CancellationToken cancellationToken = default)
     {
-        // The one input check outside a validator: v1 has always answered it with this message, and V1ContractTests
-        // pins it. A validator would answer with the FluentValidation error body instead.
-        if (command.ColorName is not { Length: >= 2 })
-        {
-            throw new BusinessRuleException(Messages.ColorNameInvalid);
-        }
+        // No validator on purpose: v1 has always answered a short name with the color's own refusal
+        // (DomainMessages.ColorNameInvalid), and V1ContractTests pins it. A validator would answer with the
+        // FluentValidation error body instead.
+        var color = new Color(command.ColorName) { Id = command.Id };
 
-        await colorDal.UpdateAsync(new Color { Id = command.Id, ColorName = command.ColorName }, cancellationToken);
+        await colorDal.UpdateAsync(color, cancellationToken);
     }
 }

@@ -1,5 +1,4 @@
 using Rentar.Modules.Fleet.Application.Common.Interfaces;
-using Rentar.Modules.Fleet.Domain;
 using Rentar.Shared.Application.Aspects.Transaction;
 using Rentar.Shared.Application.UseCases;
 using Rentar.Shared.Kernel.Exceptions;
@@ -31,12 +30,8 @@ public sealed class ReplaceCarImageCommandHandler(ICarImageDal carImageDal, IIma
         var existing = await carImageDal.GetAsync(c => c.Id == command.Id, cancellationToken)
             ?? throw new NotFoundException(Messages.CarImageNotFound);
 
-        await carImageDal.UpdateAsync(new CarImage
-        {
-            Id = existing.Id,
-            CarId = existing.CarId,
-            ImagePath = await imageStorage.ReplaceAsync(command.File, existing.ImagePath, cancellationToken),
-            Date = timeProvider.GetLocalNow().DateTime
-        }, cancellationToken);
+        var imagePath = await imageStorage.ReplaceAsync(command.File, existing.ImagePath, cancellationToken);
+
+        await carImageDal.UpdateAsync(existing.WithFile(imagePath, timeProvider.GetLocalNow().DateTime), cancellationToken);
     }
 }

@@ -20,21 +20,15 @@ public sealed record AddCarImageCommand(int CarId, FileUpload File);
 public sealed class AddCarImageCommandHandler(ICarDal carDal, ICarImageDal carImageDal, IImageStorage imageStorage, TimeProvider timeProvider)
     : ICommandHandler<AddCarImageCommand, CarImage>
 {
-    private const int MaxImagesPerCar = 5;
-
     [TransactionScopeAspect]
     public async Task<CarImage> HandleAsync(AddCarImageCommand command, CancellationToken cancellationToken = default)
     {
         // An image belongs to a stored car; the foreign key refuses any other.
-        if (!await carDal.AnyAsync(c => c.Id == command.CarId, cancellationToken))
-        {
-            throw new NotFoundException(Messages.TheCarNotFound);
-        }
+        var car = await carDal.GetWithImagesAsync(command.CarId, cancellationToken)
+            ?? throw new NotFoundException(Messages.TheCarNotFound);
 
-        if (await carImageDal.CountAsync(c => c.CarId == command.CarId, cancellationToken) >= MaxImagesPerCar)
-        {
-            throw new BusinessRuleException(Messages.CarImageLimitReached);
-        }
+        // Asked before the file is looked at or stored; the car asks again when it makes the image.
+        car.EnsureRoomForImage();
 
         // Adding without a file falls back to the default image.
         if (command.File != null && !await ImageFileValidator.IsSupportedImageAsync(command.File, cancellationToken))
@@ -42,14 +36,11 @@ public sealed class AddCarImageCommandHandler(ICarDal carDal, ICarImageDal carIm
             throw new BusinessRuleException(Messages.CarImageInvalidFile);
         }
 
-        var carImage = new CarImage
-        {
-            CarId = command.CarId,
-            Date = timeProvider.GetLocalNow().DateTime,
-            ImagePath = command.File == null
-                ? IImageStorage.DefaultImageName
-                : await imageStorage.SaveAsync(command.File, cancellationToken)
-        };
+        var imagePath = command.File == null
+            ? IImageStorage.DefaultImageName
+            : await imageStorage.SaveAsync(command.File, cancellationToken);
+
+        var carImage = car.NewImage(imagePath, timeProvider.GetLocalNow().DateTime);
 
         await carImageDal.AddAsync(carImage, cancellationToken);
         return carImage;

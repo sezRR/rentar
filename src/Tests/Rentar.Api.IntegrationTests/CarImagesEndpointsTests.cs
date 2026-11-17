@@ -153,7 +153,7 @@ public class CarImagesEndpointsTests(RentarApiFactory factory) : IntegrationTest
         var stored = UploadedFile(images.Single(i => i.ImagePath != IImageStorage.DefaultImageName).ImagePath);
 
         var cars = await Client.GetJsonAsync("/api/v1/cars/getall");
-        var car = (await cars.ReadAsAsync<V1Response<List<Car>>>()).Data.Single();
+        var car = (await cars.ReadAsAsync<V1Response<List<CarBody>>>()).Data.Single();
         var response = await Client.PostJsonAsync("/api/v1/cars/delete", car);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -172,7 +172,7 @@ public class CarImagesEndpointsTests(RentarApiFactory factory) : IntegrationTest
         HttpResponseMessage response;
         await using (await Factory.RefuseAsync("fleet", "Cars", "DELETE"))
         {
-            response = await Client.PostJsonAsync("/api/v1/cars/delete", new Car { Id = carId });
+            response = await Client.PostJsonAsync("/api/v1/cars/delete", new CarBody { Id = carId });
         }
 
         Assert.NotEqual(HttpStatusCode.OK, response.StatusCode);
@@ -235,7 +235,7 @@ public class CarImagesEndpointsTests(RentarApiFactory factory) : IntegrationTest
         await Client.PostAsync("/api/v1/carimages/add", form, TestContext.Current.CancellationToken);
     }
 
-    private async Task<HttpResponseMessage> UpdateAsync(CarImage carImage, string fileName, byte[] bytes)
+    private async Task<HttpResponseMessage> UpdateAsync(CarImageBody carImage, string fileName, byte[] bytes)
     {
         using var form = new MultipartFormDataContent();
         form.Add(new StringContent(carImage.Id.ToString()), "Id");
@@ -262,19 +262,19 @@ public class CarImagesEndpointsTests(RentarApiFactory factory) : IntegrationTest
         return await Client.PostAsync("/api/v1/carimages/add", form, TestContext.Current.CancellationToken);
     }
 
-    private async Task<List<CarImage>> GetImagesAsync(int carId)
+    private async Task<List<CarImageBody>> GetImagesAsync(int carId)
     {
         var response = await Client.GetJsonAsync($"/api/v1/carimages/getbycarid?carId={carId}");
-        var result = await response.ReadAsAsync<V1Response<List<CarImage>>>();
+        var result = await response.ReadAsAsync<V1Response<List<CarImageBody>>>();
         return result.Data;
     }
 
     private async Task<int> AddCarAsync()
     {
-        await Client.PostJsonAsync("/api/v1/brands/add", new Brand { BrandName = "Toyota" });
-        await Client.PostJsonAsync("/api/v1/colors/add", new Color { ColorName = "Red" });
+        await Client.PostJsonAsync("/api/v1/brands/add", new BrandBody { BrandName = "Toyota" });
+        await Client.PostJsonAsync("/api/v1/colors/add", new ColorBody { ColorName = "Red" });
 
-        var car = new Car
+        var car = new CarBody
         {
             BrandId = 1,
             ColorId = 1,
@@ -286,7 +286,7 @@ public class CarImagesEndpointsTests(RentarApiFactory factory) : IntegrationTest
         await Client.PostJsonAsync("/api/v1/cars/add", car);
 
         var cars = await Client.GetJsonAsync("/api/v1/cars/getall");
-        var listed = await cars.ReadAsAsync<V1Response<List<Car>>>();
+        var listed = await cars.ReadAsAsync<V1Response<List<CarBody>>>();
         return listed.Data.Single().Id;
     }
 }

@@ -10,7 +10,7 @@ namespace Rentar.Shared.Application.Data;
 /// <summary>
 /// Reads and writes one entity type. Every operation reaches the database, so every operation is asynchronous.
 /// </summary>
-public interface IEntityRepository<TEntity> where TEntity : class, IEntity, new()
+public interface IEntityRepository<TEntity> where TEntity : class, IEntity
 {
     Task<List<TEntity>> GetAllAsync(CancellationToken cancellationToken = default);
     Task<List<TEntity>> GetAllAsync(Expression<Func<TEntity, bool>> filter, CancellationToken cancellationToken = default);
@@ -24,4 +24,11 @@ public interface IEntityRepository<TEntity> where TEntity : class, IEntity, new(
     Task AddAsync(TEntity entity, CancellationToken cancellationToken = default);
     Task UpdateAsync(TEntity entity, CancellationToken cancellationToken = default);
     Task DeleteAsync(TEntity entity, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Deletes what matches without reading it first, e.g. by id: entities can only be built valid, so there is no
+    /// stand-in with just a key to hand <see cref="DeleteAsync(TEntity,CancellationToken)"/>. Like that delete, it
+    /// fails when nothing matches.
+    /// </summary>
+    Task DeleteAsync(Expression<Func<TEntity, bool>> filter, CancellationToken cancellationToken = default);
 }

@@ -43,16 +43,7 @@ public sealed class UpdateUserCommandHandler(IUserDal userDal) : ICommandHandler
 
         HashingHelper.CreatePasswordHash(command.Password, out var passwordHash, out var passwordSalt);
 
-        var user = new User
-        {
-            Id = command.Id,
-            FirstName = command.FirstName,
-            LastName = command.LastName,
-            Email = command.Email,
-            PasswordHash = passwordHash,
-            PasswordSalt = passwordSalt,
-            Status = stored.Status,
-        };
+        var user = stored.WithDetails(command.FirstName, command.LastName, command.Email, passwordHash, passwordSalt);
 
         await userDal.UpdateAsync(user, cancellationToken);
         return user;

@@ -13,7 +13,7 @@ public class BrandsEndpointsTests(RentarApiFactory factory) : IntegrationTestBas
     [Fact]
     public async Task Add_PersistsBrand_AndGetAllReturnsIt()
     {
-        var response = await Client.PostJsonAsync("/api/v1/brands/add", new Brand { BrandName = "Toyota" });
+        var response = await Client.PostJsonAsync("/api/v1/brands/add", new BrandBody { BrandName = "Toyota" });
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         var added = await response.ReadAsAsync<V1Response>();
@@ -21,7 +21,7 @@ public class BrandsEndpointsTests(RentarApiFactory factory) : IntegrationTestBas
         Assert.Equal("Brand Added", added.Message);
 
         var brands = await Client.GetJsonAsync("/api/v1/brands/getall");
-        var listed = await brands.ReadAsAsync<V1Response<List<Brand>>>();
+        var listed = await brands.ReadAsAsync<V1Response<List<BrandBody>>>();
 
         Assert.True(listed.Success);
         var brand = Assert.Single(listed.Data);
@@ -32,12 +32,12 @@ public class BrandsEndpointsTests(RentarApiFactory factory) : IntegrationTestBas
     [Fact]
     public async Task GetById_ReturnsRequestedBrand()
     {
-        await Client.PostJsonAsync("/api/v1/brands/add", new Brand { BrandName = "Honda" });
-        await Client.PostJsonAsync("/api/v1/brands/add", new Brand { BrandName = "Renault" });
+        await Client.PostJsonAsync("/api/v1/brands/add", new BrandBody { BrandName = "Honda" });
+        await Client.PostJsonAsync("/api/v1/brands/add", new BrandBody { BrandName = "Renault" });
         var id = await GetBrandIdAsync("Renault");
 
         var response = await Client.GetJsonAsync($"/api/v1/brands/getbyid?id={id}");
-        var result = await response.ReadAsAsync<V1Response<Brand>>();
+        var result = await response.ReadAsAsync<V1Response<BrandBody>>();
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal("Renault", result.Data.BrandName);
@@ -46,14 +46,14 @@ public class BrandsEndpointsTests(RentarApiFactory factory) : IntegrationTestBas
     [Fact]
     public async Task Update_ChangesBrandName()
     {
-        await Client.PostJsonAsync("/api/v1/brands/add", new Brand { BrandName = "Ople" });
+        await Client.PostJsonAsync("/api/v1/brands/add", new BrandBody { BrandName = "Ople" });
         var id = await GetBrandIdAsync("Ople");
 
-        var response = await Client.PostJsonAsync("/api/v1/brands/update", new Brand { Id = id, BrandName = "Opel" });
+        var response = await Client.PostJsonAsync("/api/v1/brands/update", new BrandBody { Id = id, BrandName = "Opel" });
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         var updated = await Client.GetJsonAsync($"/api/v1/brands/getbyid?id={id}");
-        var result = await updated.ReadAsAsync<V1Response<Brand>>();
+        var result = await updated.ReadAsAsync<V1Response<BrandBody>>();
 
         Assert.Equal("Opel", result.Data.BrandName);
     }
@@ -61,14 +61,14 @@ public class BrandsEndpointsTests(RentarApiFactory factory) : IntegrationTestBas
     [Fact]
     public async Task Delete_RemovesBrand()
     {
-        await Client.PostJsonAsync("/api/v1/brands/add", new Brand { BrandName = "Fiat" });
+        await Client.PostJsonAsync("/api/v1/brands/add", new BrandBody { BrandName = "Fiat" });
         var id = await GetBrandIdAsync("Fiat");
 
-        var response = await Client.PostJsonAsync("/api/v1/brands/delete", new Brand { Id = id, BrandName = "Fiat" });
+        var response = await Client.PostJsonAsync("/api/v1/brands/delete", new BrandBody { Id = id, BrandName = "Fiat" });
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         var brands = await Client.GetJsonAsync("/api/v1/brands/getall");
-        var listed = await brands.ReadAsAsync<V1Response<List<Brand>>>();
+        var listed = await brands.ReadAsAsync<V1Response<List<BrandBody>>>();
 
         Assert.Empty(listed.Data);
     }
@@ -76,7 +76,7 @@ public class BrandsEndpointsTests(RentarApiFactory factory) : IntegrationTestBas
     [Fact]
     public async Task Add_WithNameShorterThanTwoCharacters_ReturnsValidationError()
     {
-        var response = await Client.PostJsonAsync("/api/v1/brands/add", new Brand { BrandName = "A" });
+        var response = await Client.PostJsonAsync("/api/v1/brands/add", new BrandBody { BrandName = "A" });
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
@@ -85,14 +85,14 @@ public class BrandsEndpointsTests(RentarApiFactory factory) : IntegrationTestBas
         Assert.Contains(error.Errors, e => e.PropertyName == "BrandName");
 
         var brands = await Client.GetJsonAsync("/api/v1/brands/getall");
-        var listed = await brands.ReadAsAsync<V1Response<List<Brand>>>();
+        var listed = await brands.ReadAsAsync<V1Response<List<BrandBody>>>();
         Assert.Empty(listed.Data);
     }
 
     private async Task<int> GetBrandIdAsync(string brandName)
     {
         var brands = await Client.GetJsonAsync("/api/v1/brands/getall");
-        var listed = await brands.ReadAsAsync<V1Response<List<Brand>>>();
+        var listed = await brands.ReadAsAsync<V1Response<List<BrandBody>>>();
 
         return listed.Data.Find(b => b.BrandName == brandName).Id;
     }

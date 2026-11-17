@@ -62,13 +62,13 @@ public class UserDeactivationTests(RentarApiFactory factory) : V2TestBase(factor
         var company = await RegisterCompanyAsync();
         var member = await CreateUserAsync("member@example.com");
         var employee = await AddEmployeeAsync(company.Id, member.Id, "Member");
-        var customer = await CreateAsync<Customer>("/api/v2/customers", new CreateCustomerCommand(member.Id, company.Id));
+        var customer = await CreateAsync<CustomerBody>("/api/v2/customers", new CreateCustomerCommand(member.Id, company.Id));
 
         await DeactivateUserAsync(member.Id);
         await DeliverEventsAsync();
 
         Assert.DoesNotContain(employee.Id, (await EmployeesAsync(company.Id)).Select(e => e.Id));
-        var fetched = await (await Client.GetJsonAsync($"/api/v2/customers/{customer.Id}")).ReadAsAsync<Customer>();
+        var fetched = await (await Client.GetJsonAsync($"/api/v2/customers/{customer.Id}")).ReadAsAsync<CustomerBody>();
         Assert.Null(fetched.CompanyId);
     }
 
@@ -122,14 +122,14 @@ public class UserDeactivationTests(RentarApiFactory factory) : V2TestBase(factor
         Assert.Equal(RentalStatus.Confirmed, (await RentalAsync(someoneElses.Id)).Status);
     }
 
-    private Task<Rental> RentAsync(int carId, int customerId, DateTime rentDate, DateTime returnDate)
+    private Task<RentalBody> RentAsync(int carId, int customerId, DateTime rentDate, DateTime returnDate)
     {
-        return CreateAsync<Rental>("/api/v2/rentals", new CreateRentalCommand(carId, customerId, rentDate, returnDate));
+        return CreateAsync<RentalBody>("/api/v2/rentals", new CreateRentalCommand(carId, customerId, rentDate, returnDate));
     }
 
-    private async Task<Rental> RentalAsync(int rentalId)
+    private async Task<RentalBody> RentalAsync(int rentalId)
     {
-        return await (await Client.GetJsonAsync($"/api/v2/rentals/{rentalId}")).ReadAsAsync<Rental>();
+        return await (await Client.GetJsonAsync($"/api/v2/rentals/{rentalId}")).ReadAsAsync<RentalBody>();
     }
 
     private async Task<UserResponse> UserAsync(int userId)
@@ -137,10 +137,10 @@ public class UserDeactivationTests(RentarApiFactory factory) : V2TestBase(factor
         return await (await Client.GetJsonAsync($"/api/v2/users/{userId}")).ReadAsAsync<UserResponse>();
     }
 
-    private async Task<List<EmployeeResponse>> EmployeesAsync(int companyId)
+    private async Task<List<EmployeeBody>> EmployeesAsync(int companyId)
     {
         var response = await Client.GetJsonAsync($"/api/v2/companies/{companyId}/employees");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        return await response.ReadAsAsync<List<EmployeeResponse>>();
+        return await response.ReadAsAsync<List<EmployeeBody>>();
     }
 }

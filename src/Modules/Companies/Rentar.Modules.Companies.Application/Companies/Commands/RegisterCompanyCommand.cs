@@ -31,13 +31,9 @@ public sealed class RegisterCompanyCommandHandler(ICompanyDal companyDal, IIdent
         await identityModule.RequireActiveUserAsync(command.UserId, cancellationToken);
 
         var roles = PredefinedRoles.All.Select(role => role.ToRole()).ToList();
-        var owner = new Employee
-        {
-            UserId = command.UserId,
-            Roles = [roles.Single(role => role.Name == PredefinedRoles.Owner.Name)]
-        };
+        var ownerRole = roles.Single(role => role.Name == PredefinedRoles.Owner.Name);
 
-        var company = new Company { Name = command.Name, Roles = roles, Employees = [owner] };
+        var company = new Company(command.Name, roles, command.UserId, ownerRole);
         await companyDal.RegisterAsync(company, cancellationToken);
         return company;
     }

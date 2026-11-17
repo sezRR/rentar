@@ -21,7 +21,7 @@ namespace Rentar.Shared.Infrastructure.Persistence;
 /// inserting it.
 /// </remarks>
 public abstract class EfEntityRepositoryBase<TEntity, TContext>(IDbContextFactory<TContext> contextFactory) : IEntityRepository<TEntity>
-    where TEntity : class, IEntity, new()
+    where TEntity : class, IEntity
     where TContext : DbContext
 {
     protected IDbContextFactory<TContext> ContextFactory { get; } = contextFactory;
@@ -69,6 +69,20 @@ public abstract class EfEntityRepositoryBase<TEntity, TContext>(IDbContextFactor
     public Task DeleteAsync(TEntity entity, CancellationToken cancellationToken = default)
     {
         return SaveAsync(entity, EntityState.Deleted, cancellationToken);
+    }
+
+    /// <remarks>
+    /// One <c>DELETE</c> statement: the database's cascades apply as they do for an entity deleted with nothing loaded.
+    /// Nothing deleted fails with the exception EF throws when a delete matches no row.
+    /// </remarks>
+    public async Task DeleteAsync(Expression<Func<TEntity, bool>> filter, CancellationToken cancellationToken = default)
+    {
+        await using var context = await ContextFactory.CreateDbContextAsync(cancellationToken);
+
+        if (await context.Set<TEntity>().Where(filter).ExecuteDeleteAsync(cancellationToken) == 0)
+        {
+            throw new DbUpdateConcurrencyException($"No {typeof(TEntity).Name} matched the delete.");
+        }
     }
 
     private async Task SaveAsync(TEntity entity, EntityState state, CancellationToken cancellationToken)

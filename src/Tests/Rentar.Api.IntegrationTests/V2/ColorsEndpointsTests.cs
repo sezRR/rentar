@@ -20,12 +20,12 @@ public class ColorsEndpointsTests(RentarApiFactory factory) : V2TestBase(factory
         Assert.Equal(HttpStatusCode.NoContent, replaced.StatusCode);
 
         var fetched = await Client.GetJsonAsync($"/api/v2/colors/{color.Id}");
-        Assert.Equal("Blue", (await fetched.ReadAsAsync<Color>()).ColorName);
+        Assert.Equal("Blue", (await fetched.ReadAsAsync<ColorBody>()).ColorName);
 
         var deleted = await Client.DeleteResourceAsync($"/api/v2/colors/{color.Id}");
         Assert.Equal(HttpStatusCode.NoContent, deleted.StatusCode);
 
-        var colors = await (await Client.GetJsonAsync("/api/v2/colors")).ReadAsAsync<List<Color>>();
+        var colors = await (await Client.GetJsonAsync("/api/v2/colors")).ReadAsAsync<List<ColorBody>>();
         Assert.Empty(colors);
     }
 
@@ -47,6 +47,6 @@ public class ColorsEndpointsTests(RentarApiFactory factory) : V2TestBase(factory
 
         var response = await Client.PutJsonAsync($"/api/v2/colors/{color.Id}", new ColorRequest("R"));
 
-        await AssertProblemAsync(response, HttpStatusCode.BadRequest, Messages.ColorNameInvalid);
+        await AssertProblemAsync(response, HttpStatusCode.BadRequest, DomainMessages.ColorNameInvalid);
     }
 }

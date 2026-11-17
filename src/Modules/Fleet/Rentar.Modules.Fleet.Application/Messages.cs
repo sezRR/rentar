@@ -20,11 +20,9 @@ public static class Messages
     public const string ColorAdded = "Color Added";
     public const string ColorUpdated = "Color Updated";
     public const string ColorDeleted = "Color Deleted";
-    public const string ColorNameInvalid = "Color Name is Invalid";
     public const string ColorNotFound = "Color not found";
     public const string ColorHasCars = "Color can not be deleted while cars use it";
 
-    public const string CarImageLimitReached = "You can not add more picture about your car. You reached limit of the car images (can only upload 5 images to a car)";
     public const string CarImageNotFound = "Car image not found";
     public const string CarImageInvalidFile = "Only PNG and JPEG images (.png, .jpg, .jpeg) can be uploaded";
 }

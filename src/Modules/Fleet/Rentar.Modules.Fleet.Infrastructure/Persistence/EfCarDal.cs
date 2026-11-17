@@ -32,6 +32,12 @@ public class EfCarDal(IDbContextFactory<FleetDbContext> contextFactory) : EfEnti
         return await ToDetails(context.Cars.Where(car => car.Id == id)).SingleOrDefaultAsync(cancellationToken);
     }
 
+    public async Task<Car> GetWithImagesAsync(int id, CancellationToken cancellationToken = default)
+    {
+        await using var context = await ContextFactory.CreateDbContextAsync(cancellationToken);
+        return await context.Cars.Include(car => car.Images).SingleOrDefaultAsync(car => car.Id == id, cancellationToken);
+    }
+
     /// <summary>
     /// Follows the navigations, which EF turns into joins: the required brand and color, and the first image uploaded.
     /// Only the columns the response needs are read.

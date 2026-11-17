@@ -60,7 +60,7 @@ public sealed class CreateCustomerCommandHandler(
             throw new BusinessRuleException(Messages.UserNotEmployeeOfCompany);
         }
 
-        var customer = new Customer { UserId = command.UserId, CompanyId = command.CompanyId };
+        var customer = new Customer(command.UserId, command.CompanyId);
         await customerDal.AddAsync(customer, cancellationToken);
 
         await eventPublisher.PublishAsync(new CustomerCreatedEvent(customer.Id, customer.UserId, customer.CompanyId), cancellationToken);

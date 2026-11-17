@@ -59,7 +59,7 @@ public sealed class AddEmployeeCommandHandler(IEmployeeDal employeeDal, IRoleDal
             throw new ForbiddenException(Messages.CannotGrantMissingPermissions);
         }
 
-        var employee = new Employee { CompanyId = command.CompanyId, UserId = command.UserId, Roles = roles };
+        var employee = new Employee(command.CompanyId, command.UserId, roles);
         await employeeDal.AddWithRolesAsync(employee, cancellationToken);
 
         return new EmployeeResponse(employee.Id, employee.CompanyId, employee.UserId, user.FirstName, user.LastName, roles);

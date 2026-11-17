@@ -21,14 +21,14 @@ public class CarImagesEndpointsTests(RentarApiFactory factory) : V2TestBase(fact
         var response = await UploadImageAsync(car.Id, "car.png", PngBytes);
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-        var image = await response.ReadAsAsync<CarImage>();
+        var image = await response.ReadAsAsync<CarImageBody>();
         Assert.Equal(car.Id, image.CarId);
         Assert.NotEqual(IImageStorage.DefaultImageName, image.ImagePath);
         Assert.Equal($"/api/v2/cars/{car.Id}/images/{image.Id}", response.Headers.Location?.OriginalString);
         Assert.True(File.Exists(UploadedFile(image.ImagePath)));
 
         var fetched = await Client.GetJsonAsync(response.Headers.Location!.OriginalString);
-        Assert.Equal(image.ImagePath, (await fetched.ReadAsAsync<CarImage>()).ImagePath);
+        Assert.Equal(image.ImagePath, (await fetched.ReadAsAsync<CarImageBody>()).ImagePath);
 
         await Client.DeleteResourceAsync($"/api/v2/cars/{car.Id}/images");
     }
@@ -43,7 +43,7 @@ public class CarImagesEndpointsTests(RentarApiFactory factory) : V2TestBase(fact
         var response = await Client.PostAsync($"/api/v2/cars/{car.Id}/images", form, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-        Assert.Equal(IImageStorage.DefaultImageName, (await response.ReadAsAsync<CarImage>()).ImagePath);
+        Assert.Equal(IImageStorage.DefaultImageName, (await response.ReadAsAsync<CarImageBody>()).ImagePath);
     }
 
     [Fact]
@@ -76,7 +76,7 @@ public class CarImagesEndpointsTests(RentarApiFactory factory) : V2TestBase(fact
 
         var sixth = await UploadDefaultImageAsync(car.Id);
 
-        await AssertProblemAsync(sixth, HttpStatusCode.BadRequest, Messages.CarImageLimitReached);
+        await AssertProblemAsync(sixth, HttpStatusCode.BadRequest, DomainMessages.CarImageLimitReached);
         Assert.Equal(5, (await ImagesAsync(car.Id)).Count);
     }
 
@@ -97,7 +97,7 @@ public class CarImagesEndpointsTests(RentarApiFactory factory) : V2TestBase(fact
     public async Task Replace_SwapsTheStoredFile()
     {
         var car = await CreateCarAsync();
-        var original = await (await UploadImageAsync(car.Id, "car.png", PngBytes)).ReadAsAsync<CarImage>();
+        var original = await (await UploadImageAsync(car.Id, "car.png", PngBytes)).ReadAsAsync<CarImageBody>();
 
         using var form = new MultipartFormDataContent();
         form.Add(new ByteArrayContent(JpegBytes), "file", "new.jpg");
@@ -116,7 +116,7 @@ public class CarImagesEndpointsTests(RentarApiFactory factory) : V2TestBase(fact
     public async Task Replace_WithoutFile_IsRejected()
     {
         var car = await CreateCarAsync();
-        var image = await (await UploadImageAsync(car.Id, "car.png", PngBytes)).ReadAsAsync<CarImage>();
+        var image = await (await UploadImageAsync(car.Id, "car.png", PngBytes)).ReadAsAsync<CarImageBody>();
 
         using var form = new MultipartFormDataContent();
         form.Add(new StringContent("no file"), "note");
@@ -132,8 +132,8 @@ public class CarImagesEndpointsTests(RentarApiFactory factory) : V2TestBase(fact
     public async Task Delete_RemovesOnlyThatImageAndItsFile()
     {
         var car = await CreateCarAsync();
-        var removed = await (await UploadImageAsync(car.Id, "first.png", PngBytes)).ReadAsAsync<CarImage>();
-        var kept = await (await UploadImageAsync(car.Id, "second.jpg", JpegBytes)).ReadAsAsync<CarImage>();
+        var removed = await (await UploadImageAsync(car.Id, "first.png", PngBytes)).ReadAsAsync<CarImageBody>();
+        var kept = await (await UploadImageAsync(car.Id, "second.jpg", JpegBytes)).ReadAsAsync<CarImageBody>();
 
         var response = await Client.DeleteResourceAsync($"/api/v2/cars/{car.Id}/images/{removed.Id}");
 
@@ -150,7 +150,7 @@ public class CarImagesEndpointsTests(RentarApiFactory factory) : V2TestBase(fact
     {
         var car = await CreateCarAsync();
         var otherCar = await CreateCarAsync("Fiat", "White");
-        var image = await (await UploadImageAsync(car.Id, "car.png", PngBytes)).ReadAsAsync<CarImage>();
+        var image = await (await UploadImageAsync(car.Id, "car.png", PngBytes)).ReadAsAsync<CarImageBody>();
 
         var response = await Client.GetJsonAsync($"/api/v2/cars/{otherCar.Id}/images/{image.Id}");
         var delete = await Client.DeleteResourceAsync($"/api/v2/cars/{otherCar.Id}/images/{image.Id}");
@@ -166,7 +166,7 @@ public class CarImagesEndpointsTests(RentarApiFactory factory) : V2TestBase(fact
     public async Task DeleteAll_RemovesEveryImageOfTheCar_AndAlsoSucceedsWhenThereAreNone()
     {
         var car = await CreateCarAsync();
-        var stored = UploadedFile((await (await UploadImageAsync(car.Id, "car.png", PngBytes)).ReadAsAsync<CarImage>()).ImagePath);
+        var stored = UploadedFile((await (await UploadImageAsync(car.Id, "car.png", PngBytes)).ReadAsAsync<CarImageBody>()).ImagePath);
         await UploadImageAsync(car.Id, "car.jpg", JpegBytes);
 
         var first = await Client.DeleteResourceAsync($"/api/v2/cars/{car.Id}/images");
@@ -189,7 +189,7 @@ public class CarImagesEndpointsTests(RentarApiFactory factory) : V2TestBase(fact
         var response = await Client.GetJsonAsync("/api/v2/car-images");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var images = await response.ReadAsAsync<List<CarImage>>();
+        var images = await response.ReadAsAsync<List<CarImageBody>>();
         Assert.Equal([car.Id, otherCar.Id], images.Select(i => i.CarId).Order());
 
         await Client.DeleteResourceAsync($"/api/v2/cars/{car.Id}/images");
@@ -204,10 +204,10 @@ public class CarImagesEndpointsTests(RentarApiFactory factory) : V2TestBase(fact
         return await Client.PostAsync($"/api/v2/cars/{carId}/images", form, TestContext.Current.CancellationToken);
     }
 
-    private async Task<List<CarImage>> ImagesAsync(int carId)
+    private async Task<List<CarImageBody>> ImagesAsync(int carId)
     {
         var response = await Client.GetJsonAsync($"/api/v2/cars/{carId}/images");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        return await response.ReadAsAsync<List<CarImage>>();
+        return await response.ReadAsAsync<List<CarImageBody>>();
     }
 }

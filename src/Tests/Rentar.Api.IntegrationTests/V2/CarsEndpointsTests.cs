@@ -66,7 +66,7 @@ public class CarsEndpointsTests(RentarApiFactory factory) : V2TestBase(factory)
     public async Task Delete_RemovesTheCarWithItsImagesAndTheirFiles()
     {
         var car = await CreateCarAsync();
-        var image = await (await UploadImageAsync(car.Id, "car.png", PngBytes)).ReadAsAsync<CarImage>();
+        var image = await (await UploadImageAsync(car.Id, "car.png", PngBytes)).ReadAsAsync<CarImageBody>();
         var stored = UploadedFile(image.ImagePath);
         Assert.True(File.Exists(stored));
 
@@ -74,7 +74,7 @@ public class CarsEndpointsTests(RentarApiFactory factory) : V2TestBase(factory)
 
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
         await AssertProblemAsync(await Client.GetJsonAsync($"/api/v2/cars/{car.Id}"), HttpStatusCode.NotFound);
-        Assert.Empty(await (await Client.GetJsonAsync($"/api/v2/cars/{car.Id}/images")).ReadAsAsync<List<CarImage>>());
+        Assert.Empty(await (await Client.GetJsonAsync($"/api/v2/cars/{car.Id}/images")).ReadAsAsync<List<CarImageBody>>());
         Assert.False(File.Exists(stored));
     }
 
@@ -82,7 +82,7 @@ public class CarsEndpointsTests(RentarApiFactory factory) : V2TestBase(factory)
     public async Task Delete_OfACarWithRentals_IsAConflict_AndKeepsTheCarAndItsImages()
     {
         var car = await CreateCarAsync();
-        var image = await (await UploadImageAsync(car.Id, "car.png", PngBytes)).ReadAsAsync<CarImage>();
+        var image = await (await UploadImageAsync(car.Id, "car.png", PngBytes)).ReadAsAsync<CarImageBody>();
         var customer = await CreateCustomerAsync();
         var rented = await Client.PostJsonAsync(
             "/api/v2/rentals",
@@ -93,7 +93,7 @@ public class CarsEndpointsTests(RentarApiFactory factory) : V2TestBase(factory)
 
         await AssertProblemAsync(response, HttpStatusCode.Conflict, Messages.CarHasRentals);
         Assert.Equal(HttpStatusCode.OK, (await Client.GetJsonAsync($"/api/v2/cars/{car.Id}")).StatusCode);
-        Assert.Equal([image.Id], (await (await Client.GetJsonAsync($"/api/v2/cars/{car.Id}/images")).ReadAsAsync<List<CarImage>>()).Select(i => i.Id));
+        Assert.Equal([image.Id], (await (await Client.GetJsonAsync($"/api/v2/cars/{car.Id}/images")).ReadAsAsync<List<CarImageBody>>()).Select(i => i.Id));
         Assert.True(File.Exists(UploadedFile(image.ImagePath)));
 
         // Removes the stored file again so the test leaves wwwroot/uploads untouched.
@@ -154,7 +154,7 @@ public class CarsEndpointsTests(RentarApiFactory factory) : V2TestBase(factory)
     public async Task GetById_AnswersTheFirstImageUploaded()
     {
         var car = await CreateCarAsync();
-        var first = await (await UploadImageAsync(car.Id, "first.png", PngBytes)).ReadAsAsync<CarImage>();
+        var first = await (await UploadImageAsync(car.Id, "first.png", PngBytes)).ReadAsAsync<CarImageBody>();
         await UploadImageAsync(car.Id, "second.jpg", JpegBytes);
 
         var fetched = await (await Client.GetJsonAsync($"/api/v2/cars/{car.Id}")).ReadAsAsync<CarResponse>();

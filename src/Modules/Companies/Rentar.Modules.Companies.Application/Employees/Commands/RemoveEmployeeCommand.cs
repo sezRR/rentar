@@ -46,10 +46,8 @@ public sealed class RemoveEmployeeCommandHandler(IEmployeeDal employeeDal, IEven
             throw new BusinessRuleException(Messages.CompanyNeedsFullAccessEmployee);
         }
 
-        // A fresh entity without its loaded roles; the database removes the role grants with the employee.
-        await employeeDal.DeleteAsync(
-            new Employee { Id = employee.Id, CompanyId = employee.CompanyId, UserId = employee.UserId },
-            cancellationToken);
+        // By id, leaving its loaded roles alone; the database removes the role grants with the employee.
+        await employeeDal.DeleteAsync(e => e.Id == employee.Id, cancellationToken);
 
         await eventPublisher.PublishAsync(new EmployeeRemovedEvent(employee.CompanyId, employee.UserId), cancellationToken);
     }

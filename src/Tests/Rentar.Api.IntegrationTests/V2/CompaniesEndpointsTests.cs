@@ -29,11 +29,11 @@ public class CompaniesEndpointsTests(RentarApiFactory factory) : V2TestBase(fact
         var response = await Client.PostJsonAsync("/api/v2/companies", new CompanyRequest("Rentar Logistics"));
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-        var company = await response.ReadAsAsync<Company>();
+        var company = await response.ReadAsAsync<CompanyBody>();
         Assert.Equal("Rentar Logistics", company.Name);
         Assert.Equal($"/api/v2/companies/{company.Id}", response.Headers.Location?.OriginalString);
 
-        var employees = await (await Client.GetJsonAsync($"/api/v2/companies/{company.Id}/employees")).ReadAsAsync<List<EmployeeResponse>>();
+        var employees = await (await Client.GetJsonAsync($"/api/v2/companies/{company.Id}/employees")).ReadAsAsync<List<EmployeeBody>>();
         var employee = Assert.Single(employees);
         Assert.Equal(owner.Id, employee.UserId);
         Assert.Equal("Sezer", employee.FirstName);
@@ -46,7 +46,7 @@ public class CompaniesEndpointsTests(RentarApiFactory factory) : V2TestBase(fact
         await SignInAsNewUserAsync("owner@example.com");
         var company = await RegisterCompanyAsync();
 
-        var roles = await (await Client.GetJsonAsync($"/api/v2/companies/{company.Id}/roles")).ReadAsAsync<List<Role>>();
+        var roles = await (await Client.GetJsonAsync($"/api/v2/companies/{company.Id}/roles")).ReadAsAsync<List<RoleBody>>();
 
         Assert.Equal(["Owner", "Admin", "Member"], roles.Select(role => role.Name));
         Assert.All(roles, role => Assert.True(role.IsPredefined));
@@ -87,7 +87,7 @@ public class CompaniesEndpointsTests(RentarApiFactory factory) : V2TestBase(fact
         await SignInAsNewUserAsync("second@example.com");
         var second = await RegisterCompanyAsync("Second Company");
 
-        var companies = await (await Client.GetJsonAsync("/api/v2/companies")).ReadAsAsync<List<Company>>();
+        var companies = await (await Client.GetJsonAsync("/api/v2/companies")).ReadAsAsync<List<CompanyBody>>();
 
         Assert.Equal([second.Id], companies.Select(company => company.Id));
         Assert.NotEqual(first.Id, second.Id);
@@ -102,7 +102,7 @@ public class CompaniesEndpointsTests(RentarApiFactory factory) : V2TestBase(fact
         await AddEmployeeAsync(company.Id, member.Id, "Member");
         await SignInAsync("member@example.com");
 
-        var fetched = await (await Client.GetJsonAsync($"/api/v2/companies/{company.Id}")).ReadAsAsync<Company>();
+        var fetched = await (await Client.GetJsonAsync($"/api/v2/companies/{company.Id}")).ReadAsAsync<CompanyBody>();
 
         Assert.Equal("Rentar Logistics", fetched.Name);
     }
@@ -130,7 +130,7 @@ public class CompaniesEndpointsTests(RentarApiFactory factory) : V2TestBase(fact
         var response = await Client.PutJsonAsync($"/api/v2/companies/{company.Id}", new CompanyRequest("Rentar Fleet"));
 
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
-        var fetched = await (await Client.GetJsonAsync($"/api/v2/companies/{company.Id}")).ReadAsAsync<Company>();
+        var fetched = await (await Client.GetJsonAsync($"/api/v2/companies/{company.Id}")).ReadAsAsync<CompanyBody>();
         Assert.Equal("Rentar Fleet", fetched.Name);
     }
 
@@ -146,7 +146,7 @@ public class CompaniesEndpointsTests(RentarApiFactory factory) : V2TestBase(fact
         var response = await Client.PutJsonAsync($"/api/v2/companies/{company.Id}", new CompanyRequest("Rentar Fleet"));
 
         await AssertProblemAsync(response, HttpStatusCode.Forbidden, Messages.PermissionMissing(CompanyPermissions.CompanyManage));
-        var fetched = await (await Client.GetJsonAsync($"/api/v2/companies/{company.Id}")).ReadAsAsync<Company>();
+        var fetched = await (await Client.GetJsonAsync($"/api/v2/companies/{company.Id}")).ReadAsAsync<CompanyBody>();
         Assert.Equal("Rentar Logistics", fetched.Name);
     }
 }

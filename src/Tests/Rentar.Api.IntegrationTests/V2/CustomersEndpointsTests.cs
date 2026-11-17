@@ -19,10 +19,10 @@ public class CustomersEndpointsTests(RentarApiFactory factory) : V2TestBase(fact
         var response = await Client.PostJsonAsync("/api/v2/customers", new CreateCustomerCommand(user.Id));
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-        var customer = await response.ReadAsAsync<Customer>();
+        var customer = await response.ReadAsAsync<CustomerBody>();
         Assert.Equal($"/api/v2/customers/{customer.Id}", response.Headers.Location?.OriginalString);
 
-        var fetched = await (await Client.GetJsonAsync($"/api/v2/customers/{customer.Id}")).ReadAsAsync<Customer>();
+        var fetched = await (await Client.GetJsonAsync($"/api/v2/customers/{customer.Id}")).ReadAsAsync<CustomerBody>();
         Assert.Equal(user.Id, fetched.UserId);
         Assert.Null(fetched.CompanyId);
     }
@@ -33,7 +33,7 @@ public class CustomersEndpointsTests(RentarApiFactory factory) : V2TestBase(fact
         var owner = await SignInAsNewUserAsync("owner@example.com");
         var company = await RegisterCompanyAsync();
 
-        var customer = await CreateAsync<Customer>("/api/v2/customers", new CreateCustomerCommand(owner.Id, company.Id));
+        var customer = await CreateAsync<CustomerBody>("/api/v2/customers", new CreateCustomerCommand(owner.Id, company.Id));
 
         Assert.Equal(company.Id, customer.CompanyId);
     }
@@ -130,7 +130,7 @@ public class CustomersEndpointsTests(RentarApiFactory factory) : V2TestBase(fact
         var response = await Client.GetJsonAsync(url);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var customers = await response.ReadAsAsync<List<Customer>>();
+        var customers = await response.ReadAsAsync<List<CustomerBody>>();
         return customers.Select(c => c.UserId).Order().ToList();
     }
 }

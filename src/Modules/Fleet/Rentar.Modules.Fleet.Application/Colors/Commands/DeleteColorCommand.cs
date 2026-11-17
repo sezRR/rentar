@@ -1,5 +1,4 @@
 using Rentar.Modules.Fleet.Application.Common.Interfaces;
-using Rentar.Modules.Fleet.Domain;
 using Rentar.Shared.Application.UseCases;
 using Rentar.Shared.Kernel.Exceptions;
 using System.Linq;
@@ -21,6 +20,6 @@ public sealed class DeleteColorCommandHandler(IColorDal colorDal) : ICommandHand
             throw new ConflictException(Messages.ColorHasCars);
         }
 
-        await colorDal.DeleteAsync(new Color { Id = command.Id }, cancellationToken);
+        await colorDal.DeleteAsync(c => c.Id == command.Id, cancellationToken);
     }
 }

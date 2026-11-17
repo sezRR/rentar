@@ -26,7 +26,7 @@ public sealed class CalculateCustomerScoreCommandHandler(ICustomerScoreDal custo
             throw new NotFoundException(Messages.CustomerNotFound(command.CustomerId));
         }
 
-        var score = new CustomerScore { CustomerId = command.CustomerId, FindeksRating = FindeksRating.Calculate() };
+        var score = new CustomerScore(command.CustomerId, FindeksRating.Calculate());
 
         if (await customerScoreDal.AnyAsync(s => s.CustomerId == command.CustomerId, cancellationToken))
         {

@@ -15,7 +15,7 @@ public sealed class CreateColorCommandValidator : UseCaseValidator<CreateColorCo
 {
     public CreateColorCommandValidator()
     {
-        RuleFor(c => c.ColorName).NotEmpty().MinimumLength(2);
+        RuleFor(c => c.ColorName).NotEmpty().MinimumLength(Color.NameMinLength);
     }
 }
 
@@ -23,7 +23,7 @@ public sealed class CreateColorCommandHandler(IColorDal colorDal) : ICommandHand
 {
     public async Task<Color> HandleAsync(CreateColorCommand command, CancellationToken cancellationToken = default)
     {
-        var color = new Color { ColorName = command.ColorName };
+        var color = new Color(command.ColorName);
         await colorDal.AddAsync(color, cancellationToken);
         return color;
     }

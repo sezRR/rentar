@@ -57,14 +57,14 @@ public abstract class V2TestBase(RentarApiFactory factory) : IntegrationTestBase
         return await response.ReadAsAsync<T>();
     }
 
-    protected Task<Brand> CreateBrandAsync(string brandName = "Toyota")
+    protected Task<BrandBody> CreateBrandAsync(string brandName = "Toyota")
     {
-        return CreateAsync<Brand>("/api/v2/brands", new BrandRequest(brandName));
+        return CreateAsync<BrandBody>("/api/v2/brands", new BrandRequest(brandName));
     }
 
-    protected Task<Color> CreateColorAsync(string colorName = "Red")
+    protected Task<ColorBody> CreateColorAsync(string colorName = "Red")
     {
-        return CreateAsync<Color>("/api/v2/colors", new ColorRequest(colorName));
+        return CreateAsync<ColorBody>("/api/v2/colors", new ColorRequest(colorName));
     }
 
     protected async Task<CarResponse> CreateCarAsync(string brandName = "Toyota", string colorName = "Red", string description = "Corolla 1.6")
@@ -86,10 +86,10 @@ public abstract class V2TestBase(RentarApiFactory factory) : IntegrationTestBase
     }
 
     /// <summary>Creates a customer together with the user it belongs to; the email tells the users apart.</summary>
-    protected async Task<Customer> CreateCustomerAsync(string email = "renter@example.com")
+    protected async Task<CustomerBody> CreateCustomerAsync(string email = "renter@example.com")
     {
         var user = await CreateUserAsync(email);
-        return await CreateAsync<Customer>("/api/v2/customers", new CreateCustomerCommand(user.Id));
+        return await CreateAsync<CustomerBody>("/api/v2/customers", new CreateCustomerCommand(user.Id));
     }
 
     /// <summary>Deactivates the user through the API, so every module reacts as it does for a real deactivation.</summary>
@@ -122,9 +122,9 @@ public abstract class V2TestBase(RentarApiFactory factory) : IntegrationTestBase
     }
 
     /// <summary>Registers a company for the signed-in user, who becomes its Owner.</summary>
-    protected Task<Company> RegisterCompanyAsync(string name = "Rentar Logistics")
+    protected Task<CompanyBody> RegisterCompanyAsync(string name = "Rentar Logistics")
     {
-        return CreateAsync<Company>("/api/v2/companies", new CompanyRequest(name));
+        return CreateAsync<CompanyBody>("/api/v2/companies", new CompanyRequest(name));
     }
 
     protected async Task<int> RoleIdAsync(int companyId, string roleName)
@@ -132,14 +132,14 @@ public abstract class V2TestBase(RentarApiFactory factory) : IntegrationTestBase
         var response = await Client.GetJsonAsync($"/api/v2/companies/{companyId}/roles");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        return (await response.ReadAsAsync<List<Role>>()).Single(role => role.Name == roleName).Id;
+        return (await response.ReadAsAsync<List<RoleBody>>()).Single(role => role.Name == roleName).Id;
     }
 
     /// <summary>Employs the user with one predefined role, on behalf of the signed-in user.</summary>
-    protected async Task<EmployeeResponse> AddEmployeeAsync(int companyId, int userId, string roleName)
+    protected async Task<EmployeeBody> AddEmployeeAsync(int companyId, int userId, string roleName)
     {
         var roleId = await RoleIdAsync(companyId, roleName);
-        return await CreateAsync<EmployeeResponse>($"/api/v2/companies/{companyId}/employees", new EmployeeRequest(userId, [roleId]));
+        return await CreateAsync<EmployeeBody>($"/api/v2/companies/{companyId}/employees", new EmployeeRequest(userId, [roleId]));
     }
 
     protected async Task<HttpResponseMessage> UploadImageAsync(int carId, string fileName, byte[] bytes)

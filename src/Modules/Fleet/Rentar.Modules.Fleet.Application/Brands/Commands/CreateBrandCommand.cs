@@ -22,7 +22,7 @@ public sealed class CreateBrandCommandHandler(IBrandDal brandDal) : ICommandHand
 {
     public async Task<Brand> HandleAsync(CreateBrandCommand command, CancellationToken cancellationToken = default)
     {
-        var brand = new Brand { BrandName = command.BrandName };
+        var brand = new Brand(command.BrandName);
         await brandDal.AddAsync(brand, cancellationToken);
         return brand;
     }

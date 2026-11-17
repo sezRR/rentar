@@ -34,15 +34,17 @@ public sealed class UpdateCarCommandHandler(ICarDal carDal, IBrandDal brandDal, 
     {
         await CarReferences.EnsureExistAsync(brandDal, colorDal, command.BrandId, command.ColorId, cancellationToken);
 
-        await carDal.UpdateAsync(new Car
+        var car = new Car(
+            command.BrandId,
+            command.ColorId,
+            command.ModelYear,
+            command.DailyPrice,
+            command.Description,
+            command.MinimumFindeksRating)
         {
-            Id = command.Id,
-            BrandId = command.BrandId,
-            ColorId = command.ColorId,
-            ModelYear = command.ModelYear,
-            DailyPrice = command.DailyPrice,
-            Description = command.Description,
-            MinimumFindeksRating = command.MinimumFindeksRating
-        }, cancellationToken);
+            Id = command.Id
+        };
+
+        await carDal.UpdateAsync(car, cancellationToken);
     }
 }

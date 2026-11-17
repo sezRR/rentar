@@ -25,8 +25,9 @@ public sealed class UpdateCompanyCommandHandler(ICompanyDal companyDal, IEmploye
 {
     public async Task HandleAsync(UpdateCompanyCommand command, CancellationToken cancellationToken = default)
     {
-        await employeeDal.RequirePermissionAsync(command.CompanyId, command.ActorUserId, CompanyPermissions.CompanyManage, cancellationToken);
+        var actor = await employeeDal.RequirePermissionAsync(
+            command.CompanyId, command.ActorUserId, CompanyPermissions.CompanyManage, cancellationToken);
 
-        await companyDal.UpdateAsync(new Company { Id = command.CompanyId, Name = command.Name }, cancellationToken);
+        await companyDal.UpdateAsync(actor.Company.Renamed(command.Name), cancellationToken);
     }
 }

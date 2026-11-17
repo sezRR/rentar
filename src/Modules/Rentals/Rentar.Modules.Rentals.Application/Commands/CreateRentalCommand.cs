@@ -57,14 +57,7 @@ public sealed class CreateRentalCommandHandler(
             throw new BusinessRuleException(Messages.CustomerNotFound);
         }
 
-        var rental = new Rental
-        {
-            CarId = command.CarId,
-            CustomerId = command.CustomerId,
-            RentDate = command.RentDate,
-            ReturnDate = command.ReturnDate,
-            Status = RentalStatus.Pending
-        };
+        var rental = new Rental(command.CarId, command.CustomerId, command.RentDate, command.ReturnDate);
 
         await rentalDal.AddAsync(rental, cancellationToken);
 
