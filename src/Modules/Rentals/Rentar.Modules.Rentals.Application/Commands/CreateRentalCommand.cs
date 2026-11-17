@@ -3,7 +3,10 @@ using Rentar.Modules.Customers.Contracts;
 using Rentar.Modules.Fleet.Contracts;
 using Rentar.Modules.Rentals.Application.Common.Interfaces;
 using Rentar.Modules.Rentals.Application.Queries;
+using Rentar.Modules.Rentals.Contracts.Events;
 using Rentar.Modules.Rentals.Domain;
+using Rentar.Shared.Application.Aspects.Transaction;
+using Rentar.Shared.Application.Events;
 using Rentar.Shared.Application.UseCases;
 using Rentar.Shared.Application.Validation;
 using Rentar.Shared.Kernel.Exceptions;
@@ -14,9 +17,11 @@ using System.Threading.Tasks;
 namespace Rentar.Modules.Rentals.Application.Commands;
 
 /// <summary>
-/// Stores a new rental and answers it with its id set; throws <see cref="BusinessRuleException"/> when the Fleet module
-/// does not know the car or the Customers module does not know the customer. It does not check that the car is free;
-/// ask <see cref="CheckCarAvailabilityQuery"/> first. The dates are local times, so they carry no UTC offset.
+/// Books a rental and publishes <see cref="RentalCreatedEvent"/>, on which Payments takes its payment; answers the
+/// stored rental, <see cref="RentalStatus.Pending"/> until the payment's outcome confirms or cancels it. Throws
+/// <see cref="BusinessRuleException"/> when the Fleet module does not know the car or the Customers module does not know
+/// the customer. It does not check that the car is free; ask <see cref="CheckCarAvailabilityQuery"/> first. The dates
+/// are local times, so they carry no UTC offset.
 /// </summary>
 public sealed record CreateRentalCommand(int CarId, int CustomerId, DateTime RentDate, DateTime ReturnDate);
 
@@ -29,9 +34,13 @@ public sealed class CreateRentalCommandValidator : UseCaseValidator<CreateRental
     }
 }
 
-public sealed class CreateRentalCommandHandler(IRentalDal rentalDal, IFleetModuleApi fleetModule, ICustomersModuleApi customersModule)
-    : ICommandHandler<CreateRentalCommand, Rental>
+public sealed class CreateRentalCommandHandler(
+    IRentalDal rentalDal,
+    IFleetModuleApi fleetModule,
+    ICustomersModuleApi customersModule,
+    IEventPublisher eventPublisher) : ICommandHandler<CreateRentalCommand, Rental>
 {
+    [TransactionScopeAspect]
     public async Task<Rental> HandleAsync(CreateRentalCommand command, CancellationToken cancellationToken = default)
     {
         // The car and the customer live in other modules, so no foreign key guards the references; those modules are
@@ -53,10 +62,16 @@ public sealed class CreateRentalCommandHandler(IRentalDal rentalDal, IFleetModul
             CarId = command.CarId,
             CustomerId = command.CustomerId,
             RentDate = command.RentDate,
-            ReturnDate = command.ReturnDate
+            ReturnDate = command.ReturnDate,
+            Status = RentalStatus.Pending
         };
 
         await rentalDal.AddAsync(rental, cancellationToken);
+
+        await eventPublisher.PublishAsync(
+            new RentalCreatedEvent(rental.Id, rental.CarId, rental.CustomerId, rental.RentDate, rental.ReturnDate),
+            cancellationToken);
+
         return rental;
     }
 }

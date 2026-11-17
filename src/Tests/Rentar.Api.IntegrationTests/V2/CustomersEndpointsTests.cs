@@ -64,7 +64,7 @@ public class CustomersEndpointsTests(RentarApiFactory factory) : V2TestBase(fact
     public async Task Create_ASecondCustomerForTheSameUser_IsAConflict()
     {
         FreezeClockAtNoon();
-        var customer = await CreateCustomerAsync("renter@example.com");
+        var customer = await CreateCustomerAsync();
 
         var response = await Client.PostJsonAsync("/api/v2/customers", new CreateCustomerCommand(customer.UserId));
 
@@ -88,7 +88,7 @@ public class CustomersEndpointsTests(RentarApiFactory factory) : V2TestBase(fact
     {
         FreezeClockAtNoon();
         var user = await CreateUserAsync("inactive@example.com");
-        await Factory.DeactivateUserAsync(user.Id);
+        await DeactivateUserAsync(user.Id);
 
         var response = await Client.PostJsonAsync("/api/v2/customers", new CreateCustomerCommand(user.Id));
 

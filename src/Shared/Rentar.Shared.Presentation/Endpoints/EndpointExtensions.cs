@@ -1,5 +1,4 @@
 using Asp.Versioning;
-using Asp.Versioning.Conventions;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;

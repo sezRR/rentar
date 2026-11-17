@@ -10,7 +10,7 @@ namespace Rentar.Modules.Identity.Application.Auth.Queries;
 
 /// <summary>
 /// Answers the user the email and password belong to. Throws <see cref="InvalidCredentialsException"/> when no user
-/// has that email or the password is wrong.
+/// has that email or the password is wrong, and <see cref="ForbiddenException"/> when the user is inactive.
 /// </summary>
 public sealed record VerifyCredentialsQuery(string Email, string Password);
 
@@ -24,6 +24,12 @@ public sealed class VerifyCredentialsQueryHandler(IUserDal userDal) : IQueryHand
         if (!HashingHelper.VerifyPasswordHash(query.Password, user.PasswordHash, user.PasswordSalt))
         {
             throw new InvalidCredentialsException(Messages.PasswordError);
+        }
+
+        // Only said once the password is right, so it reveals nothing to someone guessing.
+        if (!user.Status)
+        {
+            throw new ForbiddenException(Messages.UserNotActive);
         }
 
         return user;

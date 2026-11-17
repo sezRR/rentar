@@ -17,4 +17,10 @@ public interface ICompaniesModuleApi
     /// one of its employees, which includes a company that does not exist.
     /// </summary>
     Task<EmployeeSummary> GetEmployeeAsync(int companyId, int userId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Whether the Identity user is the only employee holding every permission at one of the companies they work at,
+    /// so that company would be left without anyone able to run it once they leave.
+    /// </summary>
+    Task<bool> IsLastFullAccessEmployeeAsync(int userId, CancellationToken cancellationToken = default);
 }

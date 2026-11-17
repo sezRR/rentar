@@ -1,4 +1,5 @@
 using Rentar.Modules.Companies.Application.Common.Interfaces;
+using Rentar.Modules.Companies.Application.Employees;
 using Rentar.Modules.Companies.Contracts;
 using System.Collections.Generic;
 using System.Linq;
@@ -29,5 +30,21 @@ public class CompaniesModuleApi(ICompanyDal companyDal, IEmployeeDal employeeDal
         return employee is null
             ? null
             : new EmployeeSummary(employee.Id, employee.CompanyId, employee.Company.Name, employee.UserId, employee.Permissions());
+    }
+
+    public async Task<bool> IsLastFullAccessEmployeeAsync(int userId, CancellationToken cancellationToken = default)
+    {
+        var employments = await employeeDal.GetAllAsync(e => e.UserId == userId, cancellationToken);
+
+        foreach (var employment in employments)
+        {
+            var employees = await employeeDal.GetByCompanyAsync(employment.CompanyId, cancellationToken);
+            if (FullAccess.IsLastHeldBy(employees.Single(e => e.Id == employment.Id), employees))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

@@ -1,6 +1,9 @@
 using Rentar.Modules.Companies.Application.Common.Interfaces;
 using Rentar.Modules.Companies.Contracts;
+using Rentar.Modules.Companies.Contracts.Events;
 using Rentar.Modules.Companies.Domain;
+using Rentar.Shared.Application.Aspects.Transaction;
+using Rentar.Shared.Application.Events;
 using Rentar.Shared.Application.UseCases;
 using Rentar.Shared.Kernel.Exceptions;
 using System.Linq;
@@ -11,7 +14,7 @@ namespace Rentar.Modules.Companies.Application.Employees.Commands;
 
 /// <summary>
 /// Removes the employee <see cref="EmployeeId"/> from the company on behalf of its employee <see cref="ActorUserId"/>,
-/// who may be removing themselves.
+/// who may be removing themselves, and publishes <see cref="EmployeeRemovedEvent"/>.
 /// </summary>
 /// <remarks>
 /// The actor needs <see cref="CompanyPermissions.EmployeesManage"/> and every permission the employee holds
@@ -21,8 +24,9 @@ namespace Rentar.Modules.Companies.Application.Employees.Commands;
 /// </remarks>
 public sealed record RemoveEmployeeCommand(int ActorUserId, int CompanyId, int EmployeeId);
 
-public sealed class RemoveEmployeeCommandHandler(IEmployeeDal employeeDal) : ICommandHandler<RemoveEmployeeCommand>
+public sealed class RemoveEmployeeCommandHandler(IEmployeeDal employeeDal, IEventPublisher eventPublisher) : ICommandHandler<RemoveEmployeeCommand>
 {
+    [TransactionScopeAspect]
     public async Task HandleAsync(RemoveEmployeeCommand command, CancellationToken cancellationToken = default)
     {
         var actor = await employeeDal.RequirePermissionAsync(
@@ -37,7 +41,7 @@ public sealed class RemoveEmployeeCommandHandler(IEmployeeDal employeeDal) : ICo
             throw new ForbiddenException(Messages.CannotRemoveEmployeeWithMorePermissions);
         }
 
-        if (HasFullAccess(employee) && !employees.Any(other => other.Id != employee.Id && HasFullAccess(other)))
+        if (FullAccess.IsLastHeldBy(employee, employees))
         {
             throw new BusinessRuleException(Messages.CompanyNeedsFullAccessEmployee);
         }
@@ -46,10 +50,7 @@ public sealed class RemoveEmployeeCommandHandler(IEmployeeDal employeeDal) : ICo
         await employeeDal.DeleteAsync(
             new Employee { Id = employee.Id, CompanyId = employee.CompanyId, UserId = employee.UserId },
             cancellationToken);
-    }
 
-    private static bool HasFullAccess(Employee employee)
-    {
-        return CompanyPermissions.All.All(employee.HasPermission);
+        await eventPublisher.PublishAsync(new EmployeeRemovedEvent(employee.CompanyId, employee.UserId), cancellationToken);
     }
 }

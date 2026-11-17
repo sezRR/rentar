@@ -3,6 +3,7 @@ using Rentar.Shared.Kernel.Entities;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json.Serialization;
 using System.Text.Json.Serialization.Metadata;
 
 namespace Rentar.Shared.Presentation.Json;
@@ -13,12 +14,15 @@ public static class ApiJsonExtensions
     /// Writes entities without their navigation properties. Navigations let queries follow relationships; they are
     /// never part of a body, so an entity keeps the shape it has always had, the OpenAPI documents leave them out,
     /// and related entities pointing back at each other can never loop. A response that needs related data uses a
-    /// response model.
+    /// response model. Enums are written by name (a rental's <c>"status": "Confirmed"</c>), so a body reads on its own and
+    /// reordering an enum never changes what a client sees.
     /// </summary>
     public static IServiceCollection AddApiJson(this IServiceCollection services)
     {
         services.ConfigureHttpJsonOptions(options =>
         {
+            options.SerializerOptions.Converters.Add(new JsonStringEnumConverter());
+
             var resolver = options.SerializerOptions.TypeInfoResolver ?? new DefaultJsonTypeInfoResolver();
             options.SerializerOptions.TypeInfoResolver = resolver.WithAddedModifier(RemoveNavigations);
         });

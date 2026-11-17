@@ -10,6 +10,9 @@ public static class Messages
 
     public const string MaintenanceTime = "Servers in Maintenance (Time)";
     public const string UserNotFound = "User not found";
+    public const string UserNotActive = "User is not active";
+    public const string UserIsLastFullAccessEmployee =
+        "User is the last employee holding every permission at a company; grant another employee the Owner role first";
     public const string PasswordError = "Password is wrong";
     public const string SuccessfulLogin = "Logged in to system successfully";
     public const string UserAlreadyExists = "User already registered";

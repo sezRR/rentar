@@ -10,12 +10,13 @@ namespace Rentar.Api.IntegrationTests;
 public class ModuleSchemasTests(RentarApiFactory factory) : IntegrationTestBase(factory)
 {
     [Theory]
-    [InlineData("companies", new[] { "Companies", "EmployeeRoles", "Employees", "Roles", "__EFMigrationsHistory" })]
-    [InlineData("findeks", new[] { "CustomerScores", "__EFMigrationsHistory" })]
-    [InlineData("identity", new[] { "OperationClaims", "UserOperationClaims", "Users", "__EFMigrationsHistory" })]
-    [InlineData("fleet", new[] { "Brands", "CarImages", "Cars", "Colors", "__EFMigrationsHistory" })]
-    [InlineData("customers", new[] { "Customers", "__EFMigrationsHistory" })]
-    [InlineData("rentals", new[] { "Rentals", "__EFMigrationsHistory" })]
+    [InlineData("companies", new[] { "Companies", "EmployeeRoles", "Employees", "InboxMessages", "OutboxMessages", "Roles", "__EFMigrationsHistory" })]
+    [InlineData("findeks", new[] { "CustomerScores", "InboxMessages", "OutboxMessages", "__EFMigrationsHistory" })]
+    [InlineData("identity", new[] { "InboxMessages", "OperationClaims", "OutboxMessages", "UserOperationClaims", "Users", "__EFMigrationsHistory" })]
+    [InlineData("fleet", new[] { "Brands", "CarImages", "Cars", "Colors", "InboxMessages", "OutboxMessages", "__EFMigrationsHistory" })]
+    [InlineData("customers", new[] { "Customers", "InboxMessages", "OutboxMessages", "__EFMigrationsHistory" })]
+    [InlineData("payments", new[] { "InboxMessages", "OutboxMessages", "__EFMigrationsHistory" })]
+    [InlineData("rentals", new[] { "InboxMessages", "OutboxMessages", "Rentals", "__EFMigrationsHistory" })]
     public async Task EachModule_KeepsItsTablesAndMigrationHistoryInItsOwnSchema(string schema, string[] expectedTables)
     {
         var tables = await TablesInSchemaAsync(schema);

@@ -9,6 +9,7 @@ using Rentar.Modules.Rentals.Domain;
 using Rentar.Shared.Application.UseCases;
 using Rentar.Shared.Presentation.Endpoints;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -27,17 +28,24 @@ public class RentalsEndpoints : IEndpoint
         group.MapPost("/add", Add);
     }
 
-    private static async Task<Ok<V1Response<List<Rental>>>> GetAll(IQueryHandler<GetRentalsQuery, List<Rental>> getRentals, CancellationToken cancellationToken)
+    /// <summary>The rentals that hold their car; v1 knows no statuses, so cancelled ones are left out.</summary>
+    private static async Task<Ok<V1Response<List<RentalResponse>>>> GetAll(
+        IQueryHandler<GetRentalsQuery, List<Rental>> getRentals,
+        CancellationToken cancellationToken)
     {
-        return V1Results.Ok(await getRentals.HandleAsync(new GetRentalsQuery(), cancellationToken), Messages.RentalsListed);
+        var rentals = await getRentals.HandleAsync(new GetRentalsQuery(), cancellationToken);
+        return V1Results.Ok(
+            rentals.Where(r => r.Status != RentalStatus.Cancelled).Select(RentalResponse.From).ToList(),
+            Messages.RentalsListed);
     }
 
-    private static async Task<Ok<V1Response<Rental>>> GetRentalByCarId(
+    private static async Task<Ok<V1Response<RentalResponse>>> GetRentalByCarId(
         IQueryHandler<GetRentalByCarQuery, Rental> getRentalByCar,
         int carId,
         CancellationToken cancellationToken)
     {
-        return V1Results.Ok(await getRentalByCar.HandleAsync(new GetRentalByCarQuery(carId), cancellationToken), null);
+        var rental = await getRentalByCar.HandleAsync(new GetRentalByCarQuery(carId), cancellationToken);
+        return V1Results.Ok(rental is null ? null : RentalResponse.From(rental), null);
     }
 
     private static async Task<Ok<V1Response<List<RentalDetailResponse>>>> GetRentalDetails(
@@ -57,7 +65,14 @@ public class RentalsEndpoints : IEndpoint
             : V1Results.Fail(Messages.CarNotAvailable);
     }
 
-    private static async Task<Ok<V1Response>> Add(ICommandHandler<CreateRentalCommand, Rental> createRental, CreateRentalCommand command, CancellationToken cancellationToken)
+    /// <summary>
+    /// Books the rental, whose payment is taken right after. A declined payment cancels the rental, which v1 then no
+    /// longer lists.
+    /// </summary>
+    private static async Task<Ok<V1Response>> Add(
+        ICommandHandler<CreateRentalCommand, Rental> createRental,
+        CreateRentalCommand command,
+        CancellationToken cancellationToken)
     {
         await createRental.HandleAsync(command, cancellationToken);
         return V1Results.Ok(Messages.RentalAdded);

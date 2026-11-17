@@ -31,6 +31,9 @@ public class UsersEndpoints : IEndpoint
         group.MapPut("/{id:int}", Update)
             .ProducesProblem(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status409Conflict);
+        group.MapPost("/{id:int}/deactivation", Deactivate)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict);
     }
 
     /// <summary>
@@ -78,7 +81,7 @@ public class UsersEndpoints : IEndpoint
     }
 
     /// <summary>
-    /// Replaces the user; an email another user already has answers 409.
+    /// Replaces the user; an email another user already has answers 409. Whether the user is active stays as it is.
     /// </summary>
     private static async Task<Results<NoContent, ProblemHttpResult>> Update(
         IQueryHandler<GetUserByIdQuery, User> getUserById,
@@ -95,6 +98,26 @@ public class UsersEndpoints : IEndpoint
         await updateUser.HandleAsync(
             new UpdateUserCommand(id, body.FirstName, body.LastName, body.Email, body.Password),
             cancellationToken);
+        return TypedResults.NoContent();
+    }
+
+    /// <summary>
+    /// Deactivates the user: they can no longer sign in, and right after they stop working at every company and their
+    /// rentals that have not started are cancelled. A user who is the last one holding every permission at a company answers 409, as
+    /// that company would be left without anyone able to run it. Deactivating an inactive user changes nothing.
+    /// </summary>
+    private static async Task<Results<NoContent, ProblemHttpResult>> Deactivate(
+        IQueryHandler<GetUserByIdQuery, User> getUserById,
+        ICommandHandler<DeactivateUserCommand> deactivateUser,
+        int id,
+        CancellationToken cancellationToken)
+    {
+        if (await getUserById.HandleAsync(new GetUserByIdQuery(id), cancellationToken) is null)
+        {
+            return RestResults.NotFound("User", id);
+        }
+
+        await deactivateUser.HandleAsync(new DeactivateUserCommand(id), cancellationToken);
         return TypedResults.NoContent();
     }
 }

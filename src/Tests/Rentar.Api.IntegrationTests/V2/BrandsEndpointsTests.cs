@@ -65,7 +65,7 @@ public class BrandsEndpointsTests(RentarApiFactory factory) : V2TestBase(factory
     [Fact]
     public async Task Delete_OfABrandCarsStillHave_IsAConflict_AndKeepsTheBrand()
     {
-        var car = await CreateCarAsync("Toyota");
+        var car = await CreateCarAsync();
 
         var response = await Client.DeleteResourceAsync($"/api/v2/brands/{car.BrandId}");
 
@@ -102,7 +102,7 @@ public class BrandsEndpointsTests(RentarApiFactory factory) : V2TestBase(factory
     [Fact]
     public async Task Replace_WithNameShorterThanTwoCharacters_ReturnsValidationProblem_AndKeepsTheBrand()
     {
-        var brand = await CreateBrandAsync("Toyota");
+        var brand = await CreateBrandAsync();
 
         var response = await Client.PutJsonAsync($"/api/v2/brands/{brand.Id}", new BrandRequest("A"));
 

@@ -17,8 +17,8 @@ public class CarsEndpointsTests(RentarApiFactory factory) : V2TestBase(factory)
     [Fact]
     public async Task Create_ReturnsTheCarWithItsBrandAndColor()
     {
-        var brand = await CreateBrandAsync("Toyota");
-        var color = await CreateColorAsync("Red");
+        var brand = await CreateBrandAsync();
+        var color = await CreateColorAsync();
 
         var response = await Client.PostJsonAsync("/api/v2/cars", new CarRequest(brand.Id, color.Id, 2021, 950m, "Corolla 1.6", 700));
 
@@ -34,9 +34,9 @@ public class CarsEndpointsTests(RentarApiFactory factory) : V2TestBase(factory)
     [Fact]
     public async Task GetAll_FiltersByBrandColorOrBoth()
     {
-        var toyota = await CreateBrandAsync("Toyota");
+        var toyota = await CreateBrandAsync();
         var fiat = await CreateBrandAsync("Fiat");
-        var red = await CreateColorAsync("Red");
+        var red = await CreateColorAsync();
         var white = await CreateColorAsync("White");
 
         await CreateCarAsync(toyota.Id, red.Id, "Red Corolla");

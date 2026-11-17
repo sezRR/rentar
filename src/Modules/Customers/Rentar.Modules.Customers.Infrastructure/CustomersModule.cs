@@ -6,6 +6,7 @@ using Rentar.Modules.Customers.Application.Common.Interfaces;
 using Rentar.Modules.Customers.Application.Queries;
 using Rentar.Modules.Customers.Contracts;
 using Rentar.Modules.Customers.Infrastructure.Persistence;
+using Rentar.Shared.Infrastructure.Messaging;
 using Rentar.Shared.Infrastructure.Modules;
 using Rentar.Shared.Infrastructure.Persistence;
 using Rentar.Shared.Presentation.Endpoints;
@@ -22,6 +23,7 @@ public sealed class CustomersModule : IModule
     public void AddServices(IServiceCollection services, IConfiguration configuration)
     {
         services.AddModuleDbContext<CustomersDbContext>(CustomersDbContext.Schema);
+        services.AddModuleMessaging<CustomersDbContext>(typeof(ICustomersModuleApi).Assembly, typeof(CustomersModuleApi).Assembly);
         services.AddEndpoints(Presentation.AssemblyReference.Assembly);
     }
 

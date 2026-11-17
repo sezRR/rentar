@@ -2,6 +2,9 @@ using Rentar.Modules.Companies.Application;
 using Rentar.Modules.Companies.Application.Common.Models;
 using Rentar.Modules.Companies.Contracts;
 using Rentar.Modules.Companies.Presentation.Endpoints.V2;
+using Rentar.Modules.Customers.Application.Commands;
+using Rentar.Modules.Customers.Domain;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
@@ -217,6 +220,76 @@ public class EmployeesEndpointsTests(RentarApiFactory factory) : V2TestBase(fact
         var response = await Client.DeleteResourceAsync($"/api/v2/companies/{company.Id}/employees/{foreignEmployee.Id}");
 
         await AssertProblemAsync(response, HttpStatusCode.NotFound, Messages.EmployeeNotFound(foreignEmployee.Id));
+    }
+
+    [Fact]
+    public async Task Remove_AnEmployeeWhoRentsForTheCompany_MakesTheirCustomerOneWithNoCompany()
+    {
+        await SignInAsNewUserAsync("owner@example.com");
+        var company = await RegisterCompanyAsync();
+        var member = await CreateUserAsync("member@example.com");
+        var employee = await AddEmployeeAsync(company.Id, member.Id, "Member");
+        var customer = await CreateAsync<Customer>("/api/v2/customers", new CreateCustomerCommand(member.Id, company.Id));
+
+        var response = await Client.DeleteResourceAsync($"/api/v2/companies/{company.Id}/employees/{employee.Id}");
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        Assert.Equal(company.Id, (await CustomerAsync(customer.Id)).CompanyId);
+
+        await DeliverEventsAsync();
+
+        Assert.Null((await CustomerAsync(customer.Id)).CompanyId);
+    }
+
+    [Fact]
+    public async Task Remove_FromAnotherCompany_KeepsTheCompanyTheCustomerRentsFor()
+    {
+        await SignInAsNewUserAsync("owner@example.com");
+        var rentingFor = await RegisterCompanyAsync();
+        var other = await RegisterCompanyAsync("Other Company");
+        var member = await CreateUserAsync("member@example.com");
+        await AddEmployeeAsync(rentingFor.Id, member.Id, "Member");
+        var otherEmployment = await AddEmployeeAsync(other.Id, member.Id, "Member");
+        var customer = await CreateAsync<Customer>("/api/v2/customers", new CreateCustomerCommand(member.Id, rentingFor.Id));
+
+        await Client.DeleteResourceAsync($"/api/v2/companies/{other.Id}/employees/{otherEmployment.Id}");
+        await DeliverEventsAsync();
+
+        Assert.Equal(rentingFor.Id, (await CustomerAsync(customer.Id)).CompanyId);
+    }
+
+    [Fact]
+    public async Task Remove_WhileTheCustomerCanNotBeUpdated_RemovesTheEmployee_AndClearsTheCompanyOnARetry()
+    {
+        await SignInAsNewUserAsync("owner@example.com");
+        var company = await RegisterCompanyAsync();
+        var member = await CreateUserAsync("member@example.com");
+        var employee = await AddEmployeeAsync(company.Id, member.Id, "Member");
+        var customer = await CreateAsync<Customer>("/api/v2/customers", new CreateCustomerCommand(member.Id, company.Id));
+
+        // Customers reacts after the removal committed, so its failure leaves the removal in place and is retried.
+        await using (await Factory.RefuseAsync("customers", "Customers", "UPDATE"))
+        {
+            var response = await Client.DeleteResourceAsync($"/api/v2/companies/{company.Id}/employees/{employee.Id}");
+            Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+
+            await DeliverEventsAsync();
+        }
+
+        Assert.DoesNotContain(employee.Id, (await EmployeesAsync(company.Id)).Select(e => e.Id));
+        Assert.Equal(company.Id, (await CustomerAsync(customer.Id)).CompanyId);
+
+        Factory.Clock.FreezeAt(DateTimeOffset.UtcNow.AddMinutes(1));
+        await DeliverEventsAsync();
+
+        Assert.Null((await CustomerAsync(customer.Id)).CompanyId);
+    }
+
+    private async Task<Customer> CustomerAsync(int customerId)
+    {
+        var response = await Client.GetJsonAsync($"/api/v2/customers/{customerId}");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        return await response.ReadAsAsync<Customer>();
     }
 
     private async Task<List<EmployeeResponse>> EmployeesAsync(int companyId)

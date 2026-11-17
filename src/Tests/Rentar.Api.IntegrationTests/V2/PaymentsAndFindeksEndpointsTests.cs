@@ -9,28 +9,21 @@ namespace Rentar.Api.IntegrationTests.V2;
 public class PaymentsAndFindeksEndpointsTests(RentarApiFactory factory) : V2TestBase(factory)
 {
     [Fact]
-    public async Task Payment_EitherSucceedsWithNoContent_OrIsDeclinedWithPaymentRequired()
+    public async Task Payment_ThatGoesThrough_AnswersNoContent()
     {
-        // The payment outcome is simulated at random, so both answers are checked.
-        var seenSuccess = false;
-        var seenDecline = false;
+        var response = await Client.PostJsonAsync("/api/v2/payments", new { });
 
-        for (var attempt = 0; attempt < 64 && !(seenSuccess && seenDecline); attempt++)
-        {
-            var response = await Client.PostJsonAsync("/api/v2/payments", new { });
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+    }
 
-            if (response.StatusCode == HttpStatusCode.NoContent)
-            {
-                seenSuccess = true;
-            }
-            else
-            {
-                await AssertProblemAsync(response, HttpStatusCode.PaymentRequired, Messages.PaymentFailed);
-                seenDecline = true;
-            }
-        }
+    [Fact]
+    public async Task Payment_ThatIsDeclined_AnswersPaymentRequired()
+    {
+        Factory.PaymentGateway.Declines = true;
 
-        Assert.True(seenSuccess && seenDecline);
+        var response = await Client.PostJsonAsync("/api/v2/payments", new { });
+
+        await AssertProblemAsync(response, HttpStatusCode.PaymentRequired, Messages.PaymentFailed);
     }
 
     [Fact]

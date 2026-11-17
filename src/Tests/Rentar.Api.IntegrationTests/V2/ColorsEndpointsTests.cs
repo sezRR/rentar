@@ -43,7 +43,7 @@ public class ColorsEndpointsTests(RentarApiFactory factory) : V2TestBase(factory
     [Fact]
     public async Task Update_WithNameShorterThanTwoCharacters_ReturnsProblemWithTheServiceMessage()
     {
-        var color = await CreateColorAsync("Red");
+        var color = await CreateColorAsync();
 
         var response = await Client.PutJsonAsync($"/api/v2/colors/{color.Id}", new ColorRequest("R"));
 

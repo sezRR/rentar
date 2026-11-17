@@ -8,6 +8,7 @@
     <ProjectReference Include="../../Customers/Rentar.Modules.Customers.Contracts/Rentar.Modules.Customers.Contracts.csproj" />
     <ProjectReference Include="../../Fleet/Rentar.Modules.Fleet.Contracts/Rentar.Modules.Fleet.Contracts.csproj" />
     <ProjectReference Include="../../Identity/Rentar.Modules.Identity.Contracts/Rentar.Modules.Identity.Contracts.csproj" />
+    <ProjectReference Include="../../Payments/Rentar.Modules.Payments.Contracts/Rentar.Modules.Payments.Contracts.csproj" />
   </ItemGroup>
 
 </Project>

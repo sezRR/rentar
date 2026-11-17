@@ -100,6 +100,20 @@ public class UsersEndpointsTests(RentarApiFactory factory) : V2TestBase(factory)
     }
 
     [Fact]
+    public async Task Update_OfAnInactiveUser_KeepsThemInactive()
+    {
+        var user = await CreateUserAsync(Email);
+        await DeactivateUserAsync(user.Id);
+
+        var response = await Client.PutJsonAsync($"/api/v2/users/{user.Id}", new UserRequest("Sezen", "Tetik", Email, Password));
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        var fetched = await (await Client.GetJsonAsync($"/api/v2/users/{user.Id}")).ReadAsAsync<UserResponse>();
+        Assert.Equal("Sezen", fetched.FirstName);
+        Assert.False(fetched.Status);
+    }
+
+    [Fact]
     public async Task Update_ToAnEmailAnotherUserHas_IsAConflict()
     {
         await CreateUserAsync("taken@example.com");

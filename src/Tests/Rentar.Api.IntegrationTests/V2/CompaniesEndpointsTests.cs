@@ -72,7 +72,7 @@ public class CompaniesEndpointsTests(RentarApiFactory factory) : V2TestBase(fact
     public async Task Register_ForAnInactiveUser_IsABadRequest()
     {
         var user = await SignInAsNewUserAsync("owner@example.com");
-        await Factory.DeactivateUserAsync(user.Id);
+        await DeactivateUserAsync(user.Id);
 
         var response = await Client.PostJsonAsync("/api/v2/companies", new CompanyRequest("Rentar Logistics"));
 
@@ -97,7 +97,7 @@ public class CompaniesEndpointsTests(RentarApiFactory factory) : V2TestBase(fact
     public async Task Get_ForAnEmployee_AnswersTheCompany()
     {
         await SignInAsNewUserAsync("owner@example.com");
-        var company = await RegisterCompanyAsync("Rentar Logistics");
+        var company = await RegisterCompanyAsync();
         var member = await CreateUserAsync("member@example.com");
         await AddEmployeeAsync(company.Id, member.Id, "Member");
         await SignInAsync("member@example.com");
@@ -125,7 +125,7 @@ public class CompaniesEndpointsTests(RentarApiFactory factory) : V2TestBase(fact
     public async Task Update_ByTheOwner_RenamesTheCompany()
     {
         await SignInAsNewUserAsync("owner@example.com");
-        var company = await RegisterCompanyAsync("Rentar Logistics");
+        var company = await RegisterCompanyAsync();
 
         var response = await Client.PutJsonAsync($"/api/v2/companies/{company.Id}", new CompanyRequest("Rentar Fleet"));
 
@@ -138,7 +138,7 @@ public class CompaniesEndpointsTests(RentarApiFactory factory) : V2TestBase(fact
     public async Task Update_ByAnAdmin_IsForbidden()
     {
         await SignInAsNewUserAsync("owner@example.com");
-        var company = await RegisterCompanyAsync("Rentar Logistics");
+        var company = await RegisterCompanyAsync();
         var admin = await CreateUserAsync("admin@example.com");
         await AddEmployeeAsync(company.Id, admin.Id, "Admin");
         await SignInAsync("admin@example.com");

@@ -12,5 +12,10 @@ internal sealed class RentalConfiguration : IEntityTypeConfiguration<Rental>
         // looked up by car, and by customer for a company's rentals.
         builder.HasIndex(rental => rental.CarId);
         builder.HasIndex(rental => rental.CustomerId);
+
+        // By name, so the column reads on its own and reordering the enum never changes what a row means.
+        builder.Property(rental => rental.Status)
+            .HasConversion<string>()
+            .HasMaxLength(16);
     }
 }

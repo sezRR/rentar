@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 
 namespace Rentar.Modules.Rentals.Application.Queries;
 
-/// <summary>Whether any rental, past or upcoming, is of the Fleet car <see cref="CarId"/>.</summary>
+/// <summary>Whether any rental, past, upcoming or cancelled, is of the Fleet car <see cref="CarId"/>.</summary>
 public sealed record CheckCarHasRentalsQuery(int CarId);
 
 public sealed class CheckCarHasRentalsQueryHandler(IRentalDal rentalDal) : IQueryHandler<CheckCarHasRentalsQuery, bool>

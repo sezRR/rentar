@@ -31,12 +31,81 @@ public class RentalsEndpointsTests(RentarApiFactory factory) : V2TestBase(factor
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var rental = await response.ReadAsAsync<Rental>();
         Assert.Equal($"/api/v2/rentals/{rental.Id}", response.Headers.Location?.OriginalString);
+        Assert.Equal(RentalStatus.Pending, rental.Status);
 
         var fetched = await (await Client.GetJsonAsync($"/api/v2/rentals/{rental.Id}")).ReadAsAsync<Rental>();
         Assert.Equal(car.Id, fetched.CarId);
         Assert.Equal(customer.Id, fetched.CustomerId);
         Assert.Equal(RentDate, fetched.RentDate);
         Assert.Equal(ReturnDate, fetched.ReturnDate);
+    }
+
+    [Fact]
+    public async Task Create_ThenThePaymentGoesThrough_ConfirmsTheRental()
+    {
+        var car = await CreateCarAsync();
+        var customer = await CreateCustomerAsync();
+        var rental = await CreateRentalAsync(car.Id, customer.Id);
+
+        await DeliverEventsAsync();
+
+        Assert.Equal(RentalStatus.Confirmed, (await RentalAsync(rental.Id)).Status);
+        Assert.Equal(1, Factory.PaymentGateway.Charges);
+    }
+
+    [Fact]
+    public async Task Create_WhilePending_HoldsTheCar()
+    {
+        var car = await CreateCarAsync();
+        await CreateRentalAsync(car.Id, (await CreateCustomerAsync()).Id);
+
+        var availability = await (await Client.GetJsonAsync(
+            $"/api/v2/rentals/availability?carId={car.Id}&rentDate=2026-09-18T10:00:00&returnDate=2026-09-20T10:00:00")).ReadAsAsync<RentalAvailabilityResponse>();
+
+        Assert.False(availability.Available);
+    }
+
+    [Fact]
+    public async Task Create_ThenThePaymentIsDeclined_KeepsTheRentalCancelled_AndTheCarFree()
+    {
+        FreezeClockAtNoon();
+        var car = await CreateCarAsync();
+        var customer = await CreateCustomerAsync();
+        var rental = await CreateRentalAsync(car.Id, customer.Id);
+        Factory.PaymentGateway.Declines = true;
+
+        await DeliverEventsAsync();
+
+        Assert.Equal(RentalStatus.Cancelled, (await RentalAsync(rental.Id)).Status);
+
+        var availability = await (await Client.GetJsonAsync(
+            $"/api/v2/rentals/availability?carId={car.Id}&rentDate=2026-09-18T10:00:00&returnDate=2026-09-20T10:00:00")).ReadAsAsync<RentalAvailabilityResponse>();
+        Assert.True(availability.Available);
+        Assert.Empty(await (await Client.GetJsonAsync("/api/v2/rentals/details")).ReadAsAsync<List<RentalDetailResponse>>());
+    }
+
+    [Fact]
+    public async Task Create_WhenTheConfirmationCanNotBeStored_ConfirmsOnARetry_WithoutPayingTwice()
+    {
+        var car = await CreateCarAsync();
+        var customer = await CreateCustomerAsync();
+        var rental = await CreateRentalAsync(car.Id, customer.Id);
+
+        await using (await Factory.RefuseAsync("rentals", "Rentals", "UPDATE"))
+        {
+            await DeliverEventsAsync();
+        }
+
+        Assert.Equal(RentalStatus.Pending, (await RentalAsync(rental.Id)).Status);
+        var outcome = Assert.Single(await Factory.OutboxAsync("payments"));
+        Assert.Equal(("PaymentSucceededEvent", false, 1), (outcome.Event, outcome.Processed, outcome.Attempts));
+        Assert.Contains("refused by test", outcome.Error);
+
+        Factory.Clock.FreezeAt(DateTimeOffset.UtcNow.AddMinutes(1));
+        await DeliverEventsAsync();
+
+        Assert.Equal(RentalStatus.Confirmed, (await RentalAsync(rental.Id)).Status);
+        Assert.Equal(1, Factory.PaymentGateway.Charges);
     }
 
     [Fact]
@@ -66,7 +135,7 @@ public class RentalsEndpointsTests(RentarApiFactory factory) : V2TestBase(factor
     {
         var brand = await CreateBrandAsync();
         var color = await CreateColorAsync();
-        var firstCar = await CreateCarAsync(brand.Id, color.Id, "Corolla 1.6");
+        var firstCar = await CreateCarAsync(brand.Id, color.Id);
         var secondCar = await CreateCarAsync(brand.Id, color.Id, "Yaris 1.5");
         var first = await CreateCustomerAsync("first@example.com");
         var second = await CreateCustomerAsync("second@example.com");
@@ -118,10 +187,10 @@ public class RentalsEndpointsTests(RentarApiFactory factory) : V2TestBase(factor
     {
         // Signed in before the clock is frozen: the access token's times come from the clock.
         var owner = await SignInAsNewUserAsync("renter@example.com");
-        var company = await RegisterCompanyAsync("Rentar Logistics");
+        var company = await RegisterCompanyAsync();
         var customer = await CreateAsync<Customer>("/api/v2/customers", new CreateCustomerCommand(owner.Id, company.Id));
         FreezeClockAtNoon();
-        var car = await CreateCarAsync("Toyota", "Red", "Corolla 1.6");
+        var car = await CreateCarAsync();
         await CreateRentalAsync(car.Id, customer.Id);
         // Fleet does not know this car, so its rental has no details to show.
         await Factory.StoreRentalOfMissingCarAsync(car.Id + 1, customer.Id, RentDate, ReturnDate);
@@ -177,6 +246,11 @@ public class RentalsEndpointsTests(RentarApiFactory factory) : V2TestBase(factor
         var response = await Client.GetJsonAsync("/api/v2/rentals/404");
 
         await AssertProblemAsync(response, HttpStatusCode.NotFound, "Rental 404 was not found.");
+    }
+
+    private async Task<Rental> RentalAsync(int rentalId)
+    {
+        return await (await Client.GetJsonAsync($"/api/v2/rentals/{rentalId}")).ReadAsAsync<Rental>();
     }
 
     private Task<Rental> CreateRentalAsync(int carId, int customerId, DateTime? rentDate = null, DateTime? returnDate = null)

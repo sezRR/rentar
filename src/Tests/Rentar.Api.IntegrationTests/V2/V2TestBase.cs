@@ -92,6 +92,13 @@ public abstract class V2TestBase(RentarApiFactory factory) : IntegrationTestBase
         return await CreateAsync<Customer>("/api/v2/customers", new CreateCustomerCommand(user.Id));
     }
 
+    /// <summary>Deactivates the user through the API, so every module reacts as it does for a real deactivation.</summary>
+    protected async Task DeactivateUserAsync(int userId)
+    {
+        var response = await Client.PostJsonAsync($"/api/v2/users/{userId}/deactivation", new { });
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+    }
+
     /// <summary>
     /// Logs in as the user with <see cref="Password"/>, so every later request of <see cref="IntegrationTestBase.Client"/>
     /// carries its access token. The token's times come from the test clock, so do not freeze it before signing in.
@@ -137,10 +144,8 @@ public abstract class V2TestBase(RentarApiFactory factory) : IntegrationTestBase
 
     protected async Task<HttpResponseMessage> UploadImageAsync(int carId, string fileName, byte[] bytes)
     {
-        using var form = new MultipartFormDataContent
-        {
-            { new ByteArrayContent(bytes), "file", fileName }
-        };
+        using var form = new MultipartFormDataContent();
+        form.Add(new ByteArrayContent(bytes), "file", fileName);
 
         return await Client.PostAsync($"/api/v2/cars/{carId}/images", form, TestContext.Current.CancellationToken);
     }

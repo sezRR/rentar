@@ -3,7 +3,7 @@ using Rentar.Shared.Kernel.Entities;
 namespace Rentar.Modules.Payments.Domain;
 
 /// <summary>
-/// Card details of a payment. Never stored: the module keeps no database of its own.
+/// Card details of a payment. Never stored: the module's schema holds only its outbox and inbox.
 /// </summary>
 public class Payment : IEntity
 {

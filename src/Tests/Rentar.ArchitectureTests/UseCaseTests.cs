@@ -16,7 +16,8 @@ namespace Rentar.ArchitectureTests;
 /// </summary>
 public class UseCaseTests
 {
-    private static readonly Lazy<IContainer> ModuleContainer = new(BuildModuleContainer);
+    /// <summary>Every module's container setup, as the host registers it. Nothing is resolved.</summary>
+    internal static readonly Lazy<IContainer> ModuleContainer = new(BuildModuleContainer);
 
     public static TheoryData<string> ApplicationAssemblies()
     {
@@ -182,7 +183,7 @@ public class UseCaseTests
         Assert.Empty(missing);
     }
 
-    private static IEnumerable<RentarAssembly> ApplicationLayers()
+    internal static IEnumerable<RentarAssembly> ApplicationLayers()
     {
         return RentarAssembly.All.Where(assembly => assembly is { IsModule: true, Layer: "Application" });
     }

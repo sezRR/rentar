@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Rentar.Modules.Findeks.Domain;
+using Rentar.Shared.Infrastructure.Messaging;
 using Rentar.Shared.Infrastructure.Persistence;
 
 namespace Rentar.Modules.Findeks.Infrastructure.Persistence;
@@ -14,6 +15,7 @@ public class FindeksDbContext(DbContextOptions<FindeksDbContext> options) : DbCo
     {
         modelBuilder.HasDefaultSchema(Schema);
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(FindeksDbContext).Assembly);
+        modelBuilder.MapMessaging();
         modelBuilder.UseTimestampWithoutTimeZone();
     }
 }

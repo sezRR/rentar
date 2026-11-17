@@ -45,12 +45,24 @@ public class CustomerScoresEndpointsTests(RentarApiFactory factory) : V2TestBase
     }
 
     [Fact]
-    public async Task Get_BeforeAnyCalculation_IsNotFound()
+    public async Task CreatingACustomer_GivesItAScore()
     {
         var customer = await CreateCustomerAsync();
+        await DeliverEventsAsync();
 
         var response = await Client.GetJsonAsync($"/api/v2/customers/{customer.Id}/score");
 
-        await AssertProblemAsync(response, HttpStatusCode.NotFound, $"Score of customer {customer.Id} was not found.");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var score = await response.ReadAsAsync<CustomerScore>();
+        Assert.Equal(customer.Id, score.CustomerId);
+        Assert.InRange(score.FindeksRating, 0, 1900);
+    }
+
+    [Fact]
+    public async Task Get_ForACustomerThatIsNotStored_IsNotFound()
+    {
+        var response = await Client.GetJsonAsync("/api/v2/customers/404/score");
+
+        await AssertProblemAsync(response, HttpStatusCode.NotFound, "Score of customer 404 was not found.");
     }
 }

@@ -15,4 +15,20 @@ public class Rental : IEntity
 
     public DateTime RentDate { get; init; }
     public DateTime ReturnDate { get; init; }
+
+    public RentalStatus Status { get; init; }
+
+    /// <summary>The same rental in <paramref name="status"/>.</summary>
+    public Rental WithStatus(RentalStatus status)
+    {
+        return new Rental
+        {
+            Id = Id,
+            CarId = CarId,
+            CustomerId = CustomerId,
+            RentDate = RentDate,
+            ReturnDate = ReturnDate,
+            Status = status
+        };
+    }
 }

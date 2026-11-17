@@ -4,6 +4,8 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
+using Rentar.Modules.Payments.Application.Common.Interfaces;
+using Rentar.Shared.Infrastructure.Messaging;
 using Rentar.Shared.Infrastructure.Persistence;
 using System;
 using System.Collections.Generic;
@@ -29,6 +31,8 @@ public class RentarApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 
     public TestClock Clock { get; } = new();
 
+    public TestPaymentGateway PaymentGateway { get; } = new();
+
     public string ConnectionString => _postgres.GetConnectionString();
 
     public async ValueTask InitializeAsync()
@@ -47,8 +51,14 @@ public class RentarApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     {
         builder.UseSetting($"ConnectionStrings:{DatabaseConnection.ConnectionStringName}", ConnectionString);
         builder.UseSetting("Database:MigrateOnStartup", "false");
+        // A test delivers the events itself with DeliverEventsAsync, so it knows the reactions have run when it asserts.
+        builder.UseSetting($"{OutboxOptions.SectionName}:{nameof(OutboxOptions.DeliverInBackground)}", "false");
 
-        builder.ConfigureTestServices(services => services.AddSingleton<TimeProvider>(Clock));
+        builder.ConfigureTestServices(services =>
+        {
+            services.AddSingleton<TimeProvider>(Clock);
+            services.AddSingleton<IPaymentGateway>(PaymentGateway);
+        });
     }
 
     public override async ValueTask DisposeAsync()
@@ -97,17 +107,6 @@ public class RentarApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         }
     }
 
-    /// <summary>Stores the user as inactive (<c>Status</c> false). No v2 endpoint does, and updating a user activates it.</summary>
-    public async Task DeactivateUserAsync(int userId)
-    {
-        await using var connection = new NpgsqlConnection(ConnectionString);
-        await connection.OpenAsync();
-
-        await using var command = new NpgsqlCommand("""UPDATE identity."Users" SET "Status" = false WHERE "Id" = @userId""", connection);
-        command.Parameters.AddWithValue("userId", userId);
-        await command.ExecuteNonQueryAsync();
-    }
-
     /// <summary>
     /// Stores a rental of a car Fleet does not know, as deleting a rented car left behind before it asked Rentals.
     /// No endpoint does: creating a rental asks Fleet for its car, and a rented car can not be deleted.
@@ -119,8 +118,8 @@ public class RentarApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 
         await using var command = new NpgsqlCommand(
             """
-            INSERT INTO rentals."Rentals" ("CarId", "CustomerId", "RentDate", "ReturnDate")
-            VALUES (@carId, @customerId, @rentDate, @returnDate)
+            INSERT INTO rentals."Rentals" ("CarId", "CustomerId", "RentDate", "ReturnDate", "Status")
+            VALUES (@carId, @customerId, @rentDate, @returnDate, 'Confirmed')
             """,
             connection);
         command.Parameters.AddWithValue("carId", carId);
@@ -128,6 +127,53 @@ public class RentarApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         command.Parameters.AddWithValue("rentDate", rentDate);
         command.Parameters.AddWithValue("returnDate", returnDate);
         await command.ExecuteNonQueryAsync();
+    }
+
+    /// <summary>
+    /// Delivers every module's due outbox messages, and the events their reactions publish in turn, until a pass
+    /// delivers nothing more. A message whose delivery failed is tried again only once it is due again.
+    /// </summary>
+    public async Task DeliverEventsAsync()
+    {
+        var processor = Services.GetRequiredService<OutboxProcessor>();
+
+        for (var pass = 0; pass < 20 && await processor.ProcessAsync(TestContext.Current.CancellationToken) > 0; pass++)
+        {
+        }
+    }
+
+    /// <summary>The messages in a module's outbox, oldest first.</summary>
+    public async Task<List<OutboxRow>> OutboxAsync(string schema)
+    {
+        await using var connection = new NpgsqlConnection(ConnectionString);
+        await connection.OpenAsync();
+
+        await using var command = new NpgsqlCommand(
+            $"SELECT \"Type\", \"ProcessedOn\" IS NOT NULL, \"Attempts\", \"Error\" FROM \"{schema}\".\"OutboxMessages\" ORDER BY \"OccurredOn\", \"Id\"",
+            connection);
+
+        var rows = new List<OutboxRow>();
+        await using var reader = await command.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            var type = reader.GetString(0);
+            rows.Add(new OutboxRow(
+                type[(type.LastIndexOf('.') + 1)..],
+                reader.GetBoolean(1),
+                reader.GetInt32(2),
+                reader.IsDBNull(3) ? null : reader.GetString(3)));
+        }
+
+        return rows;
+    }
+
+    /// <summary>
+    /// Marks every message of a module's outbox as not delivered, as when delivery stopped after the subscribers handled
+    /// a message but before the outbox recorded it, so the next delivery sends them again.
+    /// </summary>
+    public Task MarkOutboxUndeliveredAsync(string schema)
+    {
+        return ExecuteAsync($"UPDATE \"{schema}\".\"OutboxMessages\" SET \"ProcessedOn\" = NULL");
     }
 
     private async Task ExecuteAsync(string sql)
@@ -148,11 +194,13 @@ public class RentarApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     }
 
     /// <summary>
-    /// Empties every module's tables, the in-process cache and the clock so each test starts from a known state.
+    /// Empties every module's tables, the in-process cache, the clock and the payment gateway so each test starts from a
+    /// known state.
     /// </summary>
     public async Task ResetAsync()
     {
         Clock.Reset();
+        PaymentGateway.Reset();
 
         await using var connection = new NpgsqlConnection(ConnectionString);
         await connection.OpenAsync();

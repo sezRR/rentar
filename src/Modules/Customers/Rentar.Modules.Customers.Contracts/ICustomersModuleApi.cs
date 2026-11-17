@@ -14,4 +14,7 @@ public interface ICustomersModuleApi
 
     /// <summary>The customers renting for the Companies company <paramref name="companyId"/>.</summary>
     Task<IReadOnlyList<CustomerSummary>> GetCompanyCustomersAsync(int companyId, CancellationToken cancellationToken = default);
+
+    /// <summary>The customer account of the Identity user <paramref name="userId"/>, or <c>null</c> when they have none.</summary>
+    Task<CustomerSummary> GetUserCustomerAsync(int userId, CancellationToken cancellationToken = default);
 }

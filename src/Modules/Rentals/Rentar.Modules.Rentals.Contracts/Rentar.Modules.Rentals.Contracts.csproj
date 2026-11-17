@@ -2,4 +2,9 @@
 
   <!-- Public surface of the Rentals module: the only Rentals project other modules may reference. -->
 
+  <ItemGroup>
+    <!-- For the integration event marker its events implement. -->
+    <ProjectReference Include="../../../Shared/Rentar.Shared.Kernel/Rentar.Shared.Kernel.csproj" />
+  </ItemGroup>
+
 </Project>

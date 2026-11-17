@@ -59,7 +59,7 @@ public class RentalsEndpoints : IEndpoint
     }
 
     /// <summary>
-    /// Lists rentals, optionally only those of a car.
+    /// Lists rentals, optionally only those of a car, cancelled ones included; <c>status</c> tells them apart.
     /// </summary>
     private static async Task<Ok<List<Rental>>> GetAll(
         IQueryHandler<GetRentalsQuery, List<Rental>> getRentals,
@@ -84,8 +84,8 @@ public class RentalsEndpoints : IEndpoint
     }
 
     /// <summary>
-    /// Rentals together with their car, customer and user; a rental whose car, customer or user is gone is left out.
-    /// Closed during the 22:00 maintenance hour.
+    /// Rentals together with their car, customer and user; a cancelled rental, and one whose car, customer or user is
+    /// gone, is left out. Closed during the 22:00 maintenance hour.
     /// </summary>
     private static async Task<Ok<List<RentalDetailResponse>>> GetDetails(
         IQueryHandler<GetRentalDetailsQuery, List<RentalDetailResponse>> getRentalDetails,
@@ -105,6 +105,10 @@ public class RentalsEndpoints : IEndpoint
         return TypedResults.Ok(new RentalAvailabilityResponse(carId, rentDate, returnDate, available));
     }
 
+    /// <summary>
+    /// Books the rental; answers 201 with it <c>Pending</c>. Its payment is taken right after, and turns it
+    /// <c>Confirmed</c>, or <c>Cancelled</c> when declined: a cancelled rental is kept, but holds no car.
+    /// </summary>
     private static async Task<Created<Rental>> Create(
         ICommandHandler<CreateRentalCommand, Rental> createRental,
         HttpRequest request,

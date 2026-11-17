@@ -2,6 +2,7 @@ using Autofac;
 using Autofac.Extras.DynamicProxy;
 using Castle.DynamicProxy;
 using FluentValidation;
+using Rentar.Shared.Application.Events;
 using Rentar.Shared.Application.Interceptors;
 using Rentar.Shared.Application.UseCases;
 using Rentar.Shared.Application.Validation;
@@ -29,7 +30,8 @@ public static class UseCaseRegistrationExtensions
     /// <summary>
     /// Registers every use case handler in a module's Application assembly behind an interface proxy, so the aspect
     /// attributes on its <c>Handle</c> method (caching, transactions, ...) run around each call. Also registers the
-    /// assembly's validators, which <see cref="RegisterUseCaseValidation"/> runs before the handler.
+    /// assembly's validators, which <see cref="RegisterUseCaseValidation"/> runs before the handler, and its integration
+    /// event handlers, the module's reactions to other modules' events.
     /// </summary>
     public static void RegisterUseCases(this ContainerBuilder builder, Assembly applicationAssembly)
     {
@@ -41,6 +43,11 @@ public static class UseCaseRegistrationExtensions
 
         builder.RegisterAssemblyTypes(applicationAssembly)
             .AsClosedTypesOf(typeof(IValidator<>))
+            .SingleInstance();
+
+        // Event handlers only adapt an event to one of the module's use cases, whose own aspects run as usual.
+        builder.RegisterAssemblyTypes(applicationAssembly)
+            .AsClosedTypesOf(typeof(IIntegrationEventHandler<>))
             .SingleInstance();
     }
 

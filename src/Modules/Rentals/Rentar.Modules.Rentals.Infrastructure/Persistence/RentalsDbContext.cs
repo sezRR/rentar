@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Rentar.Modules.Rentals.Domain;
+using Rentar.Shared.Infrastructure.Messaging;
 using Rentar.Shared.Infrastructure.Persistence;
 
 namespace Rentar.Modules.Rentals.Infrastructure.Persistence;
@@ -14,6 +15,7 @@ public class RentalsDbContext(DbContextOptions<RentalsDbContext> options) : DbCo
     {
         modelBuilder.HasDefaultSchema(Schema);
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(RentalsDbContext).Assembly);
+        modelBuilder.MapMessaging();
         modelBuilder.UseTimestampWithoutTimeZone();
     }
 }

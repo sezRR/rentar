@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Rentar.Modules.Fleet.Domain;
+using Rentar.Shared.Infrastructure.Messaging;
 using Rentar.Shared.Infrastructure.Persistence;
 
 namespace Rentar.Modules.Fleet.Infrastructure.Persistence;
@@ -17,6 +18,7 @@ public class FleetDbContext(DbContextOptions<FleetDbContext> options) : DbContex
     {
         modelBuilder.HasDefaultSchema(Schema);
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(FleetDbContext).Assembly);
+        modelBuilder.MapMessaging();
         modelBuilder.UseTimestampWithoutTimeZone();
     }
 }

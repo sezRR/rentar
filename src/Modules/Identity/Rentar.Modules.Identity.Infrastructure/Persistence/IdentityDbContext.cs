@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Rentar.Modules.Identity.Domain;
+using Rentar.Shared.Infrastructure.Messaging;
 using Rentar.Shared.Infrastructure.Persistence;
 
 namespace Rentar.Modules.Identity.Infrastructure.Persistence;
@@ -16,6 +17,7 @@ public class IdentityDbContext(DbContextOptions<IdentityDbContext> options) : Db
     {
         modelBuilder.HasDefaultSchema(Schema);
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(IdentityDbContext).Assembly);
+        modelBuilder.MapMessaging();
         modelBuilder.UseTimestampWithoutTimeZone();
     }
 }

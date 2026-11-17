@@ -10,8 +10,10 @@ using System.Threading.Tasks;
 namespace Rentar.Modules.Identity.Application.Users.Commands;
 
 /// <summary>
-/// Replaces the user, storing a fresh salted hash of <see cref="Password"/>, and answers the stored user. Throws
-/// <see cref="ConflictException"/> when another user already has the email.
+/// Replaces the user's details, storing a fresh salted hash of <see cref="Password"/>, and answers the stored user.
+/// Whether the user is active stays as it is; <see cref="DeactivateUserCommand"/> changes that. Throws
+/// <see cref="NotFoundException"/> for an unknown user and <see cref="ConflictException"/> when another user already
+/// has the email.
 /// </summary>
 public sealed record UpdateUserCommand(int Id, string FirstName, string LastName, string Email, string Password);
 
@@ -30,6 +32,9 @@ public sealed class UpdateUserCommandHandler(IUserDal userDal) : ICommandHandler
 {
     public async Task<User> HandleAsync(UpdateUserCommand command, CancellationToken cancellationToken = default)
     {
+        var stored = await userDal.GetAsync(u => u.Id == command.Id, cancellationToken)
+            ?? throw new NotFoundException(Messages.UserNotFound);
+
         // The unique index refuses it too; asking first turns that into an answer the caller can act on.
         if (await userDal.AnyAsync(u => u.Email == command.Email && u.Id != command.Id, cancellationToken))
         {
@@ -46,7 +51,7 @@ public sealed class UpdateUserCommandHandler(IUserDal userDal) : ICommandHandler
             Email = command.Email,
             PasswordHash = passwordHash,
             PasswordSalt = passwordSalt,
-            Status = true,
+            Status = stored.Status,
         };
 
         await userDal.UpdateAsync(user, cancellationToken);

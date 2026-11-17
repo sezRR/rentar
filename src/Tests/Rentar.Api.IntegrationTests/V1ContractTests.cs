@@ -89,6 +89,7 @@ public class V1ContractTests(RentarApiFactory factory) : IntegrationTestBase(fac
         "rentals/add => 200 {message: \"Rental Added\", success: true}",
         "rentals/add unknown car => 400 {message: \"Car not found\", success: false}",
         "rentals/add unknown customer => 400 {message: \"Customer not found\", success: false}",
+        "rentals/add payment declined => 200 {message: \"Rental Added\", success: true}",
         "rentals/getall => 200 {data: [{carId: number, customerId: number, id: number, rentDate: string, returnDate: string}], message: \"Rentals Listed\", success: true}",
         "rentals/getrentalbycarid => 200 {data: {carId: number, customerId: number, id: number, rentDate: string, returnDate: string}, message: null, success: true}",
         "rentals/getrentaldetails => 200 {data: [{brandName: string, carId: number, colorName: string, companyName: null, dailyPrice: number, description: string, modelYear: number, rentDate: string, rentalId: number, returnDate: string, userName: string}], message: null, success: true}",
@@ -188,22 +189,25 @@ public class V1ContractTests(RentarApiFactory factory) : IntegrationTestBase(fac
         await Get("customers/getcustomersbyuserid", "/api/v1/customers/getcustomersbyuserid?userId=1");
 
         await Post("rentals/add", "/api/v1/rentals/add", new { carId = 1, customerId = 1, rentDate = "2026-09-18T10:00:00", returnDate = "2026-09-20T10:00:00" });
+        await Factory.DeliverEventsAsync();
         await Post("rentals/add unknown car", "/api/v1/rentals/add", new { carId = 404, customerId = 1, rentDate = "2026-09-18T10:00:00", returnDate = "2026-09-20T10:00:00" });
         await Post("rentals/add unknown customer", "/api/v1/rentals/add", new { carId = 1, customerId = 404, rentDate = "2026-09-18T10:00:00", returnDate = "2026-09-20T10:00:00" });
+        // The payment is taken once the booking's event is delivered; a declined one cancels the rental, which v1 no
+        // longer lists, so car 1 still has one rental below.
+        Factory.PaymentGateway.Declines = true;
+        await Post("rentals/add payment declined", "/api/v1/rentals/add", new { carId = 1, customerId = 1, rentDate = "2026-10-18T10:00:00", returnDate = "2026-10-20T10:00:00" });
+        await Factory.DeliverEventsAsync();
+        Factory.PaymentGateway.Declines = false;
         await Get("rentals/getall", "/api/v1/rentals/getall");
         await Get("rentals/getrentalbycarid", "/api/v1/rentals/getrentalbycarid?carId=1");
         await Get("rentals/getrentaldetails", "/api/v1/rentals/getrentaldetails");
         await Post("rentals/isrentable", "/api/v1/rentals/isrentable", new { carId = 1, customerId = 1, rentDate = "2026-09-25T10:00:00", returnDate = "2026-09-26T10:00:00" });
         await Post("rentals/isrentable taken", "/api/v1/rentals/isrentable", new { carId = 1, customerId = 1, rentDate = "2026-09-19T10:00:00", returnDate = "2026-09-21T10:00:00" });
 
-        // The payment outcome is random, so both answers are collected and recorded once each.
-        var payments = new SortedSet<string>(StringComparer.Ordinal);
-        for (var attempt = 0; attempt < 64 && payments.Count < 2; attempt++)
-        {
-            var response = await Client.GetJsonAsync("/api/v1/payments/pay");
-            payments.Add(await DescribeAsync("payments/pay", response));
-        }
-        _responses.AddRange(payments);
+        await Get("payments/pay", "/api/v1/payments/pay");
+        Factory.PaymentGateway.Declines = true;
+        await Get("payments/pay", "/api/v1/payments/pay");
+        Factory.PaymentGateway.Declines = false;
 
         await Get("findeks/calculate", "/api/v1/findeks/calculate");
     }
@@ -255,7 +259,8 @@ public class V1ContractTests(RentarApiFactory factory) : IntegrationTestBase(fac
             }
         }
 
-        using var request = new HttpRequestMessage(method, url) { Content = form };
+        using var request = new HttpRequestMessage(method, url);
+        request.Content = form;
         _responses.Add(await DescribeAsync(name, await Client.SendAsync(request, TestContext.Current.CancellationToken)));
     }
 

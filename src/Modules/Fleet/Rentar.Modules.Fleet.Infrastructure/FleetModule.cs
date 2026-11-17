@@ -7,6 +7,7 @@ using Rentar.Modules.Fleet.Application.Common.Interfaces;
 using Rentar.Modules.Fleet.Contracts;
 using Rentar.Modules.Fleet.Infrastructure.Persistence;
 using Rentar.Modules.Fleet.Infrastructure.Storage;
+using Rentar.Shared.Infrastructure.Messaging;
 using Rentar.Shared.Infrastructure.Modules;
 using Rentar.Shared.Infrastructure.Persistence;
 using Rentar.Shared.Presentation.Endpoints;
@@ -23,6 +24,7 @@ public sealed class FleetModule : IModule
     public void AddServices(IServiceCollection services, IConfiguration configuration)
     {
         services.AddModuleDbContext<FleetDbContext>(FleetDbContext.Schema);
+        services.AddModuleMessaging<FleetDbContext>(typeof(IFleetModuleApi).Assembly, typeof(FleetModuleApi).Assembly);
         services.AddEndpoints(Presentation.AssemblyReference.Assembly);
 
         services.AddOptions<ImageStorageOptions>().BindConfiguration(ImageStorageOptions.SectionName);

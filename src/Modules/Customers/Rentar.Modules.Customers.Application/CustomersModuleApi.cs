@@ -30,6 +30,12 @@ public class CustomersModuleApi(ICustomerDal customerDal) : ICustomersModuleApi
         return customers.ConvertAll(ToSummary);
     }
 
+    public async Task<CustomerSummary> GetUserCustomerAsync(int userId, CancellationToken cancellationToken = default)
+    {
+        var customer = await customerDal.GetAsync(c => c.UserId == userId, cancellationToken);
+        return customer is null ? null : ToSummary(customer);
+    }
+
     private static CustomerSummary ToSummary(Customer customer)
     {
         return new CustomerSummary(customer.Id, customer.UserId, customer.CompanyId);

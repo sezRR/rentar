@@ -43,6 +43,11 @@ namespace Rentar.Modules.Rentals.Infrastructure.Persistence.Migrations
                     b.Property<DateTime>("ReturnDate")
                         .HasColumnType("timestamp without time zone");
 
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
                     b.HasKey("Id");
 
                     b.HasIndex("CarId");
@@ -50,6 +55,61 @@ namespace Rentar.Modules.Rentals.Infrastructure.Persistence.Migrations
                     b.HasIndex("CustomerId");
 
                     b.ToTable("Rentals", "rentals");
+                });
+
+            modelBuilder.Entity("Rentar.Shared.Infrastructure.Messaging.InboxMessage", b =>
+                {
+                    b.Property<Guid>("MessageId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Handler")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<DateTimeOffset>("ProcessedOn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("MessageId", "Handler");
+
+                    b.ToTable("InboxMessages", "rentals");
+                });
+
+            modelBuilder.Entity("Rentar.Shared.Infrastructure.Messaging.OutboxMessage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<string>("Error")
+                        .HasColumnType("text");
+
+                    b.Property<DateTimeOffset>("NextAttemptOn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("OccurredOn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("ProcessedOn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("NextAttemptOn")
+                        .HasFilter("\"ProcessedOn\" IS NULL");
+
+                    b.ToTable("OutboxMessages", "rentals");
                 });
 #pragma warning restore 612, 618
         }

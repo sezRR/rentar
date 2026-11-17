@@ -227,24 +227,20 @@ public class CarImagesEndpointsTests(RentarApiFactory factory) : IntegrationTest
         return Client.DeleteAsync($"/api/v1/carimages/delete?id={carId}", TestContext.Current.CancellationToken);
     }
 
-    private async Task<HttpResponseMessage> UploadWithoutFileAsync(int carId)
+    private async Task UploadWithoutFileAsync(int carId)
     {
-        using var form = new MultipartFormDataContent
-        {
-            { new StringContent(carId.ToString()), "carId" }
-        };
+        using var form = new MultipartFormDataContent();
+        form.Add(new StringContent(carId.ToString()), "carId");
 
-        return await Client.PostAsync("/api/v1/carimages/add", form, TestContext.Current.CancellationToken);
+        await Client.PostAsync("/api/v1/carimages/add", form, TestContext.Current.CancellationToken);
     }
 
     private async Task<HttpResponseMessage> UpdateAsync(CarImage carImage, string fileName, byte[] bytes)
     {
-        using var form = new MultipartFormDataContent
-        {
-            { new StringContent(carImage.Id.ToString()), "Id" },
-            { new StringContent(carImage.CarId.ToString()), "CarId" },
-            { new ByteArrayContent(bytes), "objectFile", fileName }
-        };
+        using var form = new MultipartFormDataContent();
+        form.Add(new StringContent(carImage.Id.ToString()), "Id");
+        form.Add(new StringContent(carImage.CarId.ToString()), "CarId");
+        form.Add(new ByteArrayContent(bytes), "objectFile", fileName);
 
         return await Client.PostAsync("/api/v1/carimages/update", form, TestContext.Current.CancellationToken);
     }
@@ -259,11 +255,9 @@ public class CarImagesEndpointsTests(RentarApiFactory factory) : IntegrationTest
 
     private async Task<HttpResponseMessage> UploadAsync(int carId, string fileName, byte[] bytes)
     {
-        using var form = new MultipartFormDataContent
-        {
-            { new StringContent(carId.ToString()), "carId" },
-            { new ByteArrayContent(bytes), "file", fileName }
-        };
+        using var form = new MultipartFormDataContent();
+        form.Add(new StringContent(carId.ToString()), "carId");
+        form.Add(new ByteArrayContent(bytes), "file", fileName);
 
         return await Client.PostAsync("/api/v1/carimages/add", form, TestContext.Current.CancellationToken);
     }

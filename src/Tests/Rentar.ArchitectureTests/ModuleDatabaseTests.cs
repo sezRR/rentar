@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Rentar.Shared.Infrastructure.Messaging;
 using Rentar.Shared.Infrastructure.Modules;
 using Rentar.Shared.Infrastructure.Persistence;
 using System;
@@ -12,12 +13,15 @@ using Xunit;
 namespace Rentar.ArchitectureTests;
 
 /// <summary>
-/// Each module with persistent state owns one context, registered onto a schema named after the module.
-/// Checked against the modules' real registrations; no database is contacted.
+/// Each module owns one context, registered onto a schema named after the module, which also holds the module's outbox
+/// and inbox. Checked against the modules' real registrations; no database is contacted.
 /// </summary>
 public class ModuleDatabaseTests
 {
-    private static readonly string[] ModulesWithDatabase = ["Companies", "Customers", "Findeks", "Fleet", "Identity", "Rentals"];
+    /// <summary>Every module: even one without data of its own (Payments) keeps the events it publishes and handles.</summary>
+    private static readonly string[] ModulesWithDatabase = ["Companies", "Customers", "Findeks", "Fleet", "Identity", "Payments", "Rentals"];
+
+    private static readonly Type[] MessagingEntities = [typeof(OutboxMessage), typeof(InboxMessage)];
 
     private static readonly Lazy<IServiceProvider> ModuleServices = new(BuildModuleServices);
 
@@ -53,7 +57,37 @@ public class ModuleDatabaseTests
         Assert.All(context.Model.GetEntityTypes(), entityType =>
         {
             Assert.Equal(module.ToLowerInvariant(), entityType.GetSchema());
-            Assert.Equal($"Rentar.Modules.{module}.Domain", entityType.ClrType.Assembly.GetName().Name);
+            if (!MessagingEntities.Contains(entityType.ClrType))
+            {
+                Assert.Equal($"Rentar.Modules.{module}.Domain", entityType.ClrType.Assembly.GetName().Name);
+            }
+        });
+    }
+
+    [Theory]
+    [MemberData(nameof(Contexts))]
+    public void Context_MapsTheModulesOutboxAndInbox(Type contextType)
+    {
+        using var context = CreateRegisteredContext(contextType);
+
+        Assert.All(MessagingEntities, entity => Assert.NotNull(context.Model.FindEntityType(entity)));
+    }
+
+    /// <summary>
+    /// A module's events go to its own outbox and its handlers record into its own inbox, so each module registers one
+    /// message store, over its own context, for its own Contracts and Application.
+    /// </summary>
+    [Fact]
+    public void MessageStores_AreRegisteredOnePerModule_ForItsSchemaContractsAndApplication()
+    {
+        var stores = ModuleServices.Value.GetServices<IModuleMessageStore>().OrderBy(store => store.Schema).ToList();
+
+        Assert.Equal(ModulesWithDatabase.Select(module => module.ToLowerInvariant()), stores.Select(store => store.Schema));
+        Assert.All(stores, store =>
+        {
+            var module = ModulesWithDatabase.Single(m => m.ToLowerInvariant() == store.Schema);
+            Assert.Equal($"Rentar.Modules.{module}.Contracts", store.ContractsAssembly.GetName().Name);
+            Assert.Equal($"Rentar.Modules.{module}.Application", store.ApplicationAssembly.GetName().Name);
         });
     }
 

@@ -10,6 +10,7 @@ using Rentar.Modules.Identity.Application.Users.Queries;
 using Rentar.Modules.Identity.Contracts;
 using Rentar.Modules.Identity.Infrastructure.Persistence;
 using Rentar.Modules.Identity.Infrastructure.Security;
+using Rentar.Shared.Infrastructure.Messaging;
 using Rentar.Shared.Infrastructure.Modules;
 using Rentar.Shared.Infrastructure.Persistence;
 using Rentar.Shared.Presentation.Endpoints;
@@ -26,6 +27,7 @@ public sealed class IdentityModule : IModule
     public void AddServices(IServiceCollection services, IConfiguration configuration)
     {
         services.AddModuleDbContext<IdentityDbContext>(IdentityDbContext.Schema);
+        services.AddModuleMessaging<IdentityDbContext>(typeof(IIdentityModuleApi).Assembly, typeof(IdentityModuleApi).Assembly);
         services.AddEndpoints(Presentation.AssemblyReference.Assembly);
 
         services.AddOptions<TokenOptions>().BindConfiguration(TokenOptions.SectionName);

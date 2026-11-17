@@ -1,6 +1,7 @@
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using Xunit;
 
@@ -19,6 +20,9 @@ public static class HttpClientExtensions
         {
             PropertyNameCaseInsensitive = true
         };
+
+        // The API writes enums by name.
+        options.Converters.Add(new JsonStringEnumConverter());
 
         return options;
     }

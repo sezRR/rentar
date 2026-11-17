@@ -79,7 +79,7 @@ public class RentalsEndpointsTests(RentarApiFactory factory) : IntegrationTestBa
 
         var userId = await RegisterUserAsync("Sezer", "renter@example.com");
         var customerId = await AddCustomerAsync(userId);
-        var carId = await AddCarAsync("Toyota", "Red", "Corolla 1.6");
+        var carId = await AddCarAsync();
 
         await Client.PostJsonAsync("/api/v1/rentals/add", NewRental(carId, customerId));
         // Fleet does not know this car, so its rental has no details to show.

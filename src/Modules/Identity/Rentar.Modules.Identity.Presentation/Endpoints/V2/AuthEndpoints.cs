@@ -24,12 +24,13 @@ public class AuthEndpoints : IEndpoint
         var group = builder.MapVersionedGroup("Auth", "auth", 2.0);
 
         group.MapPost("/tokens", CreateToken)
-            .ProducesProblem(StatusCodes.Status401Unauthorized);
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden);
     }
 
     /// <summary>
     /// Bad credentials answer 401 with the same detail whatever was wrong, so the response does not reveal which
-    /// accounts exist.
+    /// accounts exist. The right credentials of an inactive user answer 403.
     /// </summary>
     private static async Task<Ok<AccessToken>> CreateToken(
         IQueryHandler<VerifyCredentialsQuery, User> verifyCredentials,

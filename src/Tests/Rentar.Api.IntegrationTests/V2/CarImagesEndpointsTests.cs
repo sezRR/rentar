@@ -37,7 +37,8 @@ public class CarImagesEndpointsTests(RentarApiFactory factory) : V2TestBase(fact
     public async Task Upload_WithoutFile_GivesTheCarTheDefaultImage()
     {
         var car = await CreateCarAsync();
-        using var form = new MultipartFormDataContent { { new StringContent("no file"), "note" } };
+        using var form = new MultipartFormDataContent();
+        form.Add(new StringContent("no file"), "note");
 
         var response = await Client.PostAsync($"/api/v2/cars/{car.Id}/images", form, TestContext.Current.CancellationToken);
 
@@ -98,7 +99,8 @@ public class CarImagesEndpointsTests(RentarApiFactory factory) : V2TestBase(fact
         var car = await CreateCarAsync();
         var original = await (await UploadImageAsync(car.Id, "car.png", PngBytes)).ReadAsAsync<CarImage>();
 
-        using var form = new MultipartFormDataContent { { new ByteArrayContent(JpegBytes), "file", "new.jpg" } };
+        using var form = new MultipartFormDataContent();
+        form.Add(new ByteArrayContent(JpegBytes), "file", "new.jpg");
         var response = await Client.PutAsync($"/api/v2/cars/{car.Id}/images/{original.Id}", form, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
@@ -116,7 +118,8 @@ public class CarImagesEndpointsTests(RentarApiFactory factory) : V2TestBase(fact
         var car = await CreateCarAsync();
         var image = await (await UploadImageAsync(car.Id, "car.png", PngBytes)).ReadAsAsync<CarImage>();
 
-        using var form = new MultipartFormDataContent { { new StringContent("no file"), "note" } };
+        using var form = new MultipartFormDataContent();
+        form.Add(new StringContent("no file"), "note");
         var response = await Client.PutAsync($"/api/v2/cars/{car.Id}/images/{image.Id}", form, TestContext.Current.CancellationToken);
 
         await AssertProblemAsync(response, HttpStatusCode.BadRequest, Messages.CarImageInvalidFile);
@@ -145,7 +148,7 @@ public class CarImagesEndpointsTests(RentarApiFactory factory) : V2TestBase(fact
     [Fact]
     public async Task Image_IsNotFoundUnderAnotherCar()
     {
-        var car = await CreateCarAsync("Toyota", "Red");
+        var car = await CreateCarAsync();
         var otherCar = await CreateCarAsync("Fiat", "White");
         var image = await (await UploadImageAsync(car.Id, "car.png", PngBytes)).ReadAsAsync<CarImage>();
 
@@ -178,7 +181,7 @@ public class CarImagesEndpointsTests(RentarApiFactory factory) : V2TestBase(fact
     [Fact]
     public async Task CarImages_ListsTheImagesOfEveryCar()
     {
-        var car = await CreateCarAsync("Toyota", "Red");
+        var car = await CreateCarAsync();
         var otherCar = await CreateCarAsync("Fiat", "White");
         await UploadImageAsync(car.Id, "car.png", PngBytes);
         await UploadImageAsync(otherCar.Id, "car.jpg", JpegBytes);
@@ -196,7 +199,8 @@ public class CarImagesEndpointsTests(RentarApiFactory factory) : V2TestBase(fact
     /// <summary>Uploads without a file, so the car gets the default image and nothing is written to disk.</summary>
     private async Task<HttpResponseMessage> UploadDefaultImageAsync(int carId)
     {
-        using var form = new MultipartFormDataContent { { new StringContent("no file"), "note" } };
+        using var form = new MultipartFormDataContent();
+        form.Add(new StringContent("no file"), "note");
         return await Client.PostAsync($"/api/v2/cars/{carId}/images", form, TestContext.Current.CancellationToken);
     }
 

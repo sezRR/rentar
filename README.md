@@ -46,7 +46,7 @@ To migrate by hand instead:
 ```bash
 dotnet tool restore
 # alphabetical, as on startup: Findeks has to run before Identity (see the upgrade notes below)
-for module in Companies Customers Findeks Fleet Identity Rentals; do
+for module in Companies Customers Findeks Fleet Identity Payments Rentals; do
   project=src/Modules/$module/Rentar.Modules.$module.Infrastructure
   dotnet ef database update --project $project --startup-project $project
 done
@@ -75,11 +75,17 @@ dotnet ef migrations add <Name> --project $project --startup-project $project --
 > rating. Startup migrates schemas in alphabetical order, which keeps Findeks ahead of Identity; when migrating by hand,
 > do the same, or the ratings are gone before they are copied.
 
+> Upgrading a database from before rentals had a status: `AddRentalStatus` marks every stored rental `Confirmed`, as
+> they were booked before booking took the payment. `AddMessaging` adds the outbox and inbox tables to every schema,
+> and Payments' `InitialCreate` creates the `payments` schema.
+
 **Tests**
 
 - `src/Tests/Rentar.Api.IntegrationTests` drives the API in memory (`WebApplicationFactory`) against a throwaway
   PostgreSQL container started by Testcontainers, so Docker has to be running. Every module's schema is migrated once;
-  each test then truncates all module tables and clears the aspect cache.
+  each test then truncates all module tables and clears the aspect cache. Payments go through `TestPaymentGateway`,
+  which takes every payment unless a test makes it decline, in place of the simulated gateway's coin toss. The
+  background delivery is off: a test calls `DeliverEventsAsync()` to let the modules react, so it knows when they have.
 - `src/Tests/Rentar.ArchitectureTests` enforces the module boundaries and schema ownership described below. No Docker needed.
 
 ```bash
@@ -106,7 +112,9 @@ Bruno requests for both versions are in `api-docs/`.
   update with an empty brand name), with the same error body as before, and refuses what the stored data forbids with
   `400 { success: false, message }`: a car whose brand or color is not stored, an image of a car that is not
   stored, a customer of a user that is not stored or not active, a rental of a car or customer that is not stored,
-  deleting a brand or color that cars still have, an email another user already has, and a second customer for a user.
+  deleting a brand or color that cars still have, an email another user already has, a second customer for a user,
+  and signing in as an inactive user. Booking a rental now also takes its payment, right after `rentals/add` answers;
+  a declined payment cancels the rental, and rental lists leave cancelled rentals out, since v1 knows no statuses.
   Users no longer carry `findeksRating` (ratings are customer scores in v2 now) and `users/getuserfindeksrating` is
   gone; a `findeksRating` sent in a body is ignored. Customers carry `companyId` instead of `companyName` (`null` for
   a customer with no partner company), and rental details take `companyName` from the customer's company. It uses action-style routes (`/brands/getall`,
@@ -131,6 +139,7 @@ Bruno requests for both versions are in `api-docs/`.
 | `GET/POST/DELETE /cars/{carId}/images`, `GET/PUT/DELETE /cars/{carId}/images/{imageId}`, `GET /car-images` | `carimages/*` (form field `file`) |
 | `GET/POST /customers`, `GET /customers/{id}`<br>filter: `?userId=` | `customers/*` |
 | `GET/POST /rentals`, `GET /rentals/{id}`, `GET /rentals/details`, `GET /rentals/availability?carId=&rentDate=&returnDate=`<br>filter: `?carId=` | `rentals/*`, `isrentable` |
+| `POST /users/{id}/deactivation` (`204`; `409` for the last full-access employee of a company) | - |
 | `GET/POST /companies`, `GET/PUT /companies/{companyId}`, `GET /companies/{companyId}/roles` | - |
 | `GET/POST /companies/{companyId}/employees`, `DELETE /companies/{companyId}/employees/{employeeId}` | - |
 | `GET /companies/{companyId}/rentals` | - |
@@ -138,7 +147,12 @@ Bruno requests for both versions are in `api-docs/`.
 | `GET /findeks/rating` | `GET /findeks/calculate` |
 | `GET/POST /customers/{customerId}/score` (`POST` calculates and stores a new Findeks rating) | - |
 
-Registering in v2 takes two calls: `POST /users`, then `POST /auth/tokens`.
+Registering in v2 takes two calls: `POST /users`, then `POST /auth/tokens`. An inactive user's right credentials answer
+`403`. `PUT /users/{id}` leaves whether the user is active as it is; deactivating a user is its own call.
+
+Booking a rental takes its payment right after: `POST /rentals` answers `201` with the rental's `status` `Pending`,
+which turns `Confirmed`, or `Cancelled` when the payment is declined; `GET /rentals/{id}` shows which. A pending rental
+holds its car. A cancelled one is kept, but holds no car: availability and rental details leave it out.
 
 The `/companies` routes are the only ones that need an access token (`Authorization: Bearer <token>` from
 `POST /auth/tokens`); without one they answer `401`. They act for the caller the token was issued to: a company the
@@ -158,14 +172,17 @@ One deployable host, split into modules that each own their data and talk to eac
 src/
   Bootstrapper/Rentar.Api           host: composes the modules, nothing else
   Shared/
-    Rentar.Shared.Kernel            exceptions, entity markers (no dependencies)
-    Rentar.Shared.Application       use case handler interfaces, validation, aspects (caching, transaction, ...)
-    Rentar.Shared.Infrastructure    EF repository base, per-module DbContext wiring, cache, IModule
+    Rentar.Shared.Kernel            exceptions, entity and integration event markers (no dependencies)
+    Rentar.Shared.Application       use case handler interfaces, event publisher and handler interfaces, validation,
+                                    aspects (caching, transaction, ...)
+    Rentar.Shared.Infrastructure    EF repository base, per-module DbContext wiring, cache, IModule, messaging
+                                    (outbox publisher and processor, in-memory event bus, inbox dispatcher)
     Rentar.Shared.Presentation      endpoint discovery, versioned route groups, exception handler, v1 envelope
   Modules/<Module>/
-    Rentar.Modules.<Module>.Contracts       public API other modules may call
+    Rentar.Modules.<Module>.Contracts       public API other modules may call, and the events it publishes (Events/)
     Rentar.Modules.<Module>.Domain          entities, init-only: a change builds a new one
-    Rentar.Modules.<Module>.Application     use cases, contract implementation, and under Common/:
+    Rentar.Modules.<Module>.Application     use cases, contract implementation, EventHandlers/ (reactions to other
+                                              modules' events), and under Common/:
                                               Interfaces/ (repositories, ports) and Models/ (query responses)
     Rentar.Modules.<Module>.Presentation    minimal-API endpoints
     Rentar.Modules.<Module>.Infrastructure  DbContext, migrations, repositories, adapters, module registration
@@ -174,16 +191,16 @@ src/
 
 | Module    | Owns                                   | Schema      | Uses contracts of            |
 |-----------|----------------------------------------|-------------|------------------------------|
-| Identity  | users, operation claims, auth (JWT)    | `identity`  | -                            |
+| Identity  | users, operation claims, auth (JWT)    | `identity`  | Companies                    |
 | Fleet     | brands, colors, cars, car images       | `fleet`     | Rentals                      |
 | Companies | companies, employees, roles (company IAM) | `companies` | Identity                  |
 | Customers | customer accounts                      | `customers` | Identity, Companies          |
-| Rentals   | rentals                                | `rentals`   | Customers, Identity, Fleet, Companies |
-| Payments  | payments (stateless)                   | -           | -                            |
+| Rentals   | rentals                                | `rentals`   | Customers, Identity, Fleet, Companies, Payments |
+| Payments  | payments (no data of its own)          | `payments`  | Rentals                      |
 | Findeks   | Findeks ratings, customer scores       | `findeks`   | Customers                    |
 
-Every module with state has its own `DbContext`, its own schema and its own `__EFMigrationsHistory` table inside that
-schema, so modules migrate independently. Data in another module is referenced by id only: there are no cross-schema
+Every module has its own `DbContext`, its own schema and its own `__EFMigrationsHistory` table inside that
+schema, so modules migrate independently; the schema also holds the module's `OutboxMessages` and `InboxMessages`. Data in another module is referenced by id only: there are no cross-schema
 foreign keys or joins. For example, rental details are put together by the `GetRentalDetailsQuery` use case from the
 Customers, Identity and Fleet contracts.
 
@@ -220,6 +237,56 @@ while one is, so no rental is left pointing at a car that is gone. Calculating a
   needs related data uses a `<Name>Response` model.
 - `ModuleSchemasTests` checks the database holds exactly these foreign keys.
 
+**Integration events: outbox, event bus, inbox**
+
+A module that must hear about a change in another reacts to an integration event instead of being called by it, so the
+module that changed does not depend on the ones that react. Asking a question (does this car exist?) stays a call to
+the other module's API; telling others that something happened is an event.
+
+| Event (publisher) | Published by | Reactions |
+|---|---|---|
+| `EmployeeRemovedEvent` (Companies) | `RemoveEmployeeCommand`, `RemoveUserFromCompaniesCommand` | Customers: a customer who rented for that company becomes one with no company (`ClearCustomerCompanyCommand`) |
+| `UserDeactivatedEvent` (Identity) | `DeactivateUserCommand` | Companies: removes the user from every company (`RemoveUserFromCompaniesCommand`, which publishes `EmployeeRemovedEvent`). Rentals: cancels the user's rentals that have not started (`CancelUpcomingRentalsOfUserCommand`) |
+| `CustomerCreatedEvent` (Customers) | `CreateCustomerCommand` | Findeks: calculates the customer's score (`CalculateCustomerScoreCommand`) |
+| `RentalCreatedEvent` (Rentals) | `CreateRentalCommand` | Payments: takes the payment (`TakeRentalPaymentCommand`) |
+| `PaymentSucceededEvent` / `PaymentDeclinedEvent` (Payments) | `TakeRentalPaymentCommand` | Rentals: confirms the pending rental, or cancels it (`ConfirmRentalCommand`, `CancelRentalCommand`) |
+
+```
+use case ──(its transaction)──> own tables + own OutboxMessages
+                                        │  after commit
+OutboxProcessor ── IEventBus (in-memory) ── IntegrationEventDispatcher
+                                        │  per subscriber, in its own transaction
+                     subscriber's use case + subscriber's InboxMessages
+```
+
+- An event is a sealed record in the publisher's `Contracts/Events`, named in the past tense with an `Event` suffix
+  (`CustomerCreatedEvent`), carrying ids and facts. A reaction is a sealed `<Event>Handler`
+  (`CustomerCreatedEventHandler`) in the subscriber's `Application/EventHandlers`: like an endpoint, it turns
+  the event into one of its own use cases and runs it.
+- **Outbox.** A use case publishes through `IEventPublisher`, which adds the event to the `OutboxMessages` table in the
+  publishing module's own schema, inside the use case's transaction (`[TransactionScopeAspect]`; the publisher refuses
+  otherwise). So an event exists exactly when its change does: a rolled back use case publishes nothing, and a
+  committed one never loses its event. Every module has an outbox and an inbox, so even Payments, which stores no
+  data, has a `payments` schema now.
+- **Event bus.** `OutboxProcessor` hands every due message to the `IEventBus` and marks it processed once the bus
+  took it. `OutboxBackgroundService` runs it as soon as a transaction that published an event commits, and every
+  `Messaging:Outbox:PollingInterval` for retries. `InMemoryEventBus` delivers within the process; a broker (RabbitMQ,
+  Azure Service Bus) can replace it, with its consumers handing messages to `IntegrationEventDispatcher`.
+- **Inbox.** Delivery is at least once, so `IntegrationEventDispatcher` runs each subscriber in a transaction of its own
+  together with an `InboxMessages` row in the subscriber's schema, keyed by message id and handler. A message delivered
+  again is skipped by the handlers that already handled it, and two processes delivering the same message can not both
+  apply it.
+- **Failures.** A failing reaction rolls back only itself; the other subscribers still handle the event. The message
+  stays in the outbox and is delivered again after 2, 4, 8, ... seconds (up to `MaxRetryDelay`); after `MaxAttempts`
+  it is left in the outbox with its `Error`, for someone to look at (set `Attempts` back to 0 to retry it).
+  Messages of one module go out in the order they were published, but a failed one does not hold back the next.
+- **Consequence: reactions are eventual.** They run right after the use case, not inside it, so a response shows the
+  publisher's change only: `POST /rentals` answers the rental `Pending`, and its payment confirms or cancels it a
+  moment later. A rule the reacting module must hold is still asked of it first, synchronously: deactivating the last
+  full-access employee of a company asks Companies and answers `409`, rather than failing later in Companies' reaction.
+- Outbox settings live under `Messaging:Outbox` in `appsettings.json` (`DeliverInBackground`, `PollingInterval`,
+  `BatchSize`, `MaxAttempts`, `MaxRetryDelay`).
+
 Boundary rules (checked by `Rentar.ArchitectureTests` on the compiled assemblies):
 
 - Domain uses only the Kernel. Contracts use nothing but the Kernel.
@@ -255,7 +322,7 @@ public sealed class CreateBrandCommandHandler(IBrandDal brandDal) : ICommandHand
   caller needs something back (e.g. the created record). Queries only read and implement `IQueryHandler<TQuery, TResult>`.
 - Everything that waits on I/O is asynchronous, from the endpoint down: `HandleAsync`, repositories, module APIs, image
   storage and validation return a `Task` and take the request's `CancellationToken`, which every endpoint passes on.
-  Work that never waits (hashing, issuing a token, the simulated payment and Findeks rating) stays synchronous inside
+  Work that never waits (hashing, issuing a token, the Findeks rating) stays synchronous inside
   them, and so does deleting an image file, which has no asynchronous API. A handler that only forwards a call
   returns its task; one with any logic of its own is `async`, so even a refusal arrives through the task.
 - Naming follows the kind: `<UseCase>Command` in a `Commands` folder (`CreateCustomerCommand`), `<UseCase>Query` in a
@@ -265,8 +332,8 @@ public sealed class CreateBrandCommandHandler(IBrandDal brandDal) : ICommandHand
 - What use cases share sits under the Application project's `Common` folder: the interfaces Infrastructure implements
   (`Common/Interfaces/ICarDal.cs`, `IImageStorage`, `ITokenHelper`) and the read models queries answer with,
   named `<Name>Response` (`Common/Models/CarDetailResponse.cs`). There are no DTOs.
-- Endpoints and module APIs inject the handler they need, e.g. `ICommandHandler<CreateBrandCommand, Brand>`. There is
-  no mediator.
+- Endpoints, module APIs and event handlers inject the handler they need, e.g.
+  `ICommandHandler<CreateBrandCommand, Brand>`. There is no mediator.
 - Handlers don't call each other; they use repositories, and endpoints combine use cases where needed (v1 login =
   `VerifyCredentialsQuery` + `CreateAccessTokenCommand`).
 - `RegisterUseCases` registers every handler behind a Castle proxy, so aspect attributes on `HandleAsync` run around
@@ -276,7 +343,11 @@ public sealed class CreateBrandCommandHandler(IBrandDal brandDal) : ICommandHand
   after its record, that every command and query is named and filed after its kind, that every use case has exactly
   one handler, that every handler is registered, and the same for validators. It also checks that Application
   interfaces live in `Common.Interfaces`, that no type is named `*Dto`, that entity properties are `init`-only, and that
-  every repository and module API method returns a `Task` and takes a `CancellationToken`.
+  every repository and module API method returns a `Task` and takes a `CancellationToken`. For events it checks that
+  each is a sealed record named `*Event` in its module's `Contracts.Events` with at least one subscriber, that each
+  event handler is sealed, named after its one event (`<Event>Handler`), filed in `EventHandlers` and registered, that
+  whatever publishes is a use case handler with `[TransactionScopeAspect]`, and that every module's context maps an
+  outbox and an inbox and registers them for its own Contracts and Application.
 
 <br>
 
@@ -292,7 +363,10 @@ work at several companies, and can also be a customer of one of them (`Customer.
   and **Member** (none). `Role.IsPredefined` tells them from roles a company creates, which is not exposed yet.
 - An employee grants or removes only what they hold themselves: adding someone with a role whose permissions the caller
   lacks, or removing someone who holds such permissions, answers `403`. So an Admin can not make an Owner or remove one.
-- A company always keeps an employee who holds every permission; removing the last one answers `400`.
+- A company always keeps an employee who holds every permission; removing the last one answers `400`, and
+  deactivating their user answers `409`.
+- Removing an employee, or deactivating their user, also ends their customer account's company when it is that
+  company, once `EmployeeRemovedEvent` is delivered.
 - Use cases take the acting user as part of the record (`ActorUserId`), read from the access token by the endpoint, so
   a handler never trusts a body for who is asking.
 - Adding a permission later: add it to `CompanyPermissions.All`, and grant it to the stored Owner roles in a migration,
