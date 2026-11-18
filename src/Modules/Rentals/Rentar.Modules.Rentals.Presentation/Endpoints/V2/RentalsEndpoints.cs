@@ -26,8 +26,7 @@ public class RentalsEndpoints : IEndpoint
         group.MapGet("/", GetAll);
         group.MapGet("/{id:int}", GetById)
             .ProducesProblem(StatusCodes.Status404NotFound);
-        group.MapGet("/details", GetDetails)
-            .ProducesProblem(StatusCodes.Status503ServiceUnavailable);
+        group.MapGet("/details", GetDetails);
         group.MapGet("/availability", GetAvailability);
         group.MapPost("/", Create)
             .ProducesValidationProblem()
@@ -85,7 +84,7 @@ public class RentalsEndpoints : IEndpoint
 
     /// <summary>
     /// Rentals together with their car, customer and user; a cancelled rental, and one whose car, customer or user is
-    /// gone, is left out. Closed during the 22:00 maintenance hour.
+    /// gone, is left out.
     /// </summary>
     private static async Task<Ok<List<RentalDetailResponse>>> GetDetails(
         IQueryHandler<GetRentalDetailsQuery, List<RentalDetailResponse>> getRentalDetails,

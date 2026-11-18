@@ -10,5 +10,4 @@ public static class Messages
     public const string UserNotActive = "User is not active";
     public const string UserNotEmployeeOfCompany = "User is not an employee of the company";
     public const string UserAlreadyCustomer = "User already has a customer account";
-    public const string MaintenanceTime = "Servers in Maintenance (Time)";
 }

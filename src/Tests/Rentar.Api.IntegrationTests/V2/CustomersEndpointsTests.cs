@@ -1,6 +1,5 @@
 using Rentar.Modules.Customers.Application;
 using Rentar.Modules.Customers.Application.Commands;
-using Rentar.Modules.Customers.Domain;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
@@ -105,16 +104,6 @@ public class CustomersEndpointsTests(RentarApiFactory factory) : V2TestBase(fact
 
         Assert.Equal([first.UserId, second.UserId], await UserIdsAsync("/api/v2/customers"));
         Assert.Equal([second.UserId], await UserIdsAsync($"/api/v2/customers?userId={second.UserId}"));
-    }
-
-    [Fact]
-    public async Task GetAll_DuringTheMaintenanceHour_IsServiceUnavailable()
-    {
-        FreezeClockInMaintenanceHour();
-
-        var response = await Client.GetJsonAsync("/api/v2/customers");
-
-        await AssertProblemAsync(response, HttpStatusCode.ServiceUnavailable, Messages.MaintenanceTime);
     }
 
     [Fact]

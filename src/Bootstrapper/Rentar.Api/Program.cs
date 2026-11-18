@@ -20,6 +20,7 @@ using Rentar.Shared.Infrastructure.Persistence;
 using Rentar.Shared.Presentation.Endpoints;
 using Rentar.Shared.Presentation.Errors;
 using Rentar.Shared.Presentation.Json;
+using Rentar.Shared.Presentation.Maintenance;
 using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -39,6 +40,7 @@ IModule[] modules =
 builder.Services.AddSharedInfrastructure();
 builder.Services.AddApiErrorHandling();
 builder.Services.AddApiJson();
+builder.Services.AddApiMaintenance();
 
 foreach (var module in modules)
 {
@@ -92,6 +94,8 @@ app.UseApiErrorHandling();
 app.UseCors(cors => cors.WithOrigins("http://localhost:4200").AllowAnyHeader());
 
 app.UseStaticFiles();
+
+app.UseApiMaintenance();
 
 app.UseAuthentication();
 

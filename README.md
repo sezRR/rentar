@@ -86,6 +86,7 @@ dotnet ef migrations add <Name> --project $project --startup-project $project --
   each test then truncates all module tables and clears the aspect cache. Payments go through `TestPaymentGateway`,
   which takes every payment unless a test makes it decline, in place of the simulated gateway's coin toss. The
   background delivery is off: a test calls `DeliverEventsAsync()` to let the modules react, so it knows when they have.
+  Maintenance is disabled except in the maintenance tests, so the schedule cannot interfere with other scenarios.
 - `src/Tests/Rentar.ArchitectureTests` enforces the module boundaries and schema ownership described below. No Docker needed.
 - `src/Tests/Rentar.Domain.UnitTests` checks each entity's invariants on the domain alone: what its constructor and
   copy methods (`Confirmed()`, `Renamed()`, `NewImage()`, …) refuse, with which `DomainMessages` message, and what
@@ -112,8 +113,9 @@ The version is part of the URL (`/api/v1/...`, `/api/v2/...`). In Development, S
 versions in a dropdown, and their OpenAPI documents are at `/openapi/v1.json` and `/openapi/v2.json`.
 Bruno requests for both versions are in `api-docs/`.
 
-- **v1** is the original API and is unchanged, except that it now also refuses input its validators reject (e.g. an
-  update with an empty brand name), with the same error body as before, and refuses what the stored data forbids with
+- **v1** keeps its original response envelopes. Maintenance now answers `503` instead of `400` and covers every API
+  endpoint. It also refuses input its validators reject (e.g. an update with an empty brand name), with the same error
+  body as before, and refuses what the stored data forbids with
   `400 { success: false, message }`: a car whose brand or color is not stored, an image of a car that is not
   stored, a customer of a user that is not stored or not active, a rental of a car or customer that is not stored,
   deleting a brand or color that cars still have, an email another user already has, a second customer for a user,
@@ -130,7 +132,7 @@ Bruno requests for both versions are in `api-docs/`.
   - Errors are [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) problem details (`application/problem+json`);
     validation errors are listed under `errors`.
   - `POST` answers `201 Created` with a `Location` header. `PUT` and `DELETE` answer `204 No Content`.
-  - An unknown id answers `404`. The 22:00 maintenance hour answers `503`.
+  - An unknown id answers `404`. During the configured maintenance window, every API endpoint answers `503`.
   - Users never include the password hash or salt.
 
 | v2 route | v1 equivalent |
@@ -168,6 +170,32 @@ partner company (the "other" choice). There is no free-text company name.
 
 <br>
 
+**Maintenance**
+
+Maintenance is an HTTP concern handled once by shared middleware, not by individual use cases. The default schedule in
+`src/Bootstrapper/Rentar.Api/appsettings.json` is:
+
+```json
+"Maintenance": {
+  "Enabled": true,
+  "StartTime": "22:00:00",
+  "EndTime": "23:00:00"
+}
+```
+
+Times use the server's local timezone. The start is inclusive and the end is exclusive; overnight windows such as
+`23:00:00`–`01:00:00` are supported. Equal start and end times are rejected at startup. Set `Maintenance:Enabled` to
+`false` (or the environment variable `Maintenance__Enabled=false`) to disable the schedule. Reloadable configuration
+changes apply to subsequent requests; environment variable changes require restarting the process.
+
+During the window, all versioned API endpoints reject reads and writes with `503 Service Unavailable`, a `Retry-After`
+header giving the seconds until the window ends, and `Cache-Control: no-store`. v1 keeps its
+`{ data: null, success: false, message }` envelope; v2 uses problem details. The gate runs before authentication and
+request binding. Static files, documentation, unknown routes and background event delivery remain unaffected; it does
+not pause the whole process or cancel requests already in progress.
+
+<br>
+
 **Architecture: modular monolith**
 
 One deployable host, split into modules that each own their data and talk to each other only through contracts.
@@ -181,7 +209,7 @@ src/
                                     aspects (caching, transaction, ...)
     Rentar.Shared.Infrastructure    EF repository base, per-module DbContext wiring, cache, IModule, messaging
                                     (outbox publisher and processor, in-memory event bus, inbox dispatcher)
-    Rentar.Shared.Presentation      endpoint discovery, versioned route groups, exception handler, v1 envelope
+    Rentar.Shared.Presentation      endpoint discovery, versioned route groups, maintenance gate, exception handler, v1 envelope
   Modules/<Module>/
     Rentar.Modules.<Module>.Contracts       public API other modules may call, and the events it publishes (Events/)
     Rentar.Modules.<Module>.Domain          entities, init-only: a change builds a new one

@@ -10,7 +10,6 @@ public static class Messages
     public const string CarNotAvailable = "This car already rentaled by someone";
     public const string CarNotFound = "Car not found";
     public const string CustomerNotFound = "Customer not found";
-    public const string MaintenanceTime = "Servers in Maintenance (Time)";
 
     /// <summary>Worded like the v2 not-found problems, so an outsider can not tell a company exists.</summary>
     public static string CompanyNotFound(int companyId) => $"Company {companyId} was not found.";

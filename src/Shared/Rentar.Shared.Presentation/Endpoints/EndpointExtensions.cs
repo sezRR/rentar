@@ -1,6 +1,7 @@
 using Asp.Versioning;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -48,14 +49,20 @@ public static class EndpointExtensions
     {
         /// <summary>
         /// Opens a versioned route group at <c>/api/v{version}/{prefix}</c>, tagged with
-        /// <paramref name="name"/> so the OpenAPI document groups its endpoints together.
+        /// <paramref name="name"/> so the OpenAPI document groups its endpoints together. Every API endpoint can
+        /// answer 503 during maintenance, using its version's error body.
         /// </summary>
         public RouteGroupBuilder MapVersionedGroup(string name, string prefix, double version)
         {
-            return builder.NewVersionedApi(name)
+            var group = builder.NewVersionedApi(name)
                 .MapGroup($"/api/v{{version:apiVersion}}/{prefix}")
                 .HasApiVersion(new ApiVersion(version))
                 .WithTags(name);
+
+            return group.WithMetadata(new ProducesResponseTypeMetadata(
+                StatusCodes.Status503ServiceUnavailable,
+                version == 1.0 ? typeof(V1Response<object>) : typeof(ProblemDetails),
+                [version == 1.0 ? "application/json" : "application/problem+json"]));
         }
     }
 }

@@ -48,9 +48,9 @@ public class V1ContractTests(RentarApiFactory factory) : IntegrationTestBase(fac
         "users/getuserbyid => 200 {data: {email: string, firstName: string, id: number, lastName: string, passwordHash: string, passwordSalt: string, status: bool}, message: null, success: true}",
         "users/add => 200 {message: \"User Added\", success: true}",
         "users/update => 200 {data: {email: string, firstName: string, id: number, lastName: string, passwordHash: string, passwordSalt: string, status: bool}, message: \"Your settings successfully updated\", success: true}",
-        "users/getall maintenance => 400 {data: null, message: \"Servers in Maintenance (Time)\", success: false}",
-        "customers/getall maintenance => 400 {data: null, message: \"Servers in Maintenance (Time)\", success: false}",
-        "rentals/getrentaldetails maintenance => 400 {data: null, message: \"Servers in Maintenance (Time)\", success: false}",
+        "users/getall maintenance => 503 {data: null, message: \"Servers in Maintenance (Time)\", success: false}",
+        "customers/getall maintenance => 503 {data: null, message: \"Servers in Maintenance (Time)\", success: false}",
+        "rentals/getrentaldetails maintenance => 503 {data: null, message: \"Servers in Maintenance (Time)\", success: false}",
         "brands/add => 200 {message: \"Brand Added\", success: true}",
         "brands/add invalid => 400 {Errors: [{AttemptedValue: string, CustomState: null, ErrorCode: string, ErrorMessage: string, FormattedMessagePlaceholderValues: object, PropertyName: string, Severity: number}], Message: string, StatusCode: 400}",
         "brands/getall => 200 {data: [{brandName: string, id: number}], message: \"Brands Listed\", success: true}",
@@ -132,9 +132,11 @@ public class V1ContractTests(RentarApiFactory factory) : IntegrationTestBase(fac
     {
         Factory.Clock.FreezeAt(new DateTimeOffset(DateTime.Today.AddHours(22).AddMinutes(30)));
 
-        await Get("users/getall maintenance", "/api/v1/users/getall");
-        await Get("customers/getall maintenance", "/api/v1/customers/getall");
-        await Get("rentals/getrentaldetails maintenance", "/api/v1/rentals/getrentaldetails");
+        await using var app = Factory.WithWebHostBuilder(builder => builder.UseSetting("Maintenance:Enabled", "true"));
+        using var client = app.CreateClient();
+        _responses.Add(await DescribeAsync("users/getall maintenance", await client.GetJsonAsync("/api/v1/users/getall")));
+        _responses.Add(await DescribeAsync("customers/getall maintenance", await client.GetJsonAsync("/api/v1/customers/getall")));
+        _responses.Add(await DescribeAsync("rentals/getrentaldetails maintenance", await client.GetJsonAsync("/api/v1/rentals/getrentaldetails")));
 
         Factory.Clock.FreezeAt(new DateTimeOffset(DateTime.Today.AddHours(12)));
     }

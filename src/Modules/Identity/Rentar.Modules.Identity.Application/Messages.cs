@@ -8,7 +8,6 @@ public static class Messages
     public const string UserDeleted = "User Deleted";
     public const string UserFirstNameInvalid = "User First Name is Invalid";
 
-    public const string MaintenanceTime = "Servers in Maintenance (Time)";
     public const string UserNotFound = "User not found";
     public const string UserNotActive = "User is not active";
     public const string UserIsLastFullAccessEmployee =

@@ -51,6 +51,8 @@ public class RentarApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     {
         builder.UseSetting($"ConnectionStrings:{DatabaseConnection.ConnectionStringName}", ConnectionString);
         builder.UseSetting("Database:MigrateOnStartup", "false");
+        // Maintenance tests explicitly enable their schedule; other tests must not depend on the wall clock.
+        builder.UseSetting("Maintenance:Enabled", "false");
         // A test delivers the events itself with DeliverEventsAsync, so it knows the reactions have run when it asserts.
         builder.UseSetting($"{OutboxOptions.SectionName}:{nameof(OutboxOptions.DeliverInBackground)}", "false");
 

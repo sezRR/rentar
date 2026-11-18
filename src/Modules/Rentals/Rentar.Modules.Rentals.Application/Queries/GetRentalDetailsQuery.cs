@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -11,14 +10,12 @@ using Rentar.Modules.Rentals.Application.Common.Interfaces;
 using Rentar.Modules.Rentals.Application.Common.Models;
 using Rentar.Modules.Rentals.Domain;
 using Rentar.Shared.Application.UseCases;
-using Rentar.Shared.Kernel.Exceptions;
 
 namespace Rentar.Modules.Rentals.Application.Queries;
 
 /// <summary>
 /// Rentals together with their car, customer, user and the customer's company; a cancelled rental, and one whose car,
 /// customer or user is gone, is left out, and the company name is <c>null</c> for a customer with no company.
-/// Throws <see cref="UnavailableException"/> during the 22:00 maintenance hour.
 /// </summary>
 public sealed record GetRentalDetailsQuery;
 
@@ -27,16 +24,10 @@ public sealed class GetRentalDetailsQueryHandler(
     ICustomersModuleApi customersModule,
     IIdentityModuleApi identityModule,
     IFleetModuleApi fleetModule,
-    ICompaniesModuleApi companiesModule,
-    TimeProvider timeProvider) : IQueryHandler<GetRentalDetailsQuery, List<RentalDetailResponse>>
+    ICompaniesModuleApi companiesModule) : IQueryHandler<GetRentalDetailsQuery, List<RentalDetailResponse>>
 {
     public async Task<List<RentalDetailResponse>> HandleAsync(GetRentalDetailsQuery query, CancellationToken cancellationToken = default)
     {
-        if (timeProvider.GetLocalNow().Hour == 22)
-        {
-            throw new UnavailableException(Messages.MaintenanceTime);
-        }
-
         var rentals = await rentalDal.GetAllAsync(r => r.Status != RentalStatus.Cancelled, cancellationToken);
 
         // A rental only holds the ids of other modules' records, so their details come through those modules' public APIs.

@@ -21,8 +21,7 @@ public class UsersEndpoints : IEndpoint
     {
         var group = builder.MapVersionedGroup("Users", "users", 2.0);
 
-        group.MapGet("/", GetAll)
-            .ProducesProblem(StatusCodes.Status503ServiceUnavailable);
+        group.MapGet("/", GetAll);
         group.MapGet("/{id:int}", GetById)
             .ProducesProblem(StatusCodes.Status404NotFound);
         group.MapPost("/", Create)
@@ -37,7 +36,7 @@ public class UsersEndpoints : IEndpoint
     }
 
     /// <summary>
-    /// Lists users, optionally only the one with an email. The full list is closed during the 22:00 maintenance hour.
+    /// Lists users, optionally only the one with an email.
     /// </summary>
     private static async Task<Ok<List<UserResponse>>> GetAll(
         IQueryHandler<GetUsersQuery, List<User>> getUsers,

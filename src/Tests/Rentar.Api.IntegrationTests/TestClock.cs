@@ -3,7 +3,7 @@ using System;
 namespace Rentar.Api.IntegrationTests;
 
 /// <summary>
-/// Follows the real clock unless a test freezes it, e.g. to stay clear of the 22:00 maintenance hour.
+/// Follows the real clock unless a test freezes it, e.g. to exercise maintenance windows or delivery back-off.
 /// </summary>
 public sealed class TestClock : TimeProvider
 {

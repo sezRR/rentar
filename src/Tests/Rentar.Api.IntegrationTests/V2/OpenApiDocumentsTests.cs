@@ -21,5 +21,15 @@ public class OpenApiDocumentsTests(RentarApiFactory factory) : IntegrationTestBa
 
         Assert.Contains(expectedPath, paths);
         Assert.All(paths, path => Assert.StartsWith($"/api/{version}/", path));
+
+        var operations = document.RootElement.GetProperty("paths").EnumerateObject()
+            .SelectMany(path => path.Value.EnumerateObject())
+            .Where(operation => operation.Name is "get" or "post" or "put" or "delete");
+        Assert.All(operations, operation =>
+        {
+            var maintenance = operation.Value.GetProperty("responses").GetProperty("503");
+            Assert.True(maintenance.GetProperty("content")
+                .TryGetProperty(version == "v1" ? "application/json" : "application/problem+json", out _));
+        });
     }
 }

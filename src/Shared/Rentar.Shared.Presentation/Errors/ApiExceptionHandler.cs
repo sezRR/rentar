@@ -77,7 +77,7 @@ public sealed class ApiExceptionHandler(ILogger<ApiExceptionHandler> logger) : I
                 Message = validation.Message,
                 Errors = validation.Errors
             }),
-            // The maintenance hour only ever closed queries that return data, and v1 sent their failures with "data": null.
+            // Preserve the legacy body for application-level unavailable errors; API maintenance is handled by middleware.
             UnavailableException unavailable => TypedResults.BadRequest(new V1Response<object>(null, false, unavailable.Message)),
             RentarException refused => V1Results.Fail(refused.Message),
             _ => Json(StatusCodes.Status500InternalServerError, new ErrorDetails

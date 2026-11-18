@@ -1,12 +1,8 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
-using Rentar.Modules.Companies.Application.Common.Models;
-using Rentar.Modules.Companies.Domain;
 using Rentar.Modules.Companies.Presentation.Endpoints.V2;
 using Rentar.Modules.Customers.Application.Commands;
-using Rentar.Modules.Customers.Domain;
-using Rentar.Modules.Fleet.Domain;
 using Rentar.Modules.Fleet.Infrastructure.Storage;
 using Rentar.Modules.Fleet.Presentation.Endpoints.V2;
 using Rentar.Modules.Identity.Application.Auth;
@@ -38,16 +34,11 @@ public abstract class V2TestBase(RentarApiFactory factory) : IntegrationTestBase
     protected static readonly byte[] TextBytes = Encoding.UTF8.GetBytes("# not an image");
 
     /// <summary>
-    /// Some lists are closed during the 22:00 maintenance hour, so tests that read them pin the clock to midday.
+    /// Pins local time to midday for tests that need a known instant.
     /// </summary>
     protected void FreezeClockAtNoon()
     {
         Factory.Clock.FreezeAt(new DateTimeOffset(DateTime.Today.AddHours(12)));
-    }
-
-    protected void FreezeClockInMaintenanceHour()
-    {
-        Factory.Clock.FreezeAt(new DateTimeOffset(DateTime.Today.AddHours(22).AddMinutes(30)));
     }
 
     protected async Task<T> CreateAsync<T>(string url, object body)

@@ -1,8 +1,4 @@
-using Rentar.Modules.Customers.Domain;
-using Rentar.Modules.Fleet.Domain;
 using Rentar.Modules.Identity.Application.Auth.Commands;
-using Rentar.Modules.Identity.Domain;
-using Rentar.Modules.Rentals.Domain;
 using Rentar.Shared.Presentation.Endpoints;
 using Rentar.Shared.Presentation.Errors;
 using System;
@@ -74,7 +70,6 @@ public class RentalsEndpointsTests(RentarApiFactory factory) : IntegrationTestBa
     [Fact]
     public async Task GetRentalDetails_CombinesCustomerUserAndCarFromTheirModules()
     {
-        // Rental details are refused during the 22:00 maintenance hour.
         Factory.Clock.FreezeAt(new DateTimeOffset(DateTime.Today.AddHours(12)));
 
         var userId = await RegisterUserAsync("Sezer", "renter@example.com");

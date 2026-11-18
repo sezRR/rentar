@@ -20,8 +20,7 @@ public class CustomersEndpoints : IEndpoint
     {
         var group = builder.MapVersionedGroup("Customers", "customers", 2.0);
 
-        group.MapGet("/", GetAll)
-            .ProducesProblem(StatusCodes.Status503ServiceUnavailable);
+        group.MapGet("/", GetAll);
         group.MapGet("/{id:int}", GetById)
             .ProducesProblem(StatusCodes.Status404NotFound);
         group.MapPost("/", Create)
@@ -30,7 +29,7 @@ public class CustomersEndpoints : IEndpoint
     }
 
     /// <summary>
-    /// Lists customers, optionally only those of a user. The full list is closed during the 22:00 maintenance hour.
+    /// Lists customers, optionally only those of a user.
     /// </summary>
     private static async Task<Ok<List<Customer>>> GetAll(
         IQueryHandler<GetCustomersQuery, List<Customer>> getCustomers,

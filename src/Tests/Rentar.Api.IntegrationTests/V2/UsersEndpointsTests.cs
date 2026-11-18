@@ -73,16 +73,6 @@ public class UsersEndpointsTests(RentarApiFactory factory) : V2TestBase(factory)
     }
 
     [Fact]
-    public async Task GetAll_DuringTheMaintenanceHour_IsServiceUnavailable()
-    {
-        FreezeClockInMaintenanceHour();
-
-        var response = await Client.GetJsonAsync("/api/v2/users");
-
-        await AssertProblemAsync(response, HttpStatusCode.ServiceUnavailable, Messages.MaintenanceTime);
-    }
-
-    [Fact]
     public async Task Update_ReplacesTheUser_IncludingThePassword()
     {
         var user = await CreateUserAsync(Email);
