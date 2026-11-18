@@ -9,6 +9,7 @@ using Rentar.Modules.Customers.Infrastructure.Persistence;
 using Rentar.Shared.Infrastructure.Messaging;
 using Rentar.Shared.Infrastructure.Modules;
 using Rentar.Shared.Infrastructure.Persistence;
+using Rentar.Shared.Infrastructure.Persistence.Seeding;
 using Rentar.Shared.Presentation.Endpoints;
 
 namespace Rentar.Modules.Customers.Infrastructure;
@@ -23,6 +24,7 @@ public sealed class CustomersModule : IModule
     public void AddServices(IServiceCollection services, IConfiguration configuration)
     {
         services.AddModuleDbContext<CustomersDbContext>(CustomersDbContext.Schema);
+        services.AddTransient<IDevelopmentDataSeeder, CustomersDevelopmentDataSeeder>();
         services.AddModuleMessaging<CustomersDbContext>(typeof(ICustomersModuleApi).Assembly, typeof(CustomersModuleApi).Assembly);
         services.AddEndpoints(Presentation.AssemblyReference.Assembly);
     }

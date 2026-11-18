@@ -40,6 +40,28 @@ Connection string lives in `src/Bootstrapper/Rentar.Api/appsettings.json` under 
 overridden with the `ConnectionStrings__RentarDb` environment variable. When neither is present the
 modules fall back to the docker-compose defaults, which is also what `dotnet ef` uses.
 
+**Development sample data**
+
+Starting the API in `Development` migrates the database, then seeds a small demo dataset. Other environments never
+seed, even if the flag is enabled. To opt out locally, set `Database:SeedOnStartup` to `false` in
+`src/Bootstrapper/Rentar.Api/appsettings.Development.json`, or set `Database__SeedOnStartup=false`.
+
+All three demo accounts use **`Passw0rd!`** (local development only):
+
+| Email | Demo role |
+|-------|-----------|
+| `owner@rentar.local` | Owner of **Rentar Demo**, with all company permissions |
+| `member@rentar.local` | Company member and customer |
+| `renter@rentar.local` | Personal customer, not attached to a company |
+
+The dataset includes three brands and colors, four cars with default images, the company's predefined roles and
+employees, two customer scores, and two confirmed sample rentals (one past, one upcoming when first seeded).
+Sample rentals are demo history: they publish no events and do not charge the payment gateway.
+
+Each module seeds only its own schema. Runs are transactional and serialized across simultaneous startups; rerunning
+fills missing demo data without resetting existing passwords, prices or bookings. Startup does not continually add
+new rental date windows. If `Database:MigrateOnStartup` is disabled, apply migrations before enabling seeding.
+
 Migrating on startup is controlled by `Database:MigrateOnStartup` (on in `appsettings.Development.json`, off otherwise).
 To migrate by hand instead:
 
@@ -93,6 +115,8 @@ dotnet ef migrations add <Name> --project $project --startup-project $project --
   which takes every payment unless a test makes it decline, in place of the simulated gateway's coin toss. The
   background delivery is off: a test calls `DeliverEventsAsync()` to let the modules react, so it knows when they have.
   Maintenance is disabled except in the maintenance tests, so the schedule cannot interfere with other scenarios.
+  Development seeding is also disabled by default; its own tests enable it to check startup, idempotency, rollback,
+  concurrent hosts and the environment guard.
 - `src/Tests/Rentar.ArchitectureTests` enforces the module boundaries and schema ownership described below. No Docker needed.
 - `src/Tests/Rentar.Domain.UnitTests` checks each entity's invariants on the domain alone: what its constructor and
   copy methods (`Confirmed()`, `Renamed()`, `NewImage()`, …) refuse, with which `DomainMessages` message, and what

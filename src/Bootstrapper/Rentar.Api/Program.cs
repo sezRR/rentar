@@ -17,6 +17,7 @@ using Rentar.Shared.Application.IoC;
 using Rentar.Shared.Infrastructure;
 using Rentar.Shared.Infrastructure.Modules;
 using Rentar.Shared.Infrastructure.Persistence;
+using Rentar.Shared.Infrastructure.Persistence.Seeding;
 using Rentar.Shared.Presentation.Endpoints;
 using Rentar.Shared.Presentation.Errors;
 using Rentar.Shared.Presentation.Json;
@@ -78,6 +79,8 @@ if (app.Configuration.GetValue<bool>("Database:MigrateOnStartup"))
 {
     await app.Services.MigrateModuleDatabasesAsync();
 }
+
+await app.Services.SeedDevelopmentDataAsync(app.Lifetime.ApplicationStopping);
 
 if (app.Environment.IsDevelopment())
 {

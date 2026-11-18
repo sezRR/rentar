@@ -9,6 +9,7 @@ using Rentar.Modules.Findeks.Infrastructure.Persistence;
 using Rentar.Shared.Infrastructure.Messaging;
 using Rentar.Shared.Infrastructure.Modules;
 using Rentar.Shared.Infrastructure.Persistence;
+using Rentar.Shared.Infrastructure.Persistence.Seeding;
 using Rentar.Shared.Presentation.Endpoints;
 
 namespace Rentar.Modules.Findeks.Infrastructure;
@@ -23,6 +24,7 @@ public sealed class FindeksModule : IModule
     public void AddServices(IServiceCollection services, IConfiguration configuration)
     {
         services.AddModuleDbContext<FindeksDbContext>(FindeksDbContext.Schema);
+        services.AddTransient<IDevelopmentDataSeeder, FindeksDevelopmentDataSeeder>();
         services.AddModuleMessaging<FindeksDbContext>(typeof(IFindeksModuleApi).Assembly, typeof(FindeksModuleApi).Assembly);
         services.AddEndpoints(Presentation.AssemblyReference.Assembly);
     }

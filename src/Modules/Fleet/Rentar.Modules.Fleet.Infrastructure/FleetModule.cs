@@ -10,6 +10,7 @@ using Rentar.Modules.Fleet.Infrastructure.Storage;
 using Rentar.Shared.Infrastructure.Messaging;
 using Rentar.Shared.Infrastructure.Modules;
 using Rentar.Shared.Infrastructure.Persistence;
+using Rentar.Shared.Infrastructure.Persistence.Seeding;
 using Rentar.Shared.Presentation.Endpoints;
 
 namespace Rentar.Modules.Fleet.Infrastructure;
@@ -24,6 +25,7 @@ public sealed class FleetModule : IModule
     public void AddServices(IServiceCollection services, IConfiguration configuration)
     {
         services.AddModuleDbContext<FleetDbContext>(FleetDbContext.Schema);
+        services.AddTransient<IDevelopmentDataSeeder, FleetDevelopmentDataSeeder>();
         services.AddModuleMessaging<FleetDbContext>(typeof(IFleetModuleApi).Assembly, typeof(FleetModuleApi).Assembly);
         services.AddEndpoints(Presentation.AssemblyReference.Assembly);
 
