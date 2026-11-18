@@ -212,12 +212,12 @@ partner company (the "other" choice). There is no free-text company name.
 
 **Maintenance**
 
-Maintenance is an HTTP concern handled once by shared middleware, not by individual use cases. The default schedule in
-`src/Bootstrapper/Rentar.Api/appsettings.json` is:
+Maintenance is an HTTP concern handled once by shared middleware, not by individual use cases. The schedule in
+`src/Bootstrapper/Rentar.Api/appsettings.json` is off by default:
 
 ```json
 "Maintenance": {
-  "Enabled": true,
+  "Enabled": false,
   "StartTime": "22:00:00",
   "EndTime": "23:00:00"
 }
@@ -225,7 +225,7 @@ Maintenance is an HTTP concern handled once by shared middleware, not by individ
 
 Times use the server's local timezone. The start is inclusive and the end is exclusive; overnight windows such as
 `23:00:00`–`01:00:00` are supported. Equal start and end times are rejected at startup. Set `Maintenance:Enabled` to
-`false` (or the environment variable `Maintenance__Enabled=false`) to disable the schedule. Reloadable configuration
+`true` (or the environment variable `Maintenance__Enabled=true`) to enable the schedule. Reloadable configuration
 changes apply to subsequent requests; environment variable changes require restarting the process.
 
 During the window, all versioned API endpoints reject reads and writes with `503 Service Unavailable`, a `Retry-After`
