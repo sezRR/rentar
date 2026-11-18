@@ -67,7 +67,7 @@ public class RentalsEndpoints : IEndpoint
 
     /// <summary>
     /// Books the rental, whose payment is taken right after. A declined payment cancels the rental, which v1 then no
-    /// longer lists.
+    /// longer lists. An overlapping active booking of the car or customer answers 400 in the v1 envelope.
     /// </summary>
     private static async Task<Ok<V1Response>> Add(
         ICommandHandler<CreateRentalCommand, Rental> createRental,

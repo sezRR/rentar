@@ -192,7 +192,7 @@ public class RentalsEndpointsTests(RentarApiFactory factory) : V2TestBase(factor
         var car = await CreateCarAsync();
         await CreateRentalAsync(car.Id, customer.Id);
         // Fleet does not know this car, so its rental has no details to show.
-        await Factory.StoreRentalOfMissingCarAsync(car.Id + 1, customer.Id, RentDate, ReturnDate);
+        await Factory.StoreRentalOfMissingCarAsync(car.Id + 1, customer.Id, RentDate.AddDays(10), ReturnDate.AddDays(10));
 
         var response = await Client.GetJsonAsync("/api/v2/rentals/details");
 

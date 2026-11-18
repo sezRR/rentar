@@ -59,7 +59,7 @@ public class Rental : IEntity
         return WithStatus(RentalStatus.Confirmed);
     }
 
-    /// <summary>The same rental, cancelled, so it holds its car no more. A cancelled rental stays as it is.</summary>
+    /// <summary>The same rental, cancelled, so it holds neither car nor customer. A cancelled rental stays as it is.</summary>
     public Rental Cancelled()
     {
         if (Status == RentalStatus.Cancelled)

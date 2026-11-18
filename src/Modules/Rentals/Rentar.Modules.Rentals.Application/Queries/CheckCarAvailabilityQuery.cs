@@ -11,6 +11,7 @@ namespace Rentar.Modules.Rentals.Application.Queries;
 
 /// <summary>
 /// Whether the car is free for the whole period, i.e. no rental of it overlaps the period. A cancelled rental holds no car.
+/// Bounds are inclusive: touching start/end times count as overlap, just as in booking creation and the database.
 /// </summary>
 public sealed record CheckCarAvailabilityQuery(int CarId, DateTime RentDate, DateTime ReturnDate);
 

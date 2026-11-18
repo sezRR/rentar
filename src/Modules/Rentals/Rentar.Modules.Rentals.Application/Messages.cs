@@ -8,6 +8,7 @@ public static class Messages
     public const string RentalDeleted = "Rental Deleted";
     public const string CarIsInvalid = "Car is Invalid";
     public const string CarNotAvailable = "This car already rentaled by someone";
+    public const string CustomerNotAvailable = "Customer already has a rental during this period.";
     public const string CarNotFound = "Car not found";
     public const string CustomerNotFound = "Customer not found";
 

@@ -79,6 +79,12 @@ dotnet ef migrations add <Name> --project $project --startup-project $project --
 > they were booked before booking took the payment. `AddMessaging` adds the outbox and inbox tables to every schema,
 > and Payments' `InitialCreate` creates the `payments` schema.
 
+> Upgrading a database from before booking conflicts were enforced: Rentals' `PreventOverlappingRentals` migration
+> installs PostgreSQL's `btree_gist` extension and adds exclusion constraints for car and customer periods. The database
+> user must be allowed to install that extension, or a database administrator must install it first. Existing
+> non-cancelled overlaps (including touching endpoints) must be resolved before migrating; the migration fails rather
+> than deleting or cancelling historical bookings automatically.
+
 **Tests**
 
 - `src/Tests/Rentar.Api.IntegrationTests` drives the API in memory (`WebApplicationFactory`) against a throwaway
@@ -119,7 +125,8 @@ Bruno requests for both versions are in `api-docs/`.
   `400 { success: false, message }`: a car whose brand or color is not stored, an image of a car that is not
   stored, a customer of a user that is not stored or not active, a rental of a car or customer that is not stored,
   deleting a brand or color that cars still have, an email another user already has, a second customer for a user,
-  and signing in as an inactive user. Booking a rental now also takes its payment, right after `rentals/add` answers;
+  signing in as an inactive user, and overlapping bookings of a car or customer. Booking a rental now also takes its
+  payment, right after `rentals/add` answers;
   a declined payment cancels the rental, and rental lists leave cancelled rentals out, since v1 knows no statuses.
   Users no longer carry `findeksRating` (ratings are customer scores in v2 now) and `users/getuserfindeksrating` is
   gone; a `findeksRating` sent in a body is ignored. Customers carry `companyId` instead of `companyName` (`null` for
@@ -156,9 +163,18 @@ Bruno requests for both versions are in `api-docs/`.
 Registering in v2 takes two calls: `POST /users`, then `POST /auth/tokens`. An inactive user's right credentials answer
 `403`. `PUT /users/{id}` leaves whether the user is active as it is; deactivating a user is its own call.
 
-Booking a rental takes its payment right after: `POST /rentals` answers `201` with the rental's `status` `Pending`,
+Booking checks both the car's and the customer's schedule. A pending or confirmed rental blocks another booking of
+that car or customer for any overlapping period, including periods that share only a start/end instant. Since each
+user has only one customer account, this also prevents a user from renting different cars at the same time.
+The v2 creation endpoint answers `409 Conflict` for either clash; v1 answers `400` in its usual envelope. Availability
+queries are advisory: creation checks again, and database exclusion constraints prevent concurrent requests from
+double-booking. A rejected booking creates neither a rental nor a rental-created event, so it cannot take a payment.
+Non-overlapping periods and simultaneous bookings of different cars by different customers remain allowed.
+
+A successful booking takes its payment right after: `POST /rentals` answers `201` with the rental's `status` `Pending`,
 which turns `Confirmed`, or `Cancelled` when the payment is declined; `GET /rentals/{id}` shows which. A pending rental
-holds its car. A cancelled one is kept, but holds no car: availability and rental details leave it out.
+holds both its car and its customer. A cancelled one is kept, but holds neither: availability and rental details leave
+it out.
 
 The `/companies` routes are the only ones that need an access token (`Authorization: Bearer <token>` from
 `POST /auth/tokens`); without one they answer `401`. They act for the caller the token was issued to: a company the

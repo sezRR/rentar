@@ -78,7 +78,7 @@ public class RentalsEndpointsTests(RentarApiFactory factory) : IntegrationTestBa
 
         await Client.PostJsonAsync("/api/v1/rentals/add", NewRental(carId, customerId));
         // Fleet does not know this car, so its rental has no details to show.
-        await Factory.StoreRentalOfMissingCarAsync(carId + 1, customerId, RentDate, ReturnDate);
+        await Factory.StoreRentalOfMissingCarAsync(carId + 1, customerId, RentDate.AddDays(10), ReturnDate.AddDays(10));
 
         var response = await Client.GetJsonAsync("/api/v1/rentals/getrentaldetails");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);

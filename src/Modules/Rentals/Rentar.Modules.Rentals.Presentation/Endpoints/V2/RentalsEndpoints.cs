@@ -30,7 +30,8 @@ public class RentalsEndpoints : IEndpoint
         group.MapGet("/availability", GetAvailability);
         group.MapPost("/", Create)
             .ProducesValidationProblem()
-            .ProducesProblem(StatusCodes.Status400BadRequest);
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status409Conflict);
 
         // A company's rentals are addressed under it, and only its employees with the permission may see them.
         builder.MapVersionedGroup("Rentals", "companies/{companyId:int}/rentals", 2.0)
@@ -106,7 +107,8 @@ public class RentalsEndpoints : IEndpoint
 
     /// <summary>
     /// Books the rental; answers 201 with it <c>Pending</c>. Its payment is taken right after, and turns it
-    /// <c>Confirmed</c>, or <c>Cancelled</c> when declined: a cancelled rental is kept, but holds no car.
+    /// <c>Confirmed</c>, or <c>Cancelled</c> when declined: a cancelled rental is kept, but holds no car or customer.
+    /// An overlapping active booking of either the car or the customer answers 409.
     /// </summary>
     private static async Task<Created<Rental>> Create(
         ICommandHandler<CreateRentalCommand, Rental> createRental,

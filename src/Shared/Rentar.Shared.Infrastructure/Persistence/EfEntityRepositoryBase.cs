@@ -56,7 +56,7 @@ public abstract class EfEntityRepositoryBase<TEntity, TContext>(IDbContextFactor
         return await context.Set<TEntity>().CountAsync(filter, cancellationToken);
     }
 
-    public Task AddAsync(TEntity entity, CancellationToken cancellationToken = default)
+    public virtual Task AddAsync(TEntity entity, CancellationToken cancellationToken = default)
     {
         return SaveAsync(entity, EntityState.Added, cancellationToken);
     }

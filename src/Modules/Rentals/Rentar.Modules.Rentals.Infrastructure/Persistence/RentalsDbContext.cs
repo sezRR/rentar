@@ -14,6 +14,7 @@ public class RentalsDbContext(DbContextOptions<RentalsDbContext> options) : DbCo
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema(Schema);
+        modelBuilder.HasPostgresExtension("btree_gist");
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(RentalsDbContext).Assembly);
         modelBuilder.MapMessaging();
         modelBuilder.UseTimestampWithoutTimeZone();
