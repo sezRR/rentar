@@ -6,6 +6,7 @@ using Rentar.Modules.Identity.Application.Users.Commands;
 using Rentar.Modules.Identity.Application.Users.Queries;
 using Rentar.Modules.Identity.Domain;
 using Rentar.Shared.Application.UseCases;
+using Rentar.Shared.Kernel.Paging;
 using Rentar.Shared.Presentation.Endpoints;
 using System.Collections.Generic;
 using System.Threading;
@@ -26,9 +27,9 @@ public class UsersEndpoints : IEndpoint
         group.MapPost("/update", Update);
     }
 
-    private static async Task<Ok<V1Response<List<User>>>> GetAll(IQueryHandler<GetUsersQuery, List<User>> getUsers, CancellationToken cancellationToken)
+    private static async Task<Ok<V1Response<List<User>>>> GetAll(IQueryHandler<GetUsersQuery, Page<User>> getUsers, CancellationToken cancellationToken)
     {
-        return V1Results.Ok(await getUsers.HandleAsync(new GetUsersQuery(), cancellationToken), Messages.UsersListed);
+        return V1Results.Ok((await getUsers.HandleAsync(new GetUsersQuery(), cancellationToken)).Items, Messages.UsersListed);
     }
 
     private static async Task<Ok<V1Response<User>>> GetByMail(

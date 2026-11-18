@@ -1,18 +1,20 @@
 using Rentar.Modules.Fleet.Application.Common.Interfaces;
 using Rentar.Modules.Fleet.Application.Common.Models;
+using Rentar.Shared.Application.Data;
 using Rentar.Shared.Application.UseCases;
-using System.Collections.Generic;
+using Rentar.Shared.Kernel.Paging;
 using System.Threading;
 using System.Threading.Tasks;
 
 namespace Rentar.Modules.Fleet.Application.Cars.Queries;
 
-public sealed record GetCarsByColorQuery(int ColorId);
+/// <summary>The details of the color's cars, or one page of them.</summary>
+public sealed record GetCarsByColorQuery(int ColorId, PageRequest Page = null) : IPagedQuery;
 
-public sealed class GetCarsByColorQueryHandler(ICarDal carDal) : IQueryHandler<GetCarsByColorQuery, List<CarDetailResponse>>
+public sealed class GetCarsByColorQueryHandler(ICarDal carDal) : IQueryHandler<GetCarsByColorQuery, Page<CarDetailResponse>>
 {
-    public Task<List<CarDetailResponse>> HandleAsync(GetCarsByColorQuery query, CancellationToken cancellationToken = default)
+    public Task<Page<CarDetailResponse>> HandleAsync(GetCarsByColorQuery query, CancellationToken cancellationToken = default)
     {
-        return carDal.GetCarDetailsAsync(c => c.ColorId == query.ColorId, cancellationToken);
+        return carDal.GetCarDetailsPageAsync(c => c.ColorId == query.ColorId, query.Page, cancellationToken);
     }
 }

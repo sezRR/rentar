@@ -296,6 +296,6 @@ public class EmployeesEndpointsTests(RentarApiFactory factory) : V2TestBase(fact
     {
         var response = await Client.GetJsonAsync($"/api/v2/companies/{companyId}/employees");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        return await response.ReadAsAsync<List<EmployeeBody>>();
+        return await response.ReadItemsAsync<EmployeeBody>();
     }
 }

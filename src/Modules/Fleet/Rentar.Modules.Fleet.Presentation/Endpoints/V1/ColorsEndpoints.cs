@@ -6,6 +6,7 @@ using Rentar.Modules.Fleet.Application.Colors.Commands;
 using Rentar.Modules.Fleet.Application.Colors.Queries;
 using Rentar.Modules.Fleet.Domain;
 using Rentar.Shared.Application.UseCases;
+using Rentar.Shared.Kernel.Paging;
 using Rentar.Shared.Presentation.Endpoints;
 using System.Collections.Generic;
 using System.Threading;
@@ -26,9 +27,9 @@ public class ColorsEndpoints : IEndpoint
         group.MapPost("/delete", Delete);
     }
 
-    private static async Task<Ok<V1Response<List<Color>>>> GetAll(IQueryHandler<GetColorsQuery, List<Color>> getColors, CancellationToken cancellationToken)
+    private static async Task<Ok<V1Response<List<Color>>>> GetAll(IQueryHandler<GetColorsQuery, Page<Color>> getColors, CancellationToken cancellationToken)
     {
-        return V1Results.Ok(await getColors.HandleAsync(new GetColorsQuery(), cancellationToken), Messages.ColorsListed);
+        return V1Results.Ok((await getColors.HandleAsync(new GetColorsQuery(), cancellationToken)).Items, Messages.ColorsListed);
     }
 
     private static async Task<Ok<V1Response<Color>>> GetById(IQueryHandler<GetColorByIdQuery, Color> getColorById, int id, CancellationToken cancellationToken)

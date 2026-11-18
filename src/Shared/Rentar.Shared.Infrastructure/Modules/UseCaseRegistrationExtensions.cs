@@ -54,13 +54,18 @@ public static class UseCaseRegistrationExtensions
     /// <summary>
     /// Wraps every handler so its use case's validators run first. The wrapper sits outside the aspect proxy, so
     /// invalid input never opens a transaction or clears a cache. Call it once for the whole container: each call
-    /// adds one more wrapper around every handler of every module.
+    /// adds one more wrapper around every handler of every module. Also registers the validator every paged query
+    /// shares; Autofac only offers it for queries that satisfy its <see cref="Rentar.Shared.Application.Data.IPagedQuery"/> constraint.
     /// </summary>
     public static void RegisterUseCaseValidation(this ContainerBuilder builder)
     {
         builder.RegisterGenericDecorator(typeof(ValidatingCommandHandler<>), typeof(ICommandHandler<>));
         builder.RegisterGenericDecorator(typeof(ValidatingCommandHandler<,>), typeof(ICommandHandler<,>));
         builder.RegisterGenericDecorator(typeof(ValidatingQueryHandler<,>), typeof(IQueryHandler<,>));
+
+        builder.RegisterGeneric(typeof(PagedQueryValidator<>))
+            .As(typeof(IValidator<>))
+            .SingleInstance();
     }
 
     /// <summary>

@@ -189,7 +189,7 @@ public class CarImagesEndpointsTests(RentarApiFactory factory) : V2TestBase(fact
         var response = await Client.GetJsonAsync("/api/v2/car-images");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var images = await response.ReadAsAsync<List<CarImageBody>>();
+        var images = await response.ReadItemsAsync<CarImageBody>();
         Assert.Equal([car.Id, otherCar.Id], images.Select(i => i.CarId).Order());
 
         await Client.DeleteResourceAsync($"/api/v2/cars/{car.Id}/images");
@@ -208,6 +208,6 @@ public class CarImagesEndpointsTests(RentarApiFactory factory) : V2TestBase(fact
     {
         var response = await Client.GetJsonAsync($"/api/v2/cars/{carId}/images");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        return await response.ReadAsAsync<List<CarImageBody>>();
+        return await response.ReadItemsAsync<CarImageBody>();
     }
 }

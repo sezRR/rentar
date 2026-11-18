@@ -3,7 +3,6 @@ using Rentar.Modules.Companies.Application.Common.Models;
 using Rentar.Modules.Companies.Contracts;
 using Rentar.Modules.Companies.Domain;
 using Rentar.Modules.Companies.Presentation.Endpoints.V2;
-using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
@@ -33,7 +32,7 @@ public class CompaniesEndpointsTests(RentarApiFactory factory) : V2TestBase(fact
         Assert.Equal("Rentar Logistics", company.Name);
         Assert.Equal($"/api/v2/companies/{company.Id}", response.Headers.Location?.OriginalString);
 
-        var employees = await (await Client.GetJsonAsync($"/api/v2/companies/{company.Id}/employees")).ReadAsAsync<List<EmployeeBody>>();
+        var employees = await (await Client.GetJsonAsync($"/api/v2/companies/{company.Id}/employees")).ReadItemsAsync<EmployeeBody>();
         var employee = Assert.Single(employees);
         Assert.Equal(owner.Id, employee.UserId);
         Assert.Equal("Sezer", employee.FirstName);
@@ -46,7 +45,7 @@ public class CompaniesEndpointsTests(RentarApiFactory factory) : V2TestBase(fact
         await SignInAsNewUserAsync("owner@example.com");
         var company = await RegisterCompanyAsync();
 
-        var roles = await (await Client.GetJsonAsync($"/api/v2/companies/{company.Id}/roles")).ReadAsAsync<List<RoleBody>>();
+        var roles = await (await Client.GetJsonAsync($"/api/v2/companies/{company.Id}/roles")).ReadItemsAsync<RoleBody>();
 
         Assert.Equal(["Owner", "Admin", "Member"], roles.Select(role => role.Name));
         Assert.All(roles, role => Assert.True(role.IsPredefined));
@@ -87,7 +86,7 @@ public class CompaniesEndpointsTests(RentarApiFactory factory) : V2TestBase(fact
         await SignInAsNewUserAsync("second@example.com");
         var second = await RegisterCompanyAsync("Second Company");
 
-        var companies = await (await Client.GetJsonAsync("/api/v2/companies")).ReadAsAsync<List<CompanyBody>>();
+        var companies = await (await Client.GetJsonAsync("/api/v2/companies")).ReadItemsAsync<CompanyBody>();
 
         Assert.Equal([second.Id], companies.Select(company => company.Id));
         Assert.NotEqual(first.Id, second.Id);

@@ -6,6 +6,7 @@ using Rentar.Modules.Fleet.Application.Brands.Commands;
 using Rentar.Modules.Fleet.Application.Brands.Queries;
 using Rentar.Modules.Fleet.Domain;
 using Rentar.Shared.Application.UseCases;
+using Rentar.Shared.Kernel.Paging;
 using Rentar.Shared.Presentation.Endpoints;
 using System.Collections.Generic;
 using System.Threading;
@@ -26,9 +27,9 @@ public class BrandsEndpoints : IEndpoint
         group.MapPost("/delete", Delete);
     }
 
-    private static async Task<Ok<V1Response<List<Brand>>>> GetAll(IQueryHandler<GetBrandsQuery, List<Brand>> getBrands, CancellationToken cancellationToken)
+    private static async Task<Ok<V1Response<List<Brand>>>> GetAll(IQueryHandler<GetBrandsQuery, Page<Brand>> getBrands, CancellationToken cancellationToken)
     {
-        return V1Results.Ok(await getBrands.HandleAsync(new GetBrandsQuery(), cancellationToken), Messages.BrandsListed);
+        return V1Results.Ok((await getBrands.HandleAsync(new GetBrandsQuery(), cancellationToken)).Items, Messages.BrandsListed);
     }
 
     private static async Task<Ok<V1Response<Brand>>> GetById(IQueryHandler<GetBrandByIdQuery, Brand> getBrandById, int id, CancellationToken cancellationToken)

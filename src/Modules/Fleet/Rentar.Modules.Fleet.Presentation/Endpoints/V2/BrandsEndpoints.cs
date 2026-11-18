@@ -7,8 +7,8 @@ using Rentar.Modules.Fleet.Application.Brands.Commands;
 using Rentar.Modules.Fleet.Application.Brands.Queries;
 using Rentar.Modules.Fleet.Domain;
 using Rentar.Shared.Application.UseCases;
+using Rentar.Shared.Kernel.Paging;
 using Rentar.Shared.Presentation.Endpoints;
-using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -20,7 +20,8 @@ public class BrandsEndpoints : IEndpoint
     {
         var group = builder.MapVersionedGroup("Brands", "brands", 2.0);
 
-        group.MapGet("/", GetAll);
+        group.MapGet("/", GetAll)
+            .ProducesValidationProblem();
         group.MapGet("/{id:int}", GetById)
             .ProducesProblem(StatusCodes.Status404NotFound);
         group.MapPost("/", Create)
@@ -33,9 +34,12 @@ public class BrandsEndpoints : IEndpoint
             .ProducesProblem(StatusCodes.Status409Conflict);
     }
 
-    private static async Task<Ok<List<Brand>>> GetAll(IQueryHandler<GetBrandsQuery, List<Brand>> getBrands, CancellationToken cancellationToken)
+    private static async Task<Ok<PagedResponse<Brand>>> GetAll(
+        IQueryHandler<GetBrandsQuery, Page<Brand>> getBrands,
+        [AsParameters] PageParameters paging,
+        CancellationToken cancellationToken)
     {
-        return TypedResults.Ok(await getBrands.HandleAsync(new GetBrandsQuery(), cancellationToken));
+        return RestResults.Paged(await getBrands.HandleAsync(new GetBrandsQuery(paging.ToRequest()), cancellationToken));
     }
 
     private static async Task<Results<Ok<Brand>, ProblemHttpResult>> GetById(

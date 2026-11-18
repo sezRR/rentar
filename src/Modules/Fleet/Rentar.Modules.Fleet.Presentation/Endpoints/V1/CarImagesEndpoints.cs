@@ -8,6 +8,7 @@ using Rentar.Modules.Fleet.Application.CarImages.Commands;
 using Rentar.Modules.Fleet.Application.CarImages.Queries;
 using Rentar.Modules.Fleet.Domain;
 using Rentar.Shared.Application.UseCases;
+using Rentar.Shared.Kernel.Paging;
 using Rentar.Shared.Presentation.Endpoints;
 using System;
 using System.Collections.Generic;
@@ -31,10 +32,10 @@ public class CarImagesEndpoints : IEndpoint
     }
 
     private static async Task<Ok<V1Response<List<CarImage>>>> GetAll(
-        IQueryHandler<GetCarImagesQuery, List<CarImage>> getCarImages,
+        IQueryHandler<GetCarImagesQuery, Page<CarImage>> getCarImages,
         CancellationToken cancellationToken)
     {
-        return V1Results.Ok(await getCarImages.HandleAsync(new GetCarImagesQuery(), cancellationToken), null);
+        return V1Results.Ok((await getCarImages.HandleAsync(new GetCarImagesQuery(), cancellationToken)).Items, null);
     }
 
     private static async Task<Ok<V1Response<CarImage>>> GetById(
@@ -46,11 +47,11 @@ public class CarImagesEndpoints : IEndpoint
     }
 
     private static async Task<Ok<V1Response<List<CarImage>>>> GetByCarId(
-        IQueryHandler<GetCarImagesByCarQuery, List<CarImage>> getCarImagesByCar,
+        IQueryHandler<GetCarImagesByCarQuery, Page<CarImage>> getCarImagesByCar,
         int carId,
         CancellationToken cancellationToken)
     {
-        return V1Results.Ok(await getCarImagesByCar.HandleAsync(new GetCarImagesByCarQuery(carId), cancellationToken), null);
+        return V1Results.Ok((await getCarImagesByCar.HandleAsync(new GetCarImagesByCarQuery(carId), cancellationToken)).Items, null);
     }
 
     private static async Task<Ok<V1Response>> Add(
@@ -77,12 +78,12 @@ public class CarImagesEndpoints : IEndpoint
     /// Despite its name, <paramref name="id"/> is a car id: every image of that car is deleted.
     /// </summary>
     private static async Task<Results<Ok<V1Response>, BadRequest<string>>> Delete(
-        IQueryHandler<GetCarImagesByCarQuery, List<CarImage>> getCarImagesByCar,
+        IQueryHandler<GetCarImagesByCarQuery, Page<CarImage>> getCarImagesByCar,
         ICommandHandler<DeleteCarImagesOfCarCommand> deleteCarImagesOfCar,
         int id,
         CancellationToken cancellationToken)
     {
-        if ((await getCarImagesByCar.HandleAsync(new GetCarImagesByCarQuery(id), cancellationToken)).Count == 0)
+        if ((await getCarImagesByCar.HandleAsync(new GetCarImagesByCarQuery(id), cancellationToken)).Items.Count == 0)
         {
             return TypedResults.BadRequest("This car do not have image!");
         }

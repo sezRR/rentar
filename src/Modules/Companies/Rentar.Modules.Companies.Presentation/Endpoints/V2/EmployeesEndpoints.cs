@@ -8,8 +8,8 @@ using Rentar.Modules.Companies.Application.Employees.Commands;
 using Rentar.Modules.Companies.Application.Employees.Queries;
 using Rentar.Shared.Application.Security;
 using Rentar.Shared.Application.UseCases;
+using Rentar.Shared.Kernel.Paging;
 using Rentar.Shared.Presentation.Endpoints;
-using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -30,7 +30,8 @@ public class EmployeesEndpoints : IEndpoint
             .ProducesProblem(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status404NotFound);
 
-        group.MapGet("/", GetAll);
+        group.MapGet("/", GetAll)
+            .ProducesValidationProblem();
         group.MapPost("/", Add)
             .ProducesValidationProblem()
             .ProducesProblem(StatusCodes.Status400BadRequest)
@@ -39,14 +40,17 @@ public class EmployeesEndpoints : IEndpoint
             .ProducesProblem(StatusCodes.Status400BadRequest);
     }
 
-    /// <summary>The company's employees with their names and roles; needs <c>employees.read</c>.</summary>
-    private static async Task<Ok<List<EmployeeResponse>>> GetAll(
-        IQueryHandler<GetEmployeesQuery, List<EmployeeResponse>> getEmployees,
+    /// <summary>One page of the company's employees with their names and roles; needs <c>employees.read</c>.</summary>
+    private static async Task<Ok<PagedResponse<EmployeeResponse>>> GetAll(
+        IQueryHandler<GetEmployeesQuery, Page<EmployeeResponse>> getEmployees,
         ICurrentUser currentUser,
         int companyId,
+        [AsParameters] PageParameters paging,
         CancellationToken cancellationToken)
     {
-        return TypedResults.Ok(await getEmployees.HandleAsync(new GetEmployeesQuery(currentUser.RequireUserId(), companyId), cancellationToken));
+        return RestResults.Paged(await getEmployees.HandleAsync(
+            new GetEmployeesQuery(currentUser.RequireUserId(), companyId, paging.ToRequest()),
+            cancellationToken));
     }
 
     /// <summary>

@@ -1,7 +1,6 @@
 using Rentar.Modules.Fleet.Application;
 using Rentar.Modules.Fleet.Domain;
 using Rentar.Modules.Fleet.Presentation.Endpoints.V2;
-using System.Collections.Generic;
 using System.Net;
 using System.Threading.Tasks;
 using Xunit;
@@ -25,7 +24,7 @@ public class ColorsEndpointsTests(RentarApiFactory factory) : V2TestBase(factory
         var deleted = await Client.DeleteResourceAsync($"/api/v2/colors/{color.Id}");
         Assert.Equal(HttpStatusCode.NoContent, deleted.StatusCode);
 
-        var colors = await (await Client.GetJsonAsync("/api/v2/colors")).ReadAsAsync<List<ColorBody>>();
+        var colors = await (await Client.GetJsonAsync("/api/v2/colors")).ReadItemsAsync<ColorBody>();
         Assert.Empty(colors);
     }
 

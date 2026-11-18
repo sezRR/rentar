@@ -8,8 +8,8 @@ using Rentar.Modules.Fleet.Application.CarImages.Commands;
 using Rentar.Modules.Fleet.Application.CarImages.Queries;
 using Rentar.Modules.Fleet.Domain;
 using Rentar.Shared.Application.UseCases;
+using Rentar.Shared.Kernel.Paging;
 using Rentar.Shared.Presentation.Endpoints;
-using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -25,7 +25,8 @@ public class CarImagesEndpoints : IEndpoint
     {
         var images = builder.MapVersionedGroup("CarImages", "cars/{carId:int}/images", 2.0);
 
-        images.MapGet("/", GetByCar);
+        images.MapGet("/", GetByCar)
+            .ProducesValidationProblem();
         images.MapGet("/{imageId:int}", GetById)
             .ProducesProblem(StatusCodes.Status404NotFound);
         images.MapPost("/", Upload)
@@ -41,22 +42,25 @@ public class CarImagesEndpoints : IEndpoint
         images.MapDelete("/", DeleteAll);
 
         builder.MapVersionedGroup("CarImages", "car-images", 2.0)
-            .MapGet("/", GetAll);
+            .MapGet("/", GetAll)
+            .ProducesValidationProblem();
     }
 
-    private static async Task<Ok<List<CarImage>>> GetAll(
-        IQueryHandler<GetCarImagesQuery, List<CarImage>> getCarImages,
+    private static async Task<Ok<PagedResponse<CarImage>>> GetAll(
+        IQueryHandler<GetCarImagesQuery, Page<CarImage>> getCarImages,
+        [AsParameters] PageParameters paging,
         CancellationToken cancellationToken)
     {
-        return TypedResults.Ok(await getCarImages.HandleAsync(new GetCarImagesQuery(), cancellationToken));
+        return RestResults.Paged(await getCarImages.HandleAsync(new GetCarImagesQuery(paging.ToRequest()), cancellationToken));
     }
 
-    private static async Task<Ok<List<CarImage>>> GetByCar(
-        IQueryHandler<GetCarImagesByCarQuery, List<CarImage>> getCarImagesByCar,
+    private static async Task<Ok<PagedResponse<CarImage>>> GetByCar(
+        IQueryHandler<GetCarImagesByCarQuery, Page<CarImage>> getCarImagesByCar,
         int carId,
+        [AsParameters] PageParameters paging,
         CancellationToken cancellationToken)
     {
-        return TypedResults.Ok(await getCarImagesByCar.HandleAsync(new GetCarImagesByCarQuery(carId), cancellationToken));
+        return RestResults.Paged(await getCarImagesByCar.HandleAsync(new GetCarImagesByCarQuery(carId, paging.ToRequest()), cancellationToken));
     }
 
     private static async Task<Results<Ok<CarImage>, ProblemHttpResult>> GetById(

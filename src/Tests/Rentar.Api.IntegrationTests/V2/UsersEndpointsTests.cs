@@ -169,7 +169,7 @@ public class UsersEndpointsTests(RentarApiFactory factory) : V2TestBase(factory)
         var response = await Client.GetJsonAsync(url);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var users = await response.ReadAsAsync<List<UserResponse>>();
+        var users = await response.ReadItemsAsync<UserResponse>();
         return users.Select(u => u.FirstName).Order().ToList();
     }
 }

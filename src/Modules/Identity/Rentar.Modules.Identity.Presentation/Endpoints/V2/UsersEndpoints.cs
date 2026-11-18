@@ -8,8 +8,8 @@ using Rentar.Modules.Identity.Application.Users.Commands;
 using Rentar.Modules.Identity.Application.Users.Queries;
 using Rentar.Modules.Identity.Domain;
 using Rentar.Shared.Application.UseCases;
+using Rentar.Shared.Kernel.Paging;
 using Rentar.Shared.Presentation.Endpoints;
-using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -21,7 +21,8 @@ public class UsersEndpoints : IEndpoint
     {
         var group = builder.MapVersionedGroup("Users", "users", 2.0);
 
-        group.MapGet("/", GetAll);
+        group.MapGet("/", GetAll)
+            .ProducesValidationProblem();
         group.MapGet("/{id:int}", GetById)
             .ProducesProblem(StatusCodes.Status404NotFound);
         group.MapPost("/", Create)
@@ -36,22 +37,20 @@ public class UsersEndpoints : IEndpoint
     }
 
     /// <summary>
-    /// Lists users, optionally only the one with an email.
+    /// Lists one page of users, optionally only the one with an email.
     /// </summary>
-    private static async Task<Ok<List<UserResponse>>> GetAll(
-        IQueryHandler<GetUsersQuery, List<User>> getUsers,
-        IQueryHandler<GetUserByEmailQuery, User> getUserByEmail,
+    private static async Task<Ok<PagedResponse<UserResponse>>> GetAll(
+        IQueryHandler<GetUsersQuery, Page<User>> getUsers,
+        IQueryHandler<GetUsersByEmailQuery, Page<User>> getUsersByEmail,
         string? email,
+        [AsParameters] PageParameters paging,
         CancellationToken cancellationToken)
     {
-        if (email is not null)
-        {
-            var user = await getUserByEmail.HandleAsync(new GetUserByEmailQuery(email), cancellationToken);
-            return TypedResults.Ok(user is null ? new List<UserResponse>() : [UserResponse.From(user)]);
-        }
+        var users = email is not null
+            ? await getUsersByEmail.HandleAsync(new GetUsersByEmailQuery(email, paging.ToRequest()), cancellationToken)
+            : await getUsers.HandleAsync(new GetUsersQuery(paging.ToRequest()), cancellationToken);
 
-        var users = await getUsers.HandleAsync(new GetUsersQuery(), cancellationToken);
-        return TypedResults.Ok(users.ConvertAll(UserResponse.From));
+        return RestResults.Paged(users.Map(UserResponse.From));
     }
 
     private static async Task<Results<Ok<UserResponse>, ProblemHttpResult>> GetById(

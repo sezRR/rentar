@@ -6,6 +6,7 @@ using Rentar.Modules.Customers.Application.Commands;
 using Rentar.Modules.Customers.Application.Queries;
 using Rentar.Modules.Customers.Domain;
 using Rentar.Shared.Application.UseCases;
+using Rentar.Shared.Kernel.Paging;
 using Rentar.Shared.Presentation.Endpoints;
 using System.Collections.Generic;
 using System.Threading;
@@ -25,18 +26,18 @@ public class CustomersEndpoints : IEndpoint
     }
 
     private static async Task<Ok<V1Response<List<Customer>>>> GetAll(
-        IQueryHandler<GetCustomersQuery, List<Customer>> getCustomers,
+        IQueryHandler<GetCustomersQuery, Page<Customer>> getCustomers,
         CancellationToken cancellationToken)
     {
-        return V1Results.Ok(await getCustomers.HandleAsync(new GetCustomersQuery(), cancellationToken), Messages.CustomersListed);
+        return V1Results.Ok((await getCustomers.HandleAsync(new GetCustomersQuery(), cancellationToken)).Items, Messages.CustomersListed);
     }
 
     private static async Task<Ok<V1Response<List<Customer>>>> GetCustomersByUserId(
-        IQueryHandler<GetCustomersByUserQuery, List<Customer>> getCustomersByUser,
+        IQueryHandler<GetCustomersByUserQuery, Page<Customer>> getCustomersByUser,
         int userId,
         CancellationToken cancellationToken)
     {
-        return V1Results.Ok(await getCustomersByUser.HandleAsync(new GetCustomersByUserQuery(userId), cancellationToken), null);
+        return V1Results.Ok((await getCustomersByUser.HandleAsync(new GetCustomersByUserQuery(userId), cancellationToken)).Items, null);
     }
 
     private static async Task<Ok<V1Response>> Add(

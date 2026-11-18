@@ -7,6 +7,7 @@ using Rentar.Modules.Rentals.Application.Common.Models;
 using Rentar.Modules.Rentals.Application.Queries;
 using Rentar.Modules.Rentals.Domain;
 using Rentar.Shared.Application.UseCases;
+using Rentar.Shared.Kernel.Paging;
 using Rentar.Shared.Presentation.Endpoints;
 using System.Collections.Generic;
 using System.Linq;
@@ -30,10 +31,10 @@ public class RentalsEndpoints : IEndpoint
 
     /// <summary>The rentals that hold their car; v1 knows no statuses, so cancelled ones are left out.</summary>
     private static async Task<Ok<V1Response<List<RentalResponse>>>> GetAll(
-        IQueryHandler<GetRentalsQuery, List<Rental>> getRentals,
+        IQueryHandler<GetRentalsQuery, Page<Rental>> getRentals,
         CancellationToken cancellationToken)
     {
-        var rentals = await getRentals.HandleAsync(new GetRentalsQuery(), cancellationToken);
+        var rentals = (await getRentals.HandleAsync(new GetRentalsQuery(), cancellationToken)).Items;
         return V1Results.Ok(
             rentals.Where(r => r.Status != RentalStatus.Cancelled).Select(RentalResponse.From).ToList(),
             Messages.RentalsListed);
@@ -49,10 +50,10 @@ public class RentalsEndpoints : IEndpoint
     }
 
     private static async Task<Ok<V1Response<List<RentalDetailResponse>>>> GetRentalDetails(
-        IQueryHandler<GetRentalDetailsQuery, List<RentalDetailResponse>> getRentalDetails,
+        IQueryHandler<GetRentalDetailsQuery, Page<RentalDetailResponse>> getRentalDetails,
         CancellationToken cancellationToken)
     {
-        return V1Results.Ok(await getRentalDetails.HandleAsync(new GetRentalDetailsQuery(), cancellationToken), null);
+        return V1Results.Ok((await getRentalDetails.HandleAsync(new GetRentalDetailsQuery(), cancellationToken)).Items, null);
     }
 
     private static async Task<Results<Ok<V1Response>, BadRequest<V1Response>>> IsRentable(

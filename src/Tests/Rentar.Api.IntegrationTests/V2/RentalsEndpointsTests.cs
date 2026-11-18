@@ -5,8 +5,8 @@ using Rentar.Modules.Rentals.Application.Commands;
 using Rentar.Modules.Rentals.Application.Common.Models;
 using Rentar.Modules.Rentals.Domain;
 using Rentar.Modules.Rentals.Presentation.Endpoints.V2;
+using Rentar.Shared.Presentation.Endpoints;
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
@@ -80,7 +80,7 @@ public class RentalsEndpointsTests(RentarApiFactory factory) : V2TestBase(factor
         var availability = await (await Client.GetJsonAsync(
             $"/api/v2/rentals/availability?carId={car.Id}&rentDate=2026-09-18T10:00:00&returnDate=2026-09-20T10:00:00")).ReadAsAsync<RentalAvailabilityResponse>();
         Assert.True(availability.Available);
-        Assert.Empty(await (await Client.GetJsonAsync("/api/v2/rentals/details")).ReadAsAsync<List<RentalDetailResponse>>());
+        Assert.Empty(await (await Client.GetJsonAsync("/api/v2/rentals/details")).ReadItemsAsync<RentalDetailResponse>());
     }
 
     [Fact]
@@ -115,7 +115,7 @@ public class RentalsEndpointsTests(RentarApiFactory factory) : V2TestBase(factor
         var response = await Client.PostJsonAsync("/api/v2/rentals", new CreateRentalCommand(404, customer.Id, RentDate, ReturnDate));
 
         await AssertProblemAsync(response, HttpStatusCode.BadRequest, Messages.CarNotFound);
-        Assert.Empty(await (await Client.GetJsonAsync("/api/v2/rentals")).ReadAsAsync<List<RentalBody>>());
+        Assert.Empty(await (await Client.GetJsonAsync("/api/v2/rentals")).ReadItemsAsync<RentalBody>());
     }
 
     [Fact]
@@ -126,7 +126,7 @@ public class RentalsEndpointsTests(RentarApiFactory factory) : V2TestBase(factor
         var response = await Client.PostJsonAsync("/api/v2/rentals", new CreateRentalCommand(car.Id, 404, RentDate, ReturnDate));
 
         await AssertProblemAsync(response, HttpStatusCode.BadRequest, Messages.CustomerNotFound);
-        Assert.Empty(await (await Client.GetJsonAsync("/api/v2/rentals")).ReadAsAsync<List<RentalBody>>());
+        Assert.Empty(await (await Client.GetJsonAsync("/api/v2/rentals")).ReadItemsAsync<RentalBody>());
     }
 
     [Fact]
@@ -144,8 +144,8 @@ public class RentalsEndpointsTests(RentarApiFactory factory) : V2TestBase(factor
         await CreateRentalAsync(secondCar.Id, first.Id, RentDate.AddDays(10), ReturnDate.AddDays(10));
         await CreateRentalAsync(secondCar.Id, second.Id, RentDate.AddDays(20), ReturnDate.AddDays(20));
 
-        var all = await (await Client.GetJsonAsync("/api/v2/rentals")).ReadAsAsync<List<RentalBody>>();
-        var ofCar = await (await Client.GetJsonAsync($"/api/v2/rentals?carId={secondCar.Id}")).ReadAsAsync<List<RentalBody>>();
+        var all = await (await Client.GetJsonAsync("/api/v2/rentals")).ReadItemsAsync<RentalBody>();
+        var ofCar = await (await Client.GetJsonAsync($"/api/v2/rentals?carId={secondCar.Id}")).ReadItemsAsync<RentalBody>();
 
         Assert.Equal(3, all.Count);
         Assert.Equal([first.Id, second.Id], ofCar.Select(r => r.CustomerId).Order());
@@ -197,12 +197,31 @@ public class RentalsEndpointsTests(RentarApiFactory factory) : V2TestBase(factor
         var response = await Client.GetJsonAsync("/api/v2/rentals/details");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var detail = Assert.Single(await response.ReadAsAsync<List<RentalDetailResponse>>());
+        var detail = Assert.Single(await response.ReadItemsAsync<RentalDetailResponse>());
         Assert.Equal(car.Id, detail.CarId);
         Assert.Equal("Toyota", detail.BrandName);
         Assert.Equal("Red", detail.ColorName);
         Assert.Equal("Rentar Logistics", detail.CompanyName);
         Assert.Equal("Sezer", detail.UserName);
+    }
+
+    [Fact]
+    public async Task Details_PageOnlyTheRentalsTheyShow()
+    {
+        var car = await CreateCarAsync();
+        var otherCar = await CreateCarAsync("Fiat", "White", "Egea");
+        await CreateRentalAsync(car.Id, (await CreateCustomerAsync()).Id);
+        // Stored between the two shown rentals, but Fleet does not know its car, so no page shows it.
+        await Factory.StoreRentalOfMissingCarAsync(otherCar.Id + 1, (await CreateCustomerAsync("hidden@example.com")).Id, RentDate, ReturnDate);
+        await CreateRentalAsync(otherCar.Id, (await CreateCustomerAsync("second@example.com")).Id);
+
+        var first = await (await Client.GetJsonAsync("/api/v2/rentals/details?limit=1")).ReadAsAsync<PagedResponse<RentalDetailResponse>>();
+        var second = await (await Client.GetJsonAsync($"/api/v2/rentals/details?limit=1&cursor={first.Page.NextCursor}"))
+            .ReadAsAsync<PagedResponse<RentalDetailResponse>>();
+
+        Assert.Equal(car.Id, Assert.Single(first.Items).CarId);
+        Assert.Equal(otherCar.Id, Assert.Single(second.Items).CarId);
+        Assert.False(second.Page.HasMore);
     }
 
     [Fact]
@@ -261,7 +280,7 @@ public class RentalsEndpointsTests(RentarApiFactory factory) : V2TestBase(factor
         var response = await Client.GetJsonAsync($"/api/v2/companies/{company.Id}/rentals");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var rentals = await response.ReadAsAsync<List<RentalBody>>();
+        var rentals = await response.ReadItemsAsync<RentalBody>();
         Assert.Equal([companyRental.Id], rentals.Select(r => r.Id));
     }
 

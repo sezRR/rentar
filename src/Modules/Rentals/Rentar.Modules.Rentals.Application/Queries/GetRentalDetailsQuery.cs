@@ -9,26 +9,33 @@ using Rentar.Modules.Identity.Contracts;
 using Rentar.Modules.Rentals.Application.Common.Interfaces;
 using Rentar.Modules.Rentals.Application.Common.Models;
 using Rentar.Modules.Rentals.Domain;
+using Rentar.Shared.Application.Data;
 using Rentar.Shared.Application.UseCases;
+using Rentar.Shared.Kernel.Paging;
 
 namespace Rentar.Modules.Rentals.Application.Queries;
 
 /// <summary>
 /// Rentals together with their car, customer, user and the customer's company; a cancelled rental, and one whose car,
-/// customer or user is gone, is left out, and the company name is <c>null</c> for a customer with no company.
+/// customer or user is gone, is left out, and the company name is <c>null</c> for a customer with no company. Asked for
+/// one page, it pages what is left: which rentals are left out is only known once the other modules have answered, so
+/// every rental after the cursor is read.
 /// </summary>
-public sealed record GetRentalDetailsQuery;
+public sealed record GetRentalDetailsQuery(PageRequest Page = null) : IPagedQuery;
 
 public sealed class GetRentalDetailsQueryHandler(
     IRentalDal rentalDal,
     ICustomersModuleApi customersModule,
     IIdentityModuleApi identityModule,
     IFleetModuleApi fleetModule,
-    ICompaniesModuleApi companiesModule) : IQueryHandler<GetRentalDetailsQuery, List<RentalDetailResponse>>
+    ICompaniesModuleApi companiesModule) : IQueryHandler<GetRentalDetailsQuery, Page<RentalDetailResponse>>
 {
-    public async Task<List<RentalDetailResponse>> HandleAsync(GetRentalDetailsQuery query, CancellationToken cancellationToken = default)
+    public async Task<Page<RentalDetailResponse>> HandleAsync(GetRentalDetailsQuery query, CancellationToken cancellationToken = default)
     {
-        var rentals = await rentalDal.GetAllAsync(r => r.Status != RentalStatus.Cancelled, cancellationToken);
+        var after = query.Page?.After;
+        var rentals = await rentalDal.GetAllAsync(
+            r => r.Status != RentalStatus.Cancelled && (after == null || r.Id > after),
+            cancellationToken);
 
         // A rental only holds the ids of other modules' records, so their details come through those modules' public APIs.
         var customers = (await customersModule.GetCustomersAsync(rentals.Select(r => r.CustomerId).Distinct().ToList(), cancellationToken))
@@ -68,6 +75,6 @@ public sealed class GetRentalDetailsQueryHandler(
             });
         }
 
-        return details;
+        return Page.Of(details, detail => detail.RentalId, query.Page);
     }
 }

@@ -1,17 +1,27 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
+using Rentar.Shared.Kernel.Paging;
 
 namespace Rentar.Shared.Presentation.Endpoints;
 
 /// <summary>
 /// Responses for the RESTful endpoints (v2 onwards). Resources are returned as they are, without the v1
-/// envelope; failures thrown by the services become RFC 9457 problem details in <c>ApiExceptionHandler</c>.
+/// envelope, and lists as one <see cref="PagedResponse{T}"/>; failures thrown by the services become RFC 9457 problem
+/// details in <c>ApiExceptionHandler</c>.
 /// </summary>
 public static class RestResults
 {
     public static ProblemHttpResult NotFound(string resource, int id)
     {
         return TypedResults.Problem(detail: $"{resource} {id} was not found.", statusCode: StatusCodes.Status404NotFound);
+    }
+
+    /// <summary>
+    /// Answers 200 with the page as every v2 list answers: <c>{ items, page: { hasMore, nextCursor } }</c>.
+    /// </summary>
+    public static Ok<PagedResponse<T>> Paged<T>(Page<T> page)
+    {
+        return TypedResults.Ok(PagedResponse<T>.From(page));
     }
 
     /// <summary>

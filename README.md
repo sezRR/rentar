@@ -159,7 +159,7 @@ Bruno requests for both versions are in `api-docs/`.
 - **v2** is RESTful:
   - Routes name resources, and the HTTP method says what to do with them.
   - Ids are in the path and filters are in the query string.
-  - Bodies are the resources themselves, with no envelope.
+  - Bodies are the resources themselves, with no envelope; a list is one page of them (see below).
   - Errors are [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) problem details (`application/problem+json`);
     validation errors are listed under `errors`.
   - `POST` answers `201 Created` with a `Location` header. `PUT` and `DELETE` answer `204 No Content`.
@@ -207,6 +207,36 @@ caller does not work at answers `404`, as if it did not exist, and a missing per
 A user has at most one customer account; a second one answers `409`. Its `companyId` is optional: it makes the
 customer one of that company's, which needs the user to be its employee; leaving it out stands for a customer with no
 partner company (the "other" choice). There is no free-text company name.
+
+**Paging (v2)**
+
+Every v2 `GET` that answers a list answers one page of it, with cursor (keyset) paging:
+
+```json
+{
+  "items": [
+    { "id": 123, "brandName": "BMW" },
+    { "id": 124, "brandName": "Audi" }
+  ],
+  "page": {
+    "hasMore": true,
+    "nextCursor": "eyJpZCI6MTI0fQ"
+  }
+}
+```
+
+- `?limit=` sets how many items a page holds, 1 to 100; leaving it out answers 25.
+- The next page is `?cursor=` set to the `nextCursor` of the page before, with the same filters and limit, e.g.
+  `GET /api/v2/cars?brandId=3&limit=10&cursor=eyJpZCI6MTI0fQ`. Leaving the cursor out answers the first page.
+- On the last page `hasMore` is `false` and `nextCursor` is `null`.
+- Items are ordered by id, and a page holds the items after the cursor's id, so following the cursors lists every
+  item once even while items are added or deleted. A page deep into a list costs what the first one does: nothing is
+  counted or skipped, which is also why there is no total.
+- A cursor is opaque: pass it back as it was given. (It is the last item's key as base64url JSON, `{"id":124}`.)
+  A `limit` out of range, or a cursor the API did not write, answers `400` with a validation problem naming `limit`
+  or `cursor`.
+
+v1 lists are not paged and still answer every item in their usual envelope, now in id order.
 
 <br>
 
@@ -408,6 +438,13 @@ public sealed class CreateBrandCommandHandler(IBrandDal brandDal) : ICommandHand
   `ICommandHandler<CreateBrandCommand, Brand>`. There is no mediator.
 - Handlers don't call each other; they use repositories, and endpoints combine use cases where needed (v1 login =
   `VerifyCredentialsQuery` + `CreateAccessTokenCommand`).
+- A query that lists implements `IPagedQuery`: it takes an optional `PageRequest Page` (the key to continue
+  after, and a size) and answers a `Page<T>` (`GetBrandsQuery(PageRequest Page = null)` -> `Page<Brand>`). v2
+  endpoints bind it with `[AsParameters] PageParameters`, which turns `?cursor=` into the key, and answer
+  `RestResults.Paged(page)`, which writes the next key as a cursor; v1 and other use cases leave it `null` and get
+  every item as one page. Repositories page in the database by key (`GetPageAsync`, or `ToPageAsync` with a
+  `PageKey<T>`), and one shared `PagedQueryValidator` checks the size of every such query, so a list query needs no
+  validator of its own for it.
 - `RegisterUseCases` registers every handler behind a Castle proxy, so aspect attributes on `HandleAsync` run around
   it. Castle calls an interceptor synchronously, so an aspect implements `InterceptAsync` and awaits the handler: the
   cache stores the finished result, the transaction commits once the task succeeds, and the timing covers all of it.

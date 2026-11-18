@@ -7,8 +7,8 @@ using Rentar.Modules.Customers.Application.Commands;
 using Rentar.Modules.Customers.Application.Queries;
 using Rentar.Modules.Customers.Domain;
 using Rentar.Shared.Application.UseCases;
+using Rentar.Shared.Kernel.Paging;
 using Rentar.Shared.Presentation.Endpoints;
-using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -20,7 +20,8 @@ public class CustomersEndpoints : IEndpoint
     {
         var group = builder.MapVersionedGroup("Customers", "customers", 2.0);
 
-        group.MapGet("/", GetAll);
+        group.MapGet("/", GetAll)
+            .ProducesValidationProblem();
         group.MapGet("/{id:int}", GetById)
             .ProducesProblem(StatusCodes.Status404NotFound);
         group.MapPost("/", Create)
@@ -29,19 +30,20 @@ public class CustomersEndpoints : IEndpoint
     }
 
     /// <summary>
-    /// Lists customers, optionally only those of a user.
+    /// Lists one page of customers, optionally only those of a user.
     /// </summary>
-    private static async Task<Ok<List<Customer>>> GetAll(
-        IQueryHandler<GetCustomersQuery, List<Customer>> getCustomers,
-        IQueryHandler<GetCustomersByUserQuery, List<Customer>> getCustomersByUser,
+    private static async Task<Ok<PagedResponse<Customer>>> GetAll(
+        IQueryHandler<GetCustomersQuery, Page<Customer>> getCustomers,
+        IQueryHandler<GetCustomersByUserQuery, Page<Customer>> getCustomersByUser,
         int? userId,
+        [AsParameters] PageParameters paging,
         CancellationToken cancellationToken)
     {
         var customers = userId is { } user
-            ? await getCustomersByUser.HandleAsync(new GetCustomersByUserQuery(user), cancellationToken)
-            : await getCustomers.HandleAsync(new GetCustomersQuery(), cancellationToken);
+            ? await getCustomersByUser.HandleAsync(new GetCustomersByUserQuery(user, paging.ToRequest()), cancellationToken)
+            : await getCustomers.HandleAsync(new GetCustomersQuery(paging.ToRequest()), cancellationToken);
 
-        return TypedResults.Ok(customers);
+        return RestResults.Paged(customers);
     }
 
     private static async Task<Results<Ok<Customer>, ProblemHttpResult>> GetById(

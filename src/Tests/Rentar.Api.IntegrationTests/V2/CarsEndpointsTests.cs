@@ -74,7 +74,7 @@ public class CarsEndpointsTests(RentarApiFactory factory) : V2TestBase(factory)
 
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
         await AssertProblemAsync(await Client.GetJsonAsync($"/api/v2/cars/{car.Id}"), HttpStatusCode.NotFound);
-        Assert.Empty(await (await Client.GetJsonAsync($"/api/v2/cars/{car.Id}/images")).ReadAsAsync<List<CarImageBody>>());
+        Assert.Empty(await (await Client.GetJsonAsync($"/api/v2/cars/{car.Id}/images")).ReadItemsAsync<CarImageBody>());
         Assert.False(File.Exists(stored));
     }
 
@@ -93,7 +93,7 @@ public class CarsEndpointsTests(RentarApiFactory factory) : V2TestBase(factory)
 
         await AssertProblemAsync(response, HttpStatusCode.Conflict, Messages.CarHasRentals);
         Assert.Equal(HttpStatusCode.OK, (await Client.GetJsonAsync($"/api/v2/cars/{car.Id}")).StatusCode);
-        Assert.Equal([image.Id], (await (await Client.GetJsonAsync($"/api/v2/cars/{car.Id}/images")).ReadAsAsync<List<CarImageBody>>()).Select(i => i.Id));
+        Assert.Equal([image.Id], (await (await Client.GetJsonAsync($"/api/v2/cars/{car.Id}/images")).ReadItemsAsync<CarImageBody>()).Select(i => i.Id));
         Assert.True(File.Exists(UploadedFile(image.ImagePath)));
 
         // Removes the stored file again so the test leaves wwwroot/uploads untouched.
@@ -136,7 +136,7 @@ public class CarsEndpointsTests(RentarApiFactory factory) : V2TestBase(factory)
             new CarRequest(unknownBrand ? 404 : brand.Id, unknownColor ? 404 : color.Id, 2021, 950m, "Corolla 1.6", 700));
 
         await AssertProblemAsync(response, HttpStatusCode.BadRequest, detail);
-        Assert.Empty(await (await Client.GetJsonAsync("/api/v2/cars")).ReadAsAsync<List<CarResponse>>());
+        Assert.Empty(await (await Client.GetJsonAsync("/api/v2/cars")).ReadItemsAsync<CarResponse>());
     }
 
     [Fact]
@@ -169,7 +169,7 @@ public class CarsEndpointsTests(RentarApiFactory factory) : V2TestBase(factory)
         var response = await Client.GetJsonAsync(url);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var cars = await response.ReadAsAsync<List<CarResponse>>();
+        var cars = await response.ReadItemsAsync<CarResponse>();
         return cars.Select(c => c.Description).Order().ToList();
     }
 }

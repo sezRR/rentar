@@ -8,8 +8,8 @@ using Rentar.Modules.Fleet.Application.Cars.Queries;
 using Rentar.Modules.Fleet.Application.Common.Models;
 using Rentar.Modules.Fleet.Domain;
 using Rentar.Shared.Application.UseCases;
+using Rentar.Shared.Kernel.Paging;
 using Rentar.Shared.Presentation.Endpoints;
-using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -21,7 +21,8 @@ public class CarsEndpoints : IEndpoint
     {
         var group = builder.MapVersionedGroup("Cars", "cars", 2.0);
 
-        group.MapGet("/", GetAll);
+        group.MapGet("/", GetAll)
+            .ProducesValidationProblem();
         group.MapGet("/{id:int}", GetById)
             .ProducesProblem(StatusCodes.Status404NotFound);
         group.MapPost("/", Create)
@@ -36,26 +37,28 @@ public class CarsEndpoints : IEndpoint
     }
 
     /// <summary>
-    /// Lists cars, optionally only those of a brand, a color, or both. Each filter is its own use case.
+    /// Lists one page of cars, optionally only those of a brand, a color, or both. Each filter is its own use case.
     /// </summary>
-    private static async Task<Ok<List<CarResponse>>> GetAll(
-        IQueryHandler<GetCarDetailsQuery, List<CarDetailResponse>> getCarDetails,
-        IQueryHandler<GetCarsByBrandQuery, List<CarDetailResponse>> getCarsByBrand,
-        IQueryHandler<GetCarsByColorQuery, List<CarDetailResponse>> getCarsByColor,
-        IQueryHandler<GetCarsByBrandAndColorQuery, List<CarDetailResponse>> getCarsByBrandAndColor,
+    private static async Task<Ok<PagedResponse<CarResponse>>> GetAll(
+        IQueryHandler<GetCarDetailsQuery, Page<CarDetailResponse>> getCarDetails,
+        IQueryHandler<GetCarsByBrandQuery, Page<CarDetailResponse>> getCarsByBrand,
+        IQueryHandler<GetCarsByColorQuery, Page<CarDetailResponse>> getCarsByColor,
+        IQueryHandler<GetCarsByBrandAndColorQuery, Page<CarDetailResponse>> getCarsByBrandAndColor,
         int? brandId,
         int? colorId,
+        [AsParameters] PageParameters paging,
         CancellationToken cancellationToken)
     {
+        var page = paging.ToRequest();
         var cars = (brandId, colorId) switch
         {
-            ({ } brand, { } color) => await getCarsByBrandAndColor.HandleAsync(new GetCarsByBrandAndColorQuery(brand, color), cancellationToken),
-            ({ } brand, null) => await getCarsByBrand.HandleAsync(new GetCarsByBrandQuery(brand), cancellationToken),
-            (null, { } color) => await getCarsByColor.HandleAsync(new GetCarsByColorQuery(color), cancellationToken),
-            _ => await getCarDetails.HandleAsync(new GetCarDetailsQuery(), cancellationToken)
+            ({ } brand, { } color) => await getCarsByBrandAndColor.HandleAsync(new GetCarsByBrandAndColorQuery(brand, color, page), cancellationToken),
+            ({ } brand, null) => await getCarsByBrand.HandleAsync(new GetCarsByBrandQuery(brand, page), cancellationToken),
+            (null, { } color) => await getCarsByColor.HandleAsync(new GetCarsByColorQuery(color, page), cancellationToken),
+            _ => await getCarDetails.HandleAsync(new GetCarDetailsQuery(page), cancellationToken)
         };
 
-        return TypedResults.Ok(cars.ConvertAll(CarResponse.From));
+        return RestResults.Paged(cars.Map(CarResponse.From));
     }
 
     private static async Task<Results<Ok<CarResponse>, ProblemHttpResult>> GetById(

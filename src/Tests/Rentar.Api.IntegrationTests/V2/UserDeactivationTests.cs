@@ -141,6 +141,6 @@ public class UserDeactivationTests(RentarApiFactory factory) : V2TestBase(factor
     {
         var response = await Client.GetJsonAsync($"/api/v2/companies/{companyId}/employees");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        return await response.ReadAsAsync<List<EmployeeBody>>();
+        return await response.ReadItemsAsync<EmployeeBody>();
     }
 }

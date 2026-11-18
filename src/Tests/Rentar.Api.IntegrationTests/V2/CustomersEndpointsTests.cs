@@ -119,7 +119,7 @@ public class CustomersEndpointsTests(RentarApiFactory factory) : V2TestBase(fact
         var response = await Client.GetJsonAsync(url);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var customers = await response.ReadAsAsync<List<CustomerBody>>();
+        var customers = await response.ReadItemsAsync<CustomerBody>();
         return customers.Select(c => c.UserId).Order().ToList();
     }
 }

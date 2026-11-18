@@ -7,6 +7,7 @@ using Rentar.Modules.Fleet.Application.Cars.Queries;
 using Rentar.Modules.Fleet.Application.Common.Models;
 using Rentar.Modules.Fleet.Domain;
 using Rentar.Shared.Application.UseCases;
+using Rentar.Shared.Kernel.Paging;
 using Rentar.Shared.Presentation.Endpoints;
 using System.Collections.Generic;
 using System.Threading;
@@ -38,10 +39,10 @@ public class CarsEndpoints : IEndpoint
     }
 
     private static async Task<Ok<V1Response<List<CarDetailResponse>>>> GetCarDetails(
-        IQueryHandler<GetCarDetailsQuery, List<CarDetailResponse>> getCarDetails,
+        IQueryHandler<GetCarDetailsQuery, Page<CarDetailResponse>> getCarDetails,
         CancellationToken cancellationToken)
     {
-        return V1Results.Ok(await getCarDetails.HandleAsync(new GetCarDetailsQuery(), cancellationToken), null);
+        return V1Results.Ok((await getCarDetails.HandleAsync(new GetCarDetailsQuery(), cancellationToken)).Items, null);
     }
 
     private static async Task<Ok<V1Response<CarDetailResponse>>> GetCarDetailsById(
@@ -53,28 +54,28 @@ public class CarsEndpoints : IEndpoint
     }
 
     private static async Task<Ok<V1Response<List<CarDetailResponse>>>> GetByBrandId(
-        IQueryHandler<GetCarsByBrandQuery, List<CarDetailResponse>> getCarsByBrand,
+        IQueryHandler<GetCarsByBrandQuery, Page<CarDetailResponse>> getCarsByBrand,
         int brandId,
         CancellationToken cancellationToken)
     {
-        return V1Results.Ok(await getCarsByBrand.HandleAsync(new GetCarsByBrandQuery(brandId), cancellationToken), null);
+        return V1Results.Ok((await getCarsByBrand.HandleAsync(new GetCarsByBrandQuery(brandId), cancellationToken)).Items, null);
     }
 
     private static async Task<Ok<V1Response<List<CarDetailResponse>>>> GetByColorId(
-        IQueryHandler<GetCarsByColorQuery, List<CarDetailResponse>> getCarsByColor,
+        IQueryHandler<GetCarsByColorQuery, Page<CarDetailResponse>> getCarsByColor,
         int colorId,
         CancellationToken cancellationToken)
     {
-        return V1Results.Ok(await getCarsByColor.HandleAsync(new GetCarsByColorQuery(colorId), cancellationToken), Messages.CarsListed);
+        return V1Results.Ok((await getCarsByColor.HandleAsync(new GetCarsByColorQuery(colorId), cancellationToken)).Items, Messages.CarsListed);
     }
 
     private static async Task<Ok<V1Response<List<CarDetailResponse>>>> GetCarsByBrandIdAndColorId(
-        IQueryHandler<GetCarsByBrandAndColorQuery, List<CarDetailResponse>> getCarsByBrandAndColor,
+        IQueryHandler<GetCarsByBrandAndColorQuery, Page<CarDetailResponse>> getCarsByBrandAndColor,
         int brandId,
         int colorId,
         CancellationToken cancellationToken)
     {
-        var cars = await getCarsByBrandAndColor.HandleAsync(new GetCarsByBrandAndColorQuery(brandId, colorId), cancellationToken);
+        var cars = (await getCarsByBrandAndColor.HandleAsync(new GetCarsByBrandAndColorQuery(brandId, colorId), cancellationToken)).Items;
         return V1Results.Ok(cars, null);
     }
 

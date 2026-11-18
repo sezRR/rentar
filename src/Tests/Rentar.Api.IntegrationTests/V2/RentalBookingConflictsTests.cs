@@ -271,6 +271,6 @@ public class RentalBookingConflictsTests(RentarApiFactory factory) : V2TestBase(
 
     private async Task<List<RentalBody>> RentalsAsync()
     {
-        return await (await Client.GetJsonAsync("/api/v2/rentals")).ReadAsAsync<List<RentalBody>>();
+        return await (await Client.GetJsonAsync("/api/v2/rentals")).ReadItemsAsync<RentalBody>();
     }
 }

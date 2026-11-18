@@ -7,8 +7,8 @@ using Rentar.Modules.Fleet.Application.Colors.Commands;
 using Rentar.Modules.Fleet.Application.Colors.Queries;
 using Rentar.Modules.Fleet.Domain;
 using Rentar.Shared.Application.UseCases;
+using Rentar.Shared.Kernel.Paging;
 using Rentar.Shared.Presentation.Endpoints;
-using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -20,7 +20,8 @@ public class ColorsEndpoints : IEndpoint
     {
         var group = builder.MapVersionedGroup("Colors", "colors", 2.0);
 
-        group.MapGet("/", GetAll);
+        group.MapGet("/", GetAll)
+            .ProducesValidationProblem();
         group.MapGet("/{id:int}", GetById)
             .ProducesProblem(StatusCodes.Status404NotFound);
         group.MapPost("/", Create)
@@ -33,9 +34,12 @@ public class ColorsEndpoints : IEndpoint
             .ProducesProblem(StatusCodes.Status409Conflict);
     }
 
-    private static async Task<Ok<List<Color>>> GetAll(IQueryHandler<GetColorsQuery, List<Color>> getColors, CancellationToken cancellationToken)
+    private static async Task<Ok<PagedResponse<Color>>> GetAll(
+        IQueryHandler<GetColorsQuery, Page<Color>> getColors,
+        [AsParameters] PageParameters paging,
+        CancellationToken cancellationToken)
     {
-        return TypedResults.Ok(await getColors.HandleAsync(new GetColorsQuery(), cancellationToken));
+        return RestResults.Paged(await getColors.HandleAsync(new GetColorsQuery(paging.ToRequest()), cancellationToken));
     }
 
     private static async Task<Results<Ok<Color>, ProblemHttpResult>> GetById(

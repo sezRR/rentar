@@ -1,3 +1,5 @@
+using Rentar.Shared.Presentation.Endpoints;
+using System.Collections.Generic;
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -51,6 +53,12 @@ public static class HttpClientExtensions
     {
         var json = await response.ReadTextAsync();
         return JsonSerializer.Deserialize<T>(json, Options);
+    }
+
+    /// <summary>The items of one page of a v2 list, which answers <c>{ items, page: { hasMore, nextCursor } }</c>.</summary>
+    public static async Task<List<T>> ReadItemsAsync<T>(this HttpResponseMessage response)
+    {
+        return (await response.ReadAsAsync<PagedResponse<T>>()).Items;
     }
 
     public static Task<string> ReadTextAsync(this HttpResponseMessage response)

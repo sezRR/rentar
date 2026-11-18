@@ -1,7 +1,6 @@
 using Rentar.Modules.Fleet.Application;
 using Rentar.Modules.Fleet.Domain;
 using Rentar.Modules.Fleet.Presentation.Endpoints.V2;
-using System.Collections.Generic;
 using System.Net;
 using System.Threading.Tasks;
 using Xunit;
@@ -26,7 +25,7 @@ public class BrandsEndpointsTests(RentarApiFactory factory) : V2TestBase(factory
     }
 
     [Fact]
-    public async Task GetAll_ReturnsThePlainList_WithoutTheV1Envelope()
+    public async Task GetAll_ReturnsOnePage_WithoutTheV1Envelope()
     {
         await CreateBrandAsync("Honda");
         await CreateBrandAsync("Renault");
@@ -34,8 +33,10 @@ public class BrandsEndpointsTests(RentarApiFactory factory) : V2TestBase(factory
         var response = await Client.GetJsonAsync("/api/v2/brands");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.StartsWith("[", await response.ReadTextAsync());
-        var brands = await response.ReadAsAsync<List<BrandBody>>();
+        var body = await response.ReadTextAsync();
+        Assert.StartsWith("{\"items\":[", body);
+        Assert.DoesNotContain("\"success\"", body);
+        var brands = await response.ReadItemsAsync<BrandBody>();
         Assert.Equal(["Honda", "Renault"], brands.ConvertAll(b => b.BrandName));
     }
 
@@ -95,7 +96,7 @@ public class BrandsEndpointsTests(RentarApiFactory factory) : V2TestBase(factory
         var response = await Client.PostJsonAsync("/api/v2/brands", new BrandRequest("A"));
 
         await AssertValidationProblemAsync(response, "brandName");
-        var brands = await (await Client.GetJsonAsync("/api/v2/brands")).ReadAsAsync<List<BrandBody>>();
+        var brands = await (await Client.GetJsonAsync("/api/v2/brands")).ReadItemsAsync<BrandBody>();
         Assert.Empty(brands);
     }
 

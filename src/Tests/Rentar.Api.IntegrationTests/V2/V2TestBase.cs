@@ -9,7 +9,6 @@ using Rentar.Modules.Identity.Application.Auth;
 using Rentar.Modules.Identity.Application.Auth.Queries;
 using Rentar.Modules.Identity.Presentation.Endpoints.V2;
 using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -123,7 +122,7 @@ public abstract class V2TestBase(RentarApiFactory factory) : IntegrationTestBase
         var response = await Client.GetJsonAsync($"/api/v2/companies/{companyId}/roles");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        return (await response.ReadAsAsync<List<RoleBody>>()).Single(role => role.Name == roleName).Id;
+        return (await response.ReadItemsAsync<RoleBody>()).Single(role => role.Name == roleName).Id;
     }
 
     /// <summary>Employs the user with one predefined role, on behalf of the signed-in user.</summary>

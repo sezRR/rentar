@@ -9,9 +9,9 @@ using Rentar.Modules.Rentals.Application.Queries;
 using Rentar.Modules.Rentals.Domain;
 using Rentar.Shared.Application.Security;
 using Rentar.Shared.Application.UseCases;
+using Rentar.Shared.Kernel.Paging;
 using Rentar.Shared.Presentation.Endpoints;
 using System;
-using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -23,10 +23,12 @@ public class RentalsEndpoints : IEndpoint
     {
         var group = builder.MapVersionedGroup("Rentals", "rentals", 2.0);
 
-        group.MapGet("/", GetAll);
+        group.MapGet("/", GetAll)
+            .ProducesValidationProblem();
         group.MapGet("/{id:int}", GetById)
             .ProducesProblem(StatusCodes.Status404NotFound);
-        group.MapGet("/details", GetDetails);
+        group.MapGet("/details", GetDetails)
+            .ProducesValidationProblem();
         group.MapGet("/availability", GetAvailability);
         group.MapPost("/", Create)
             .ProducesValidationProblem()
@@ -37,6 +39,7 @@ public class RentalsEndpoints : IEndpoint
         builder.MapVersionedGroup("Rentals", "companies/{companyId:int}/rentals", 2.0)
             .RequireAuthorization()
             .MapGet("/", GetByCompany)
+            .ProducesValidationProblem()
             // Authentication refuses a missing or invalid token with an empty 401, not a problem.
             .Produces(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status403Forbidden)
@@ -44,34 +47,36 @@ public class RentalsEndpoints : IEndpoint
     }
 
     /// <summary>
-    /// Rentals booked by the company's customers; needs <c>rentals.read</c> in the company. A company the caller does
-    /// not work at answers 404.
+    /// One page of the rentals booked by the company's customers; needs <c>rentals.read</c> in the company. A company
+    /// the caller does not work at answers 404.
     /// </summary>
-    private static async Task<Ok<List<Rental>>> GetByCompany(
-        IQueryHandler<GetCompanyRentalsQuery, List<Rental>> getCompanyRentals,
+    private static async Task<Ok<PagedResponse<Rental>>> GetByCompany(
+        IQueryHandler<GetCompanyRentalsQuery, Page<Rental>> getCompanyRentals,
         ICurrentUser currentUser,
         int companyId,
+        [AsParameters] PageParameters paging,
         CancellationToken cancellationToken)
     {
-        return TypedResults.Ok(await getCompanyRentals.HandleAsync(
-            new GetCompanyRentalsQuery(currentUser.RequireUserId(), companyId),
+        return RestResults.Paged(await getCompanyRentals.HandleAsync(
+            new GetCompanyRentalsQuery(currentUser.RequireUserId(), companyId, paging.ToRequest()),
             cancellationToken));
     }
 
     /// <summary>
-    /// Lists rentals, optionally only those of a car, cancelled ones included; <c>status</c> tells them apart.
+    /// Lists one page of rentals, optionally only those of a car, cancelled ones included; <c>status</c> tells them apart.
     /// </summary>
-    private static async Task<Ok<List<Rental>>> GetAll(
-        IQueryHandler<GetRentalsQuery, List<Rental>> getRentals,
-        IQueryHandler<GetRentalsByCarQuery, List<Rental>> getRentalsByCar,
+    private static async Task<Ok<PagedResponse<Rental>>> GetAll(
+        IQueryHandler<GetRentalsQuery, Page<Rental>> getRentals,
+        IQueryHandler<GetRentalsByCarQuery, Page<Rental>> getRentalsByCar,
         int? carId,
+        [AsParameters] PageParameters paging,
         CancellationToken cancellationToken)
     {
         var rentals = carId is { } car
-            ? await getRentalsByCar.HandleAsync(new GetRentalsByCarQuery(car), cancellationToken)
-            : await getRentals.HandleAsync(new GetRentalsQuery(), cancellationToken);
+            ? await getRentalsByCar.HandleAsync(new GetRentalsByCarQuery(car, paging.ToRequest()), cancellationToken)
+            : await getRentals.HandleAsync(new GetRentalsQuery(paging.ToRequest()), cancellationToken);
 
-        return TypedResults.Ok(rentals);
+        return RestResults.Paged(rentals);
     }
 
     private static async Task<Results<Ok<Rental>, ProblemHttpResult>> GetById(
@@ -84,14 +89,15 @@ public class RentalsEndpoints : IEndpoint
     }
 
     /// <summary>
-    /// Rentals together with their car, customer and user; a cancelled rental, and one whose car, customer or user is
-    /// gone, is left out.
+    /// One page of rentals together with their car, customer and user; a cancelled rental, and one whose car, customer
+    /// or user is gone, is left out.
     /// </summary>
-    private static async Task<Ok<List<RentalDetailResponse>>> GetDetails(
-        IQueryHandler<GetRentalDetailsQuery, List<RentalDetailResponse>> getRentalDetails,
+    private static async Task<Ok<PagedResponse<RentalDetailResponse>>> GetDetails(
+        IQueryHandler<GetRentalDetailsQuery, Page<RentalDetailResponse>> getRentalDetails,
+        [AsParameters] PageParameters paging,
         CancellationToken cancellationToken)
     {
-        return TypedResults.Ok(await getRentalDetails.HandleAsync(new GetRentalDetailsQuery(), cancellationToken));
+        return RestResults.Paged(await getRentalDetails.HandleAsync(new GetRentalDetailsQuery(paging.ToRequest()), cancellationToken));
     }
 
     private static async Task<Ok<RentalAvailabilityResponse>> GetAvailability(

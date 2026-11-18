@@ -30,10 +30,10 @@ public class DevelopmentSeedingTests(RentarApiFactory factory) : V2TestBase(fact
         await using var app = WithSeeding(migrate: true);
         using var client = app.CreateClient();
 
-        var users = await (await client.GetJsonAsync("/api/v2/users")).ReadAsAsync<List<UserResponse>>();
-        var cars = await (await client.GetJsonAsync("/api/v2/cars")).ReadAsAsync<List<CarBody>>();
-        var customers = await (await client.GetJsonAsync("/api/v2/customers")).ReadAsAsync<List<CustomerBody>>();
-        var rentals = await (await client.GetJsonAsync("/api/v2/rentals")).ReadAsAsync<List<RentalBody>>();
+        var users = await (await client.GetJsonAsync("/api/v2/users")).ReadItemsAsync<UserResponse>();
+        var cars = await (await client.GetJsonAsync("/api/v2/cars")).ReadItemsAsync<CarBody>();
+        var customers = await (await client.GetJsonAsync("/api/v2/customers")).ReadItemsAsync<CustomerBody>();
+        var rentals = await (await client.GetJsonAsync("/api/v2/rentals")).ReadItemsAsync<RentalBody>();
         Assert.Equal(3, users.Count);
         Assert.Equal(4, cars.Count);
         Assert.Equal(2, customers.Count);
@@ -62,12 +62,12 @@ public class DevelopmentSeedingTests(RentarApiFactory factory) : V2TestBase(fact
         var tokenResponse = await client.PostJsonAsync("/api/v2/auth/tokens", new VerifyCredentialsQuery("owner@rentar.local", Password));
         var token = await tokenResponse.ReadAsAsync<AccessToken>();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token.Token);
-        var company = Assert.Single(await (await client.GetJsonAsync("/api/v2/companies")).ReadAsAsync<List<CompanyBody>>());
+        var company = Assert.Single(await (await client.GetJsonAsync("/api/v2/companies")).ReadItemsAsync<CompanyBody>());
         Assert.Equal("Rentar Demo", company.Name);
         Assert.Equal(company.Id, Assert.Single(customers, customer => customer.CompanyId != null).CompanyId);
         var employees = await client.GetJsonAsync($"/api/v2/companies/{company.Id}/employees");
         Assert.Equal(HttpStatusCode.OK, employees.StatusCode);
-        Assert.Equal(2, (await employees.ReadAsAsync<List<EmployeeBody>>()).Count);
+        Assert.Equal(2, (await employees.ReadItemsAsync<EmployeeBody>()).Count);
         await AssertNoEventsOrChargesAsync();
     }
 
@@ -76,9 +76,9 @@ public class DevelopmentSeedingTests(RentarApiFactory factory) : V2TestBase(fact
     {
         await using var app = WithSeeding();
         using var client = app.CreateClient();
-        var user = Assert.Single(await (await client.GetJsonAsync("/api/v2/users?email=renter@rentar.local")).ReadAsAsync<List<UserResponse>>());
-        var car = (await (await client.GetJsonAsync("/api/v2/cars")).ReadAsAsync<List<CarBody>>()).First();
-        var rentals = await (await client.GetJsonAsync("/api/v2/rentals")).ReadAsAsync<List<RentalBody>>();
+        var user = Assert.Single(await (await client.GetJsonAsync("/api/v2/users?email=renter@rentar.local")).ReadItemsAsync<UserResponse>());
+        var car = (await (await client.GetJsonAsync("/api/v2/cars")).ReadItemsAsync<CarBody>()).First();
+        var rentals = await (await client.GetJsonAsync("/api/v2/rentals")).ReadItemsAsync<RentalBody>();
         var counts = await CountsAsync();
         Assert.Equal(HttpStatusCode.NoContent, (await client.PutJsonAsync($"/api/v2/users/{user.Id}",
             new UserRequest("Edited", "Renter", user.Email, "N3wPassw0rd!"))).StatusCode);
@@ -95,7 +95,7 @@ public class DevelopmentSeedingTests(RentarApiFactory factory) : V2TestBase(fact
         var login = await client.PostJsonAsync("/api/v2/auth/tokens", new VerifyCredentialsQuery(user.Email, "N3wPassw0rd!"));
         Assert.Equal(HttpStatusCode.OK, login.StatusCode);
         Assert.Equal(999m, (await (await client.GetJsonAsync($"/api/v2/cars/{car.Id}")).ReadAsAsync<CarBody>()).DailyPrice);
-        var after = await (await client.GetJsonAsync("/api/v2/rentals")).ReadAsAsync<List<RentalBody>>();
+        var after = await (await client.GetJsonAsync("/api/v2/rentals")).ReadItemsAsync<RentalBody>();
         Assert.Equal(rentals.Select(rental => (rental.Id, rental.RentDate, rental.ReturnDate)).OrderBy(rental => rental.Id),
             after.Select(rental => (rental.Id, rental.RentDate, rental.ReturnDate)).OrderBy(rental => rental.Id));
         await AssertNoEventsOrChargesAsync();
@@ -112,13 +112,13 @@ public class DevelopmentSeedingTests(RentarApiFactory factory) : V2TestBase(fact
         await using var app = WithSeeding();
         using var client = app.CreateClient();
 
-        var users = await (await client.GetJsonAsync("/api/v2/users")).ReadAsAsync<List<UserResponse>>();
+        var users = await (await client.GetJsonAsync("/api/v2/users")).ReadItemsAsync<UserResponse>();
         Assert.Equal(3, users.Count);
         Assert.Equal(owner.Id, Assert.Single(users, user => user.Email == owner.Email).Id);
         Assert.Equal("Existing", Assert.Single(users, user => user.Id == owner.Id).FirstName);
-        var brands = await (await client.GetJsonAsync("/api/v2/brands")).ReadAsAsync<List<BrandBody>>();
+        var brands = await (await client.GetJsonAsync("/api/v2/brands")).ReadItemsAsync<BrandBody>();
         Assert.Equal(brand.Id, Assert.Single(brands, row => row.BrandName == "Toyota").Id);
-        var cars = await (await client.GetJsonAsync("/api/v2/cars")).ReadAsAsync<List<CarBody>>();
+        var cars = await (await client.GetJsonAsync("/api/v2/cars")).ReadItemsAsync<CarBody>();
         Assert.Equal(5, cars.Count);
         Assert.Equal("My existing car", Assert.Single(cars, car => car.Id == existingCar.Id).Description);
     }
@@ -148,8 +148,8 @@ public class DevelopmentSeedingTests(RentarApiFactory factory) : V2TestBase(fact
         Assert.All(await CountsAsync(), row => Assert.Equal(0, row.Value));
         await using var retry = WithSeeding();
         using var client = retry.CreateClient();
-        Assert.Equal(3, (await (await client.GetJsonAsync("/api/v2/users")).ReadAsAsync<List<UserResponse>>()).Count);
-        Assert.Equal(4, (await (await client.GetJsonAsync("/api/v2/cars")).ReadAsAsync<List<CarBody>>()).Count);
+        Assert.Equal(3, (await (await client.GetJsonAsync("/api/v2/users")).ReadItemsAsync<UserResponse>()).Count);
+        Assert.Equal(4, (await (await client.GetJsonAsync("/api/v2/cars")).ReadItemsAsync<CarBody>()).Count);
     }
 
     [Fact]
@@ -164,9 +164,9 @@ public class DevelopmentSeedingTests(RentarApiFactory factory) : V2TestBase(fact
         using var firstClient = clients[0];
         using var secondClient = clients[1];
 
-        Assert.Equal(3, (await (await firstClient.GetJsonAsync("/api/v2/users")).ReadAsAsync<List<UserResponse>>()).Count);
-        Assert.Equal(4, (await (await secondClient.GetJsonAsync("/api/v2/cars")).ReadAsAsync<List<CarBody>>()).Count);
-        Assert.Equal(2, (await (await secondClient.GetJsonAsync("/api/v2/rentals")).ReadAsAsync<List<RentalBody>>()).Count);
+        Assert.Equal(3, (await (await firstClient.GetJsonAsync("/api/v2/users")).ReadItemsAsync<UserResponse>()).Count);
+        Assert.Equal(4, (await (await secondClient.GetJsonAsync("/api/v2/cars")).ReadItemsAsync<CarBody>()).Count);
+        Assert.Equal(2, (await (await secondClient.GetJsonAsync("/api/v2/rentals")).ReadItemsAsync<RentalBody>()).Count);
         await AssertNoEventsOrChargesAsync();
     }
 

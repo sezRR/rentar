@@ -211,7 +211,7 @@ public class MaintenanceTests(RentarApiFactory factory) : V2TestBase(factory)
         var response = await client.PostJsonAsync("/api/v2/brands", new { brandName = "Toyota" });
 
         await AssertProblemAsync(response, HttpStatusCode.ServiceUnavailable, Message);
-        Assert.Empty(await (await Client.GetJsonAsync("/api/v2/brands")).ReadAsAsync<List<BrandBody>>());
+        Assert.Empty(await (await Client.GetJsonAsync("/api/v2/brands")).ReadItemsAsync<BrandBody>());
     }
 
     [Fact]
