@@ -1,6 +1,5 @@
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Rentar.Api.IntegrationTests.V2;
 using Rentar.Shared.Presentation.Endpoints;
@@ -15,6 +14,10 @@ using Xunit;
 
 namespace Rentar.Api.IntegrationTests;
 
+/// <summary>
+/// Opens the maintenance window on the shared host through <see cref="RentarApiFactory.Settings"/>; only the startup
+/// validation needs a host of its own.
+/// </summary>
 public class MaintenanceTests(RentarApiFactory factory) : V2TestBase(factory)
 {
     private const string Message = "Servers in Maintenance (Time)";
@@ -38,15 +41,14 @@ public class MaintenanceTests(RentarApiFactory factory) : V2TestBase(factory)
     public async Task Maintenance_RefusesReadsAndWritesAcrossModules_BeforeAuthenticationOrBinding(string method, string path)
     {
         FreezeAt("22:30");
-        await using var app = WithMaintenance();
-        using var client = app.CreateClient();
+        EnableMaintenance();
         using var request = new HttpRequestMessage(new HttpMethod(method), path);
         if (method is "POST" or "PUT")
         {
             request.Content = new StringContent("{", Encoding.UTF8, "application/json");
         }
 
-        var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
+        var response = await Client.SendAsync(request, TestContext.Current.CancellationToken);
 
         await AssertProblemAsync(response, HttpStatusCode.ServiceUnavailable, Message);
         Assert.Equal(TimeSpan.FromMinutes(30), response.Headers.RetryAfter?.Delta);
@@ -61,11 +63,10 @@ public class MaintenanceTests(RentarApiFactory factory) : V2TestBase(factory)
     public async Task Maintenance_KeepsTheV1Envelope_ButAnswersServiceUnavailable(string method, string path)
     {
         FreezeAt("22:30");
-        await using var app = WithMaintenance();
-        using var client = app.CreateClient();
+        EnableMaintenance();
         using var request = new HttpRequestMessage(new HttpMethod(method), path);
 
-        var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
+        var response = await Client.SendAsync(request, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
         Assert.Equal("application/json", response.Content.Headers.ContentType?.MediaType);
@@ -95,10 +96,9 @@ public class MaintenanceTests(RentarApiFactory factory) : V2TestBase(factory)
         string start, string end, string now, HttpStatusCode status, int? retryAfter)
     {
         FreezeAt(now);
-        await using var app = WithMaintenance(start: start, end: end);
-        using var client = app.CreateClient();
+        EnableMaintenance(start, end);
 
-        var response = await client.GetJsonAsync("/api/v2/brands");
+        var response = await Client.GetJsonAsync("/api/v2/brands");
 
         Assert.Equal(status, response.StatusCode);
         Assert.Equal(retryAfter is { } seconds ? TimeSpan.FromSeconds(seconds) : (TimeSpan?)null, response.Headers.RetryAfter?.Delta);
@@ -108,10 +108,9 @@ public class MaintenanceTests(RentarApiFactory factory) : V2TestBase(factory)
     public async Task Maintenance_CanBeDisabled()
     {
         FreezeAt("22:30");
-        await using var app = WithMaintenance(enabled: false);
-        using var client = app.CreateClient();
+        Factory.Settings.Apply(("Maintenance:Enabled", "false"), ("Maintenance:StartTime", "22:00"), ("Maintenance:EndTime", "23:00"));
 
-        var response = await client.GetJsonAsync("/api/v2/brands");
+        var response = await Client.GetJsonAsync("/api/v2/brands");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Null(response.Headers.RetryAfter);
@@ -121,21 +120,19 @@ public class MaintenanceTests(RentarApiFactory factory) : V2TestBase(factory)
     public async Task ConfigurationReload_ChangesTheGateWithoutRestartingTheHost()
     {
         FreezeAt("22:30");
-        await using var app = WithMaintenance();
-        using var client = app.CreateClient();
-        Assert.Equal(HttpStatusCode.ServiceUnavailable, (await client.GetJsonAsync("/api/v2/brands")).StatusCode);
+        EnableMaintenance();
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, (await Client.GetJsonAsync("/api/v2/brands")).StatusCode);
 
-        var configuration = app.Services.GetRequiredService<IConfiguration>();
-        configuration["Maintenance:Enabled"] = "false";
-        ((IConfigurationRoot)configuration).Reload();
+        EndMaintenance();
 
-        Assert.Equal(HttpStatusCode.OK, (await client.GetJsonAsync("/api/v2/brands")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await Client.GetJsonAsync("/api/v2/brands")).StatusCode);
     }
 
     [Fact]
     public async Task AnEmptyWindow_IsRejectedAtStartup()
     {
-        await using var app = WithMaintenance(start: "22:00", end: "22:00");
+        // ValidateOnStart only runs while a host starts, so this test needs one of its own.
+        await using var app = WithMaintenanceWindow(start: "22:00", end: "22:00");
 
         Assert.Throws<OptionsValidationException>(() => app.CreateClient());
     }
@@ -148,10 +145,9 @@ public class MaintenanceTests(RentarApiFactory factory) : V2TestBase(factory)
     public async Task Maintenance_DoesNotReplaceNonApiOrNotFoundResponses(string path)
     {
         FreezeAt("22:30");
-        await using var app = WithMaintenance();
-        using var client = app.CreateClient();
+        EnableMaintenance();
 
-        var response = await client.GetJsonAsync(path);
+        var response = await Client.GetJsonAsync(path);
 
         Assert.NotEqual(HttpStatusCode.ServiceUnavailable, response.StatusCode);
         Assert.Null(response.Headers.RetryAfter);
@@ -161,24 +157,24 @@ public class MaintenanceTests(RentarApiFactory factory) : V2TestBase(factory)
     public async Task Maintenance_DoesNotBlockStaticImages()
     {
         var car = await CreateCarAsync();
-        var uploaded = await UploadImageAsync(car.Id, "car.png", PngBytes);
+        var uploaded = await UploadImageAsync(car.Id, "car.png", TestImages.Png);
         Assert.Equal(HttpStatusCode.Created, uploaded.StatusCode);
         var image = await uploaded.ReadAsAsync<CarImageBody>();
 
         try
         {
             FreezeAt("22:30");
-            await using var app = WithMaintenance();
-            using var client = app.CreateClient();
+            EnableMaintenance();
 
-            var response = await client.GetAsync($"/uploads/{image.ImagePath}", TestContext.Current.CancellationToken);
+            var response = await Client.GetAsync($"/uploads/{image.ImagePath}", TestContext.Current.CancellationToken);
 
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-            Assert.Equal(PngBytes, await response.Content.ReadAsByteArrayAsync(TestContext.Current.CancellationToken));
+            Assert.Equal(TestImages.Png, await response.Content.ReadAsByteArrayAsync(TestContext.Current.CancellationToken));
             Assert.Null(response.Headers.RetryAfter);
         }
         finally
         {
+            EndMaintenance();
             await Client.DeleteResourceAsync($"/api/v2/cars/{car.Id}/images");
         }
     }
@@ -187,14 +183,13 @@ public class MaintenanceTests(RentarApiFactory factory) : V2TestBase(factory)
     public async Task Maintenance_DoesNotBlockCorsPreflight()
     {
         FreezeAt("22:30");
-        await using var app = WithMaintenance();
-        using var client = app.CreateClient();
+        EnableMaintenance();
         using var request = new HttpRequestMessage(HttpMethod.Options, "/api/v2/brands");
         request.Headers.Add("Origin", "http://localhost:4200");
         request.Headers.Add("Access-Control-Request-Method", "POST");
         request.Headers.Add("Access-Control-Request-Headers", "content-type");
 
-        var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
+        var response = await Client.SendAsync(request, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
         Assert.Contains("http://localhost:4200", response.Headers.GetValues("Access-Control-Allow-Origin"));
@@ -205,12 +200,12 @@ public class MaintenanceTests(RentarApiFactory factory) : V2TestBase(factory)
     public async Task ARefusedWrite_DoesNotChangeStoredData()
     {
         FreezeAt("22:30");
-        await using var app = WithMaintenance();
-        using var client = app.CreateClient();
+        EnableMaintenance();
 
-        var response = await client.PostJsonAsync("/api/v2/brands", new { brandName = "Toyota" });
+        var response = await Client.PostJsonAsync("/api/v2/brands", new { brandName = "Toyota" });
 
         await AssertProblemAsync(response, HttpStatusCode.ServiceUnavailable, Message);
+        EndMaintenance();
         Assert.Empty(await (await Client.GetJsonAsync("/api/v2/brands")).ReadItemsAsync<BrandBody>());
     }
 
@@ -219,22 +214,28 @@ public class MaintenanceTests(RentarApiFactory factory) : V2TestBase(factory)
     {
         FreezeAt("22:30");
         var customer = await CreateCustomerAsync();
-        await using var app = WithMaintenance();
-        using var client = app.CreateClient();
-        Assert.Equal(HttpStatusCode.ServiceUnavailable, (await client.GetJsonAsync($"/api/v2/customers/{customer.Id}/score")).StatusCode);
+        EnableMaintenance();
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, (await Client.GetJsonAsync($"/api/v2/customers/{customer.Id}/score")).StatusCode);
 
         await DeliverEventsAsync();
 
         Assert.True(Assert.Single(await Factory.OutboxAsync("customers")).Processed);
+        EndMaintenance();
         Assert.Equal(HttpStatusCode.OK, (await Client.GetJsonAsync($"/api/v2/customers/{customer.Id}/score")).StatusCode);
     }
 
-    private WebApplicationFactory<Program> WithMaintenance(bool enabled = true, string start = "22:00", string end = "23:00")
+    /// <summary>Closes the window again, so the test can look at what is stored through the same client.</summary>
+    private void EndMaintenance()
+    {
+        Factory.Settings.Apply(("Maintenance:Enabled", "false"));
+    }
+
+    private WebApplicationFactory<Program> WithMaintenanceWindow(string start, string end)
     {
         return Factory.WithWebHostBuilder(builder => builder.ConfigureAppConfiguration((_, configuration) =>
             configuration.AddInMemoryCollection(new Dictionary<string, string>
             {
-                ["Maintenance:Enabled"] = enabled.ToString(),
+                ["Maintenance:Enabled"] = "true",
                 ["Maintenance:StartTime"] = start,
                 ["Maintenance:EndTime"] = end
             })));

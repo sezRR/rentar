@@ -1,4 +1,5 @@
 using Rentar.Modules.Fleet.Application;
+using Rentar.Modules.Fleet.Application.Common.Interfaces;
 using Rentar.Modules.Fleet.Domain;
 using Rentar.Modules.Fleet.Presentation.Endpoints.V2;
 using Rentar.Modules.Rentals.Application.Commands;
@@ -7,6 +8,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net;
+using System.Net.Http;
 using System.Threading.Tasks;
 using Xunit;
 
@@ -63,12 +65,30 @@ public class CarsEndpointsTests(RentarApiFactory factory) : V2TestBase(factory)
     }
 
     [Fact]
+    public async Task GetAll_ByBrand_IsRefreshedAfterAddingAnotherCar()
+    {
+        var brand = await CreateBrandAsync();
+        var color = await CreateColorAsync();
+        await CreateCarAsync(brand.Id, color.Id, "Corolla 1.6");
+
+        // The first list fills the cache the caching aspect keeps for the brand query.
+        Assert.Equal(["Corolla 1.6"], await DescriptionsAsync($"/api/v2/cars?brandId={brand.Id}"));
+        await CreateCarAsync(brand.Id, color.Id, "Corolla 1.8");
+
+        Assert.Equal(["Corolla 1.6", "Corolla 1.8"], await DescriptionsAsync($"/api/v2/cars?brandId={brand.Id}"));
+    }
+
+    [Fact]
     public async Task Delete_RemovesTheCarWithItsImagesAndTheirFiles()
     {
         var car = await CreateCarAsync();
-        var image = await (await UploadImageAsync(car.Id, "car.png", PngBytes)).ReadAsAsync<CarImageBody>();
+        var image = await (await UploadImageAsync(car.Id, "car.png", TestImages.Png)).ReadAsAsync<CarImageBody>();
         var stored = UploadedFile(image.ImagePath);
         Assert.True(File.Exists(stored));
+        using var withoutFile = new MultipartFormDataContent();
+        withoutFile.Add(new StringContent("no file"), "note");
+        Assert.Equal(HttpStatusCode.Created,
+            (await Client.PostAsync($"/api/v2/cars/{car.Id}/images", withoutFile, TestContext.Current.CancellationToken)).StatusCode);
 
         var response = await Client.DeleteResourceAsync($"/api/v2/cars/{car.Id}");
 
@@ -76,13 +96,36 @@ public class CarsEndpointsTests(RentarApiFactory factory) : V2TestBase(factory)
         await AssertProblemAsync(await Client.GetJsonAsync($"/api/v2/cars/{car.Id}"), HttpStatusCode.NotFound);
         Assert.Empty(await (await Client.GetJsonAsync($"/api/v2/cars/{car.Id}/images")).ReadItemsAsync<CarImageBody>());
         Assert.False(File.Exists(stored));
+        // Every car without an image of its own shares the default file, so deleting one car leaves it.
+        Assert.True(File.Exists(UploadedFile(IImageStorage.DefaultImageName)));
+    }
+
+    [Fact]
+    public async Task Delete_WhenTheCarCanNotBeDeleted_KeepsItsImagesAndFiles()
+    {
+        var car = await CreateCarAsync();
+        var image = await (await UploadImageAsync(car.Id, "car.png", TestImages.Png)).ReadAsAsync<CarImageBody>();
+        var stored = UploadedFile(image.ImagePath);
+
+        HttpResponseMessage response;
+        await using (await Factory.RefuseAsync("fleet", "Cars", "DELETE"))
+        {
+            response = await Client.DeleteResourceAsync($"/api/v2/cars/{car.Id}");
+        }
+
+        await AssertProblemAsync(response, HttpStatusCode.InternalServerError);
+        Assert.Equal([image.Id], (await (await Client.GetJsonAsync($"/api/v2/cars/{car.Id}/images")).ReadItemsAsync<CarImageBody>()).Select(i => i.Id));
+        Assert.True(File.Exists(stored));
+
+        await Client.DeleteResourceAsync($"/api/v2/cars/{car.Id}/images");
+        Assert.False(File.Exists(stored));
     }
 
     [Fact]
     public async Task Delete_OfACarWithRentals_IsAConflict_AndKeepsTheCarAndItsImages()
     {
         var car = await CreateCarAsync();
-        var image = await (await UploadImageAsync(car.Id, "car.png", PngBytes)).ReadAsAsync<CarImageBody>();
+        var image = await (await UploadImageAsync(car.Id, "car.png", TestImages.Png)).ReadAsAsync<CarImageBody>();
         var customer = await CreateCustomerAsync();
         var rented = await Client.PostJsonAsync(
             "/api/v2/rentals",
@@ -154,8 +197,8 @@ public class CarsEndpointsTests(RentarApiFactory factory) : V2TestBase(factory)
     public async Task GetById_AnswersTheFirstImageUploaded()
     {
         var car = await CreateCarAsync();
-        var first = await (await UploadImageAsync(car.Id, "first.png", PngBytes)).ReadAsAsync<CarImageBody>();
-        await UploadImageAsync(car.Id, "second.jpg", JpegBytes);
+        var first = await (await UploadImageAsync(car.Id, "first.png", TestImages.Png)).ReadAsAsync<CarImageBody>();
+        await UploadImageAsync(car.Id, "second.jpg", TestImages.Jpeg);
 
         var fetched = await (await Client.GetJsonAsync($"/api/v2/cars/{car.Id}")).ReadAsAsync<CarResponse>();
 

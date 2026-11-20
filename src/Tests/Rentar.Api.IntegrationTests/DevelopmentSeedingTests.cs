@@ -74,28 +74,28 @@ public class DevelopmentSeedingTests(RentarApiFactory factory) : V2TestBase(fact
     [Fact]
     public async Task RepeatedSeeding_DoesNotDuplicateData_ResetEdits_OrMoveRentalDates()
     {
-        await using var app = WithSeeding();
-        using var client = app.CreateClient();
-        var user = Assert.Single(await (await client.GetJsonAsync("/api/v2/users?email=renter@rentar.local")).ReadItemsAsync<UserResponse>());
-        var car = (await (await client.GetJsonAsync("/api/v2/cars")).ReadItemsAsync<CarBody>()).First();
-        var rentals = await (await client.GetJsonAsync("/api/v2/rentals")).ReadItemsAsync<RentalBody>();
+        EnableSeeding();
+        await SeedAsync();
+        var user = Assert.Single(await (await Client.GetJsonAsync("/api/v2/users?email=renter@rentar.local")).ReadItemsAsync<UserResponse>());
+        var car = (await (await Client.GetJsonAsync("/api/v2/cars")).ReadItemsAsync<CarBody>()).First();
+        var rentals = await (await Client.GetJsonAsync("/api/v2/rentals")).ReadItemsAsync<RentalBody>();
         var counts = await CountsAsync();
-        Assert.Equal(HttpStatusCode.NoContent, (await client.PutJsonAsync($"/api/v2/users/{user.Id}",
+        Assert.Equal(HttpStatusCode.NoContent, (await Client.PutJsonAsync($"/api/v2/users/{user.Id}",
             new UserRequest("Edited", "Renter", user.Email, "N3wPassw0rd!"))).StatusCode);
-        Assert.Equal(HttpStatusCode.NoContent, (await client.PutJsonAsync($"/api/v2/cars/{car.Id}",
+        Assert.Equal(HttpStatusCode.NoContent, (await Client.PutJsonAsync($"/api/v2/cars/{car.Id}",
             new CarRequest(car.BrandId, car.ColorId, car.ModelYear, 999m, car.Description, car.MinimumFindeksRating))).StatusCode);
 
         Factory.Clock.FreezeAt(DateTimeOffset.Now.AddMonths(1));
-        await app.Services.SeedDevelopmentDataAsync(TestContext.Current.CancellationToken);
-        await app.Services.SeedDevelopmentDataAsync(TestContext.Current.CancellationToken);
+        await SeedAsync();
+        await SeedAsync();
 
         Assert.Equal(counts.OrderBy(row => row.Key), (await CountsAsync()).OrderBy(row => row.Key));
-        var editedUser = await (await client.GetJsonAsync($"/api/v2/users/{user.Id}")).ReadAsAsync<UserResponse>();
+        var editedUser = await (await Client.GetJsonAsync($"/api/v2/users/{user.Id}")).ReadAsAsync<UserResponse>();
         Assert.Equal("Edited", editedUser.FirstName);
-        var login = await client.PostJsonAsync("/api/v2/auth/tokens", new VerifyCredentialsQuery(user.Email, "N3wPassw0rd!"));
+        var login = await Client.PostJsonAsync("/api/v2/auth/tokens", new VerifyCredentialsQuery(user.Email, "N3wPassw0rd!"));
         Assert.Equal(HttpStatusCode.OK, login.StatusCode);
-        Assert.Equal(999m, (await (await client.GetJsonAsync($"/api/v2/cars/{car.Id}")).ReadAsAsync<CarBody>()).DailyPrice);
-        var after = await (await client.GetJsonAsync("/api/v2/rentals")).ReadItemsAsync<RentalBody>();
+        Assert.Equal(999m, (await (await Client.GetJsonAsync($"/api/v2/cars/{car.Id}")).ReadAsAsync<CarBody>()).DailyPrice);
+        var after = await (await Client.GetJsonAsync("/api/v2/rentals")).ReadItemsAsync<RentalBody>();
         Assert.Equal(rentals.Select(rental => (rental.Id, rental.RentDate, rental.ReturnDate)).OrderBy(rental => rental.Id),
             after.Select(rental => (rental.Id, rental.RentDate, rental.ReturnDate)).OrderBy(rental => rental.Id));
         // The demo rentals keep the car, user and price they were seeded with, whatever was edited since.
@@ -114,28 +114,37 @@ public class DevelopmentSeedingTests(RentarApiFactory factory) : V2TestBase(fact
         var color = await CreateColorAsync("Red");
         var existingCar = await CreateCarAsync(brand.Id, color.Id, "My existing car");
 
-        await using var app = WithSeeding();
-        using var client = app.CreateClient();
+        EnableSeeding();
+        await SeedAsync();
 
-        var users = await (await client.GetJsonAsync("/api/v2/users")).ReadItemsAsync<UserResponse>();
+        var users = await (await Client.GetJsonAsync("/api/v2/users")).ReadItemsAsync<UserResponse>();
         Assert.Equal(3, users.Count);
         Assert.Equal(owner.Id, Assert.Single(users, user => user.Email == owner.Email).Id);
         Assert.Equal("Existing", Assert.Single(users, user => user.Id == owner.Id).FirstName);
-        var brands = await (await client.GetJsonAsync("/api/v2/brands")).ReadItemsAsync<BrandBody>();
+        var brands = await (await Client.GetJsonAsync("/api/v2/brands")).ReadItemsAsync<BrandBody>();
         Assert.Equal(brand.Id, Assert.Single(brands, row => row.BrandName == "Toyota").Id);
-        var cars = await (await client.GetJsonAsync("/api/v2/cars")).ReadItemsAsync<CarBody>();
+        var cars = await (await Client.GetJsonAsync("/api/v2/cars")).ReadItemsAsync<CarBody>();
         Assert.Equal(5, cars.Count);
         Assert.Equal("My existing car", Assert.Single(cars, car => car.Id == existingCar.Id).Description);
     }
 
-    [Theory]
-    [InlineData("Production", true)]
-    [InlineData("Staging", true)]
-    [InlineData("Development", false)]
-    public async Task Seeding_IsDisabledOutsideDevelopment_AndCanBeOptedOut(string environment, bool enabled)
+    [Fact]
+    public async Task Seeding_IsDisabledOutsideDevelopment()
     {
-        await using var app = WithSeeding(environment, enabled);
+        // The environment is fixed when a host is built, so this test needs one of its own. Any environment other than
+        // Development takes the same branch.
+        await using var app = WithSeeding("Production");
         using var client = app.CreateClient();
+
+        Assert.All(await CountsAsync(), row => Assert.Equal(0, row.Value));
+        Assert.Equal(0, Factory.PaymentGateway.Charges);
+    }
+
+    [Fact]
+    public async Task Seeding_CanBeOptedOut()
+    {
+        // The shared host is a Development host that has not opted in.
+        await SeedAsync();
 
         Assert.All(await CountsAsync(), row => Assert.Equal(0, row.Value));
         Assert.Equal(0, Factory.PaymentGateway.Charges);
@@ -144,35 +153,39 @@ public class DevelopmentSeedingTests(RentarApiFactory factory) : V2TestBase(fact
     [Fact]
     public async Task AFailedSeed_RollsBackAllModules_AndCanBeRetried()
     {
+        EnableSeeding();
         await using (await Factory.RefuseAsync("fleet", "Cars", "INSERT"))
         {
-            await using var failed = WithSeeding();
-            Assert.Throws<DbUpdateException>(() => failed.CreateClient());
+            await Assert.ThrowsAsync<DbUpdateException>(SeedAsync);
         }
 
         Assert.All(await CountsAsync(), row => Assert.Equal(0, row.Value));
-        await using var retry = WithSeeding();
-        using var client = retry.CreateClient();
-        Assert.Equal(3, (await (await client.GetJsonAsync("/api/v2/users")).ReadItemsAsync<UserResponse>()).Count);
-        Assert.Equal(4, (await (await client.GetJsonAsync("/api/v2/cars")).ReadItemsAsync<CarBody>()).Count);
+        await SeedAsync();
+        Assert.Equal(3, (await (await Client.GetJsonAsync("/api/v2/users")).ReadItemsAsync<UserResponse>()).Count);
+        Assert.Equal(4, (await (await Client.GetJsonAsync("/api/v2/cars")).ReadItemsAsync<CarBody>()).Count);
     }
 
     [Fact]
-    public async Task ConcurrentDevelopmentHosts_SeedOnlyOneCopyOfTheData()
+    public async Task ConcurrentSeeding_SeedsOnlyOneCopyOfTheData()
     {
-        await using var first = WithSeeding();
-        await using var second = WithSeeding();
+        // Each run opens its own scope, connection and transaction, as two hosts starting at once would, so the database
+        // lock is what keeps them from seeding twice.
+        EnableSeeding();
 
-        var clients = await Task.WhenAll(
-            Task.Run(() => first.CreateClient(), TestContext.Current.CancellationToken),
-            Task.Run(() => second.CreateClient(), TestContext.Current.CancellationToken));
-        using var firstClient = clients[0];
-        using var secondClient = clients[1];
+        await Task.WhenAll(
+            Task.Run(SeedAsync, TestContext.Current.CancellationToken),
+            Task.Run(SeedAsync, TestContext.Current.CancellationToken));
 
-        Assert.Equal(3, (await (await firstClient.GetJsonAsync("/api/v2/users")).ReadItemsAsync<UserResponse>()).Count);
-        Assert.Equal(4, (await (await secondClient.GetJsonAsync("/api/v2/cars")).ReadItemsAsync<CarBody>()).Count);
-        Assert.Equal(2, (await (await secondClient.GetJsonAsync("/api/v2/rentals")).ReadItemsAsync<RentalBody>()).Count);
+        Assert.Equal(3, (await (await Client.GetJsonAsync("/api/v2/users")).ReadItemsAsync<UserResponse>()).Count);
+        Assert.Equal(4, (await (await Client.GetJsonAsync("/api/v2/cars")).ReadItemsAsync<CarBody>()).Count);
+        Assert.Equal(2, (await (await Client.GetJsonAsync("/api/v2/rentals")).ReadItemsAsync<RentalBody>()).Count);
         await AssertNoEventsOrChargesAsync();
+    }
+
+    /// <summary>Seeds the shared host the way Program does at startup; it seeds only once a test called <c>EnableSeeding()</c>.</summary>
+    private Task SeedAsync()
+    {
+        return Factory.Services.SeedDevelopmentDataAsync(TestContext.Current.CancellationToken);
     }
 
     private WebApplicationFactory<Program> WithSeeding(string environment = "Development", bool enabled = true, bool migrate = false)

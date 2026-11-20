@@ -2,10 +2,12 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
 using Rentar.Modules.Payments.Application.Common.Interfaces;
 using Rentar.Modules.Rentals.Domain;
+using Rentar.Shared.Application.IoC;
 using Rentar.Shared.Infrastructure.Messaging;
 using Rentar.Shared.Infrastructure.Persistence;
 using System;
@@ -34,6 +36,9 @@ public class RentarApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 
     public TestPaymentGateway PaymentGateway { get; } = new();
 
+    /// <summary>Configuration a test changes at runtime; <see cref="ResetAsync"/> drops it again.</summary>
+    public TestSettings Settings { get; } = new();
+
     public string ConnectionString => _postgres.GetConnectionString();
 
     public async ValueTask InitializeAsync()
@@ -57,6 +62,21 @@ public class RentarApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         builder.UseSetting("Maintenance:Enabled", "false");
         // A test delivers the events itself with DeliverEventsAsync, so it knows the reactions have run when it asserts.
         builder.UseSetting($"{OutboxOptions.SectionName}:{nameof(OutboxOptions.DeliverInBackground)}", "false");
+
+        builder.ConfigureAppConfiguration((_, configuration) =>
+        {
+            // Only warnings and errors, such as the ones deliberate failures log: the host's lifetime and request
+            // information would otherwise bury them. appsettings names Microsoft.Hosting.Lifetime itself, so it is
+            // lowered on its own.
+            configuration.AddInMemoryCollection(new Dictionary<string, string>
+            {
+                ["Logging:LogLevel:Default"] = "Warning",
+                ["Logging:LogLevel:Microsoft.Hosting.Lifetime"] = "Warning"
+            });
+
+            // Added last, so what a test applies wins over every setting above.
+            configuration.Add(Settings);
+        });
 
         builder.ConfigureTestServices(services =>
         {
@@ -239,13 +259,18 @@ public class RentarApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     }
 
     /// <summary>
-    /// Empties every module's tables, the in-process cache, the clock and the payment gateway so each test starts from a
-    /// known state.
+    /// Empties every module's tables, the in-process cache, the clock, the payment gateway and the test settings so each
+    /// test starts from a known state.
     /// </summary>
     public async Task ResetAsync()
     {
         Clock.Reset();
         PaymentGateway.Reset();
+        Settings.Reset();
+
+        // Every host Program builds takes over ServiceTool, through which aspect attributes resolve their services. A
+        // test that built a host of its own leaves it pointing at that disposed host, so point it back at this one.
+        ServiceTool.Initialize(Services);
 
         await using var connection = new NpgsqlConnection(ConnectionString);
         await connection.OpenAsync();

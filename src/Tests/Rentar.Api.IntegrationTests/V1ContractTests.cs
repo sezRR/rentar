@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
-using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Xunit;
@@ -15,8 +14,6 @@ namespace Rentar.Api.IntegrationTests;
 /// </summary>
 public class V1ContractTests(RentarApiFactory factory) : IntegrationTestBase(factory)
 {
-    private static readonly byte[] PngBytes = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00];
-
     private readonly List<string> _responses = [];
 
     [Fact]
@@ -132,12 +129,12 @@ public class V1ContractTests(RentarApiFactory factory) : IntegrationTestBase(fac
     {
         Factory.Clock.FreezeAt(new DateTimeOffset(DateTime.Today.AddHours(22).AddMinutes(30)));
 
-        await using var app = Factory.WithWebHostBuilder(builder => builder.UseSetting("Maintenance:Enabled", "true"));
-        using var client = app.CreateClient();
-        _responses.Add(await DescribeAsync("users/getall maintenance", await client.GetJsonAsync("/api/v1/users/getall")));
-        _responses.Add(await DescribeAsync("customers/getall maintenance", await client.GetJsonAsync("/api/v1/customers/getall")));
-        _responses.Add(await DescribeAsync("rentals/getrentaldetails maintenance", await client.GetJsonAsync("/api/v1/rentals/getrentaldetails")));
+        Factory.Settings.Apply(("Maintenance:Enabled", "true"));
+        _responses.Add(await DescribeAsync("users/getall maintenance", await Client.GetJsonAsync("/api/v1/users/getall")));
+        _responses.Add(await DescribeAsync("customers/getall maintenance", await Client.GetJsonAsync("/api/v1/customers/getall")));
+        _responses.Add(await DescribeAsync("rentals/getrentaldetails maintenance", await Client.GetJsonAsync("/api/v1/rentals/getrentaldetails")));
 
+        Factory.Settings.Apply(("Maintenance:Enabled", "false"));
         Factory.Clock.FreezeAt(new DateTimeOffset(DateTime.Today.AddHours(12)));
     }
 
@@ -172,13 +169,13 @@ public class V1ContractTests(RentarApiFactory factory) : IntegrationTestBase(fac
     private async Task CarImagesAsync()
     {
         await Form("carimages/add without file", HttpMethod.Post, "/api/v1/carimages/add", ("carId", "1"));
-        await Form("carimages/add invalid file", HttpMethod.Post, "/api/v1/carimages/add", ("carId", "1"), ("file", "notes.md", Encoding.UTF8.GetBytes("# notes")));
+        await Form("carimages/add invalid file", HttpMethod.Post, "/api/v1/carimages/add", ("carId", "1"), ("file", "notes.md", TestImages.Text));
         await Form("carimages/add unknown car", HttpMethod.Post, "/api/v1/carimages/add", ("carId", "999"));
         await Get("carimages/getall", "/api/v1/carimages/getall");
         await Get("carimages/getbyid", "/api/v1/carimages/getbyid?id=1");
         await Get("carimages/getbycarid", "/api/v1/carimages/getbycarid?carId=1");
-        await Form("carimages/update", HttpMethod.Post, "/api/v1/carimages/update", ("Id", "1"), ("CarId", "1"), ("objectFile", "car.png", PngBytes));
-        await Form("carimages/update unknown image", HttpMethod.Post, "/api/v1/carimages/update", ("Id", "999"), ("CarId", "1"), ("objectFile", "car.png", PngBytes));
+        await Form("carimages/update", HttpMethod.Post, "/api/v1/carimages/update", ("Id", "1"), ("CarId", "1"), ("objectFile", "car.png", TestImages.Png));
+        await Form("carimages/update unknown image", HttpMethod.Post, "/api/v1/carimages/update", ("Id", "999"), ("CarId", "1"), ("objectFile", "car.png", TestImages.Png));
         await Send("carimages/delete", HttpMethod.Delete, "/api/v1/carimages/delete?id=1");
         await Send("carimages/delete without images", HttpMethod.Delete, "/api/v1/carimages/delete?id=1");
     }

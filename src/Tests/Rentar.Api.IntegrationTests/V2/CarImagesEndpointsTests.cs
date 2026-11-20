@@ -18,7 +18,7 @@ public class CarImagesEndpointsTests(RentarApiFactory factory) : V2TestBase(fact
     {
         var car = await CreateCarAsync();
 
-        var response = await UploadImageAsync(car.Id, "car.png", PngBytes);
+        var response = await UploadImageAsync(car.Id, "car.png", TestImages.Png);
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var image = await response.ReadAsAsync<CarImageBody>();
@@ -49,7 +49,7 @@ public class CarImagesEndpointsTests(RentarApiFactory factory) : V2TestBase(fact
     [Fact]
     public async Task Upload_ForACarThatIsNotStored_IsNotFound()
     {
-        var response = await UploadImageAsync(404, "car.png", PngBytes);
+        var response = await UploadImageAsync(404, "car.png", TestImages.Png);
 
         await AssertProblemAsync(response, HttpStatusCode.NotFound, Messages.TheCarNotFound);
     }
@@ -81,26 +81,66 @@ public class CarImagesEndpointsTests(RentarApiFactory factory) : V2TestBase(fact
     }
 
     [Theory]
-    [InlineData("notes.md")]
-    [InlineData("fake.png")]
-    public async Task Upload_OfAnythingButPngOrJpeg_IsRejected(string fileName)
+    [InlineData("car.png", nameof(TestImages.Png))]
+    [InlineData("car.jpg", nameof(TestImages.Jpeg))]
+    [InlineData("car.JPEG", nameof(TestImages.Jpeg))]
+    public async Task Upload_AcceptsPngOrJpeg_WhateverTheExtensionCase(string fileName, string content)
     {
         var car = await CreateCarAsync();
 
-        var response = await UploadImageAsync(car.Id, fileName, TextBytes);
+        var response = await UploadImageAsync(car.Id, fileName, Bytes(content));
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var image = Assert.Single(await ImagesAsync(car.Id));
+        Assert.NotEqual(IImageStorage.DefaultImageName, image.ImagePath);
+        Assert.True(File.Exists(UploadedFile(image.ImagePath)));
+
+        await Client.DeleteResourceAsync($"/api/v2/cars/{car.Id}/images");
+    }
+
+    [Theory]
+    [InlineData("notes.md", nameof(TestImages.Text))]
+    [InlineData("car.gif", nameof(TestImages.Gif))]
+    [InlineData("car", nameof(TestImages.Text))]
+    [InlineData("fake.png", nameof(TestImages.Text))]
+    [InlineData("fake.jpg", nameof(TestImages.Text))]
+    [InlineData("car.png", nameof(TestImages.Jpeg))]
+    public async Task Upload_OfAnythingButPngOrJpeg_IsRejected(string fileName, string content)
+    {
+        var car = await CreateCarAsync();
+
+        var response = await UploadImageAsync(car.Id, fileName, Bytes(content));
 
         await AssertProblemAsync(response, HttpStatusCode.BadRequest, Messages.CarImageInvalidFile);
         Assert.Empty(await ImagesAsync(car.Id));
     }
 
     [Fact]
+    public async Task Upload_WhenTheImageCanNotBeStored_RemovesItsFileAgain()
+    {
+        var car = await CreateCarAsync();
+        var filesBefore = UploadedFiles();
+
+        HttpResponseMessage response;
+        await using (await Factory.RefuseAsync("fleet", "CarImages", "INSERT"))
+        {
+            response = await UploadImageAsync(car.Id, "car.png", TestImages.Png);
+        }
+
+        // The file was written before the row failed; the rolled back transaction takes it away again.
+        await AssertProblemAsync(response, HttpStatusCode.InternalServerError);
+        Assert.Empty(await ImagesAsync(car.Id));
+        Assert.Equal(filesBefore, UploadedFiles());
+    }
+
+    [Fact]
     public async Task Replace_SwapsTheStoredFile()
     {
         var car = await CreateCarAsync();
-        var original = await (await UploadImageAsync(car.Id, "car.png", PngBytes)).ReadAsAsync<CarImageBody>();
+        var original = await (await UploadImageAsync(car.Id, "car.png", TestImages.Png)).ReadAsAsync<CarImageBody>();
 
         using var form = new MultipartFormDataContent();
-        form.Add(new ByteArrayContent(JpegBytes), "file", "new.jpg");
+        form.Add(new ByteArrayContent(TestImages.Jpeg), "file", "new.jpg");
         var response = await Client.PutAsync($"/api/v2/cars/{car.Id}/images/{original.Id}", form, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
@@ -113,10 +153,28 @@ public class CarImagesEndpointsTests(RentarApiFactory factory) : V2TestBase(fact
     }
 
     [Fact]
+    public async Task Replace_OfTheDefaultImage_KeepsTheDefaultFile()
+    {
+        var car = await CreateCarAsync();
+        var original = await (await UploadDefaultImageAsync(car.Id)).ReadAsAsync<CarImageBody>();
+        Assert.Equal(IImageStorage.DefaultImageName, original.ImagePath);
+
+        using var form = new MultipartFormDataContent();
+        form.Add(new ByteArrayContent(TestImages.Png), "file", "new.png");
+        var response = await Client.PutAsync($"/api/v2/cars/{car.Id}/images/{original.Id}", form, TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        Assert.NotEqual(IImageStorage.DefaultImageName, Assert.Single(await ImagesAsync(car.Id)).ImagePath);
+        Assert.True(File.Exists(UploadedFile(IImageStorage.DefaultImageName)));
+
+        await Client.DeleteResourceAsync($"/api/v2/cars/{car.Id}/images");
+    }
+
+    [Fact]
     public async Task Replace_WithoutFile_IsRejected()
     {
         var car = await CreateCarAsync();
-        var image = await (await UploadImageAsync(car.Id, "car.png", PngBytes)).ReadAsAsync<CarImageBody>();
+        var image = await (await UploadImageAsync(car.Id, "car.png", TestImages.Png)).ReadAsAsync<CarImageBody>();
 
         using var form = new MultipartFormDataContent();
         form.Add(new StringContent("no file"), "note");
@@ -132,8 +190,8 @@ public class CarImagesEndpointsTests(RentarApiFactory factory) : V2TestBase(fact
     public async Task Delete_RemovesOnlyThatImageAndItsFile()
     {
         var car = await CreateCarAsync();
-        var removed = await (await UploadImageAsync(car.Id, "first.png", PngBytes)).ReadAsAsync<CarImageBody>();
-        var kept = await (await UploadImageAsync(car.Id, "second.jpg", JpegBytes)).ReadAsAsync<CarImageBody>();
+        var removed = await (await UploadImageAsync(car.Id, "first.png", TestImages.Png)).ReadAsAsync<CarImageBody>();
+        var kept = await (await UploadImageAsync(car.Id, "second.jpg", TestImages.Jpeg)).ReadAsAsync<CarImageBody>();
 
         var response = await Client.DeleteResourceAsync($"/api/v2/cars/{car.Id}/images/{removed.Id}");
 
@@ -150,7 +208,7 @@ public class CarImagesEndpointsTests(RentarApiFactory factory) : V2TestBase(fact
     {
         var car = await CreateCarAsync();
         var otherCar = await CreateCarAsync("Fiat", "White");
-        var image = await (await UploadImageAsync(car.Id, "car.png", PngBytes)).ReadAsAsync<CarImageBody>();
+        var image = await (await UploadImageAsync(car.Id, "car.png", TestImages.Png)).ReadAsAsync<CarImageBody>();
 
         var response = await Client.GetJsonAsync($"/api/v2/cars/{otherCar.Id}/images/{image.Id}");
         var delete = await Client.DeleteResourceAsync($"/api/v2/cars/{otherCar.Id}/images/{image.Id}");
@@ -166,8 +224,8 @@ public class CarImagesEndpointsTests(RentarApiFactory factory) : V2TestBase(fact
     public async Task DeleteAll_RemovesEveryImageOfTheCar_AndAlsoSucceedsWhenThereAreNone()
     {
         var car = await CreateCarAsync();
-        var stored = UploadedFile((await (await UploadImageAsync(car.Id, "car.png", PngBytes)).ReadAsAsync<CarImageBody>()).ImagePath);
-        await UploadImageAsync(car.Id, "car.jpg", JpegBytes);
+        var stored = UploadedFile((await (await UploadImageAsync(car.Id, "car.png", TestImages.Png)).ReadAsAsync<CarImageBody>()).ImagePath);
+        await UploadImageAsync(car.Id, "car.jpg", TestImages.Jpeg);
 
         var first = await Client.DeleteResourceAsync($"/api/v2/cars/{car.Id}/images");
         var second = await Client.DeleteResourceAsync($"/api/v2/cars/{car.Id}/images");
@@ -179,12 +237,25 @@ public class CarImagesEndpointsTests(RentarApiFactory factory) : V2TestBase(fact
     }
 
     [Fact]
+    public async Task DeleteAll_OfTheDefaultImage_KeepsTheDefaultFile()
+    {
+        var car = await CreateCarAsync();
+        Assert.Equal(IImageStorage.DefaultImageName, (await (await UploadDefaultImageAsync(car.Id)).ReadAsAsync<CarImageBody>()).ImagePath);
+
+        var response = await Client.DeleteResourceAsync($"/api/v2/cars/{car.Id}/images");
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        Assert.Empty(await ImagesAsync(car.Id));
+        Assert.True(File.Exists(UploadedFile(IImageStorage.DefaultImageName)));
+    }
+
+    [Fact]
     public async Task CarImages_ListsTheImagesOfEveryCar()
     {
         var car = await CreateCarAsync();
         var otherCar = await CreateCarAsync("Fiat", "White");
-        await UploadImageAsync(car.Id, "car.png", PngBytes);
-        await UploadImageAsync(otherCar.Id, "car.jpg", JpegBytes);
+        await UploadImageAsync(car.Id, "car.png", TestImages.Png);
+        await UploadImageAsync(otherCar.Id, "car.jpg", TestImages.Jpeg);
 
         var response = await Client.GetJsonAsync("/api/v2/car-images");
 
@@ -209,5 +280,23 @@ public class CarImagesEndpointsTests(RentarApiFactory factory) : V2TestBase(fact
         var response = await Client.GetJsonAsync($"/api/v2/cars/{carId}/images");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         return await response.ReadItemsAsync<CarImageBody>();
+    }
+
+    /// <summary>Every file in the uploads folder, default image included, in name order.</summary>
+    private string[] UploadedFiles()
+    {
+        return Directory.GetFiles(Path.GetDirectoryName(UploadedFile(IImageStorage.DefaultImageName))!).Order().ToArray();
+    }
+
+    /// <summary>The bytes a theory row names: one of <see cref="TestImages"/>.</summary>
+    private static byte[] Bytes(string content)
+    {
+        return content switch
+        {
+            nameof(TestImages.Png) => TestImages.Png,
+            nameof(TestImages.Jpeg) => TestImages.Jpeg,
+            nameof(TestImages.Gif) => TestImages.Gif,
+            _ => TestImages.Text
+        };
     }
 }

@@ -14,7 +14,6 @@ using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
-using System.Text;
 using System.Threading.Tasks;
 using Rentar.Modules.Fleet.Application.Common.Interfaces;
 using Xunit;
@@ -28,16 +27,32 @@ public abstract class V2TestBase(RentarApiFactory factory) : IntegrationTestBase
 {
     protected const string Password = "Passw0rd!";
 
-    protected static readonly byte[] PngBytes = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00];
-    protected static readonly byte[] JpegBytes = [0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10];
-    protected static readonly byte[] TextBytes = Encoding.UTF8.GetBytes("# not an image");
-
     /// <summary>
     /// Pins local time to midday for tests that need a known instant.
     /// </summary>
     protected void FreezeClockAtNoon()
     {
         Factory.Clock.FreezeAt(new DateTimeOffset(DateTime.Today.AddHours(12)));
+    }
+
+    /// <summary>
+    /// Turns the daily maintenance window on for the shared host, in server-local time, until the test ends. Freeze the
+    /// clock inside or outside the window to see the gate refuse or pass a request.
+    /// </summary>
+    protected void EnableMaintenance(string start = "22:00", string end = "23:00")
+    {
+        Factory.Settings.Apply(
+            ("Maintenance:Enabled", "true"),
+            ("Maintenance:StartTime", start),
+            ("Maintenance:EndTime", end));
+    }
+
+    /// <summary>
+    /// Lets <c>SeedDevelopmentDataAsync</c> seed the shared host, which is a Development host, until the test ends.
+    /// </summary>
+    protected void EnableSeeding()
+    {
+        Factory.Settings.Apply(("Database:SeedOnStartup", "true"));
     }
 
     protected async Task<T> CreateAsync<T>(string url, object body)

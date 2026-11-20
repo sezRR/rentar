@@ -120,9 +120,15 @@ dotnet ef migrations add <Name> --project $project --startup-project $project --
   each test then truncates all module tables and clears the aspect cache. Payments go through `TestPaymentGateway`,
   which takes every payment unless a test makes it decline, in place of the simulated gateway's coin toss. The
   background delivery is off: a test calls `DeliverEventsAsync()` to let the modules react, so it knows when they have.
-  Maintenance is disabled except in the maintenance tests, so the schedule cannot interfere with other scenarios.
-  Development seeding is also disabled by default; its own tests enable it to check startup, idempotency, rollback,
-  concurrent hosts and the environment guard.
+  Maintenance is disabled by default, so the schedule cannot interfere with other scenarios. A test that needs it
+  opens the window at runtime on the shared host (`EnableMaintenance()`, through the factory's `TestSettings`, which
+  every test resets). Only `AnEmptyWindow_IsRejectedAtStartup` builds a host of its own, because startup validation
+  runs only while a host starts.
+  Development seeding is also disabled by default. Its tests turn it on the same way (`EnableSeeding()`) and seed the
+  shared host directly to check idempotency, rollback, concurrent runs and the opt-out. Only
+  `DevelopmentStartup_SeedsRelatedDemoData_AndUsableAccounts` and `Seeding_IsDisabledOutsideDevelopment` build hosts
+  of their own, because they test startup and the host environment. Each test also points `ServiceTool` back at the
+  shared host, so a host a test built and disposed cannot break the aspects of later tests.
 - `src/Tests/Rentar.ArchitectureTests` enforces the module boundaries and schema ownership described below. No Docker needed.
 - `src/Tests/Rentar.Domain.UnitTests` checks each entity's invariants on the domain alone: what its constructor and
   copy methods (`Confirmed()`, `Renamed()`, `NewImage()`, …) refuse, with which `DomainMessages` message, and what

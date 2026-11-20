@@ -18,67 +18,40 @@ public class RentalBookingConflictsTests(RentarApiFactory factory) : V2TestBase(
     private static readonly DateTime Start = new(2026, 9, 18, 10, 0, 0, DateTimeKind.Unspecified);
     private static readonly DateTime End = Start.AddDays(2);
 
-    public static TheoryData<double, double, bool> OverlappingPeriods()
+    /// <summary>
+    /// Periods overlapping <see cref="Start"/> to <see cref="End"/>, including the ones that only share its start or its
+    /// end instant. The status of the rental holding the car or customer does not change this arithmetic, so the periods
+    /// run against a pending rental, and one confirmed case per side covers the status.
+    /// </summary>
+    public static TheoryData<double, double> OverlappingPeriods()
     {
-        var periods = new (double From, double To)[] { (0, 2), (-1, 1), (1, 3), (-1, 3), (0.5, 1.5), (-1, 0), (2, 3) };
-        var cases = new TheoryData<double, double, bool>();
-        foreach (var (from, to) in periods)
-        {
-            cases.Add(from, to, false);
-            cases.Add(from, to, true);
-        }
-
-        return cases;
+        return new TheoryData<double, double> { { 0, 2 }, { -1, 1 }, { 1, 3 }, { -1, 3 }, { 0.5, 1.5 }, { -1, 0 }, { 2, 3 } };
     }
 
     [Theory]
     [MemberData(nameof(OverlappingPeriods))]
-    public async Task Create_ForAnOccupiedCar_IsAConflict_EvenForAnotherCustomer(double from, double to, bool confirmed)
+    public Task Create_ForAnOccupiedCar_IsAConflict_EvenForAnotherCustomer(double from, double to)
     {
-        FreezeClockAtNoon();
-        var car = await CreateCarAsync();
-        var first = await CreateCustomerAsync("first@example.com");
-        var second = await CreateCustomerAsync("second@example.com");
-        await BookAsync(car.Id, first.Id);
-        if (confirmed)
-        {
-            await DeliverEventsAsync();
-        }
+        return AssertCarConflictAsync(from, to, confirmed: false);
+    }
 
-        var response = await Client.PostJsonAsync("/api/v2/rentals",
-            new CreateRentalCommand(car.Id, second.Id, Start.AddDays(from), Start.AddDays(to)));
-
-        await AssertProblemAsync(response, HttpStatusCode.Conflict, Messages.CarNotAvailable);
-        var stored = Assert.Single(await RentalsAsync());
-        Assert.Equal(first.Id, stored.CustomerId);
-        Assert.Single(await Factory.OutboxAsync("rentals"));
-        await DeliverEventsAsync();
-        Assert.Equal(1, Factory.PaymentGateway.Charges);
+    [Fact]
+    public Task Create_ForACarAConfirmedRentalHolds_IsAConflict_EvenForAnotherCustomer()
+    {
+        return AssertCarConflictAsync(0, 2, confirmed: true);
     }
 
     [Theory]
     [MemberData(nameof(OverlappingPeriods))]
-    public async Task Create_ForAnOccupiedCustomer_IsAConflict_EvenForAnotherCar(double from, double to, bool confirmed)
+    public Task Create_ForAnOccupiedCustomer_IsAConflict_EvenForAnotherCar(double from, double to)
     {
-        FreezeClockAtNoon();
-        var first = await CreateCarAsync();
-        var second = await CreateCarAsync();
-        var customer = await CreateCustomerAsync();
-        await BookAsync(first.Id, customer.Id);
-        if (confirmed)
-        {
-            await DeliverEventsAsync();
-        }
+        return AssertCustomerConflictAsync(from, to, confirmed: false);
+    }
 
-        var response = await Client.PostJsonAsync("/api/v2/rentals",
-            new CreateRentalCommand(second.Id, customer.Id, Start.AddDays(from), Start.AddDays(to)));
-
-        await AssertProblemAsync(response, HttpStatusCode.Conflict, Messages.CustomerNotAvailable);
-        var stored = Assert.Single(await RentalsAsync());
-        Assert.Equal(first.Id, stored.CarId);
-        Assert.Single(await Factory.OutboxAsync("rentals"));
-        await DeliverEventsAsync();
-        Assert.Equal(1, Factory.PaymentGateway.Charges);
+    [Fact]
+    public Task Create_ForACustomerAConfirmedRentalHolds_IsAConflict_EvenForAnotherCar()
+    {
+        return AssertCustomerConflictAsync(0, 2, confirmed: true);
     }
 
     [Theory]
@@ -263,5 +236,53 @@ public class RentalBookingConflictsTests(RentarApiFactory factory) : V2TestBase(
     private async Task<List<RentalBody>> RentalsAsync()
     {
         return await (await Client.GetJsonAsync("/api/v2/rentals")).ReadItemsAsync<RentalBody>();
+    }
+
+    /// <summary>Books the car for one customer, then asks for it for another customer over the given period.</summary>
+    private async Task AssertCarConflictAsync(double from, double to, bool confirmed)
+    {
+        FreezeClockAtNoon();
+        var car = await CreateCarAsync();
+        var first = await CreateCustomerAsync("first@example.com");
+        var second = await CreateCustomerAsync("second@example.com");
+        await BookAsync(car.Id, first.Id);
+        if (confirmed)
+        {
+            await DeliverEventsAsync();
+        }
+
+        var response = await Client.PostJsonAsync("/api/v2/rentals",
+            new CreateRentalCommand(car.Id, second.Id, Start.AddDays(from), Start.AddDays(to)));
+
+        await AssertProblemAsync(response, HttpStatusCode.Conflict, Messages.CarNotAvailable);
+        var stored = Assert.Single(await RentalsAsync());
+        Assert.Equal(first.Id, stored.CustomerId);
+        Assert.Single(await Factory.OutboxAsync("rentals"));
+        await DeliverEventsAsync();
+        Assert.Equal(1, Factory.PaymentGateway.Charges);
+    }
+
+    /// <summary>Books one car for the customer, then asks for another car for them over the given period.</summary>
+    private async Task AssertCustomerConflictAsync(double from, double to, bool confirmed)
+    {
+        FreezeClockAtNoon();
+        var first = await CreateCarAsync();
+        var second = await CreateCarAsync();
+        var customer = await CreateCustomerAsync();
+        await BookAsync(first.Id, customer.Id);
+        if (confirmed)
+        {
+            await DeliverEventsAsync();
+        }
+
+        var response = await Client.PostJsonAsync("/api/v2/rentals",
+            new CreateRentalCommand(second.Id, customer.Id, Start.AddDays(from), Start.AddDays(to)));
+
+        await AssertProblemAsync(response, HttpStatusCode.Conflict, Messages.CustomerNotAvailable);
+        var stored = Assert.Single(await RentalsAsync());
+        Assert.Equal(first.Id, stored.CarId);
+        Assert.Single(await Factory.OutboxAsync("rentals"));
+        await DeliverEventsAsync();
+        Assert.Equal(1, Factory.PaymentGateway.Charges);
     }
 }

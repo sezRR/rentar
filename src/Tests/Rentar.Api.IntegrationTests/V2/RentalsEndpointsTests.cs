@@ -289,9 +289,16 @@ public class RentalsEndpointsTests(RentarApiFactory factory) : V2TestBase(factor
             .ReadAsAsync<PagedResponse<RentalDetailResponse>>();
 
         Assert.Equal(car.Id, Assert.Single(first.Items).CarId);
-        Assert.Equal(otherCar.Id + 1, Assert.Single(second.Items).CarId);
         Assert.Equal(otherCar.Id, Assert.Single(third.Items).CarId);
         Assert.False(third.Page.HasMore);
+        // The rental of the missing car still shows the car, customer and price it was booked with.
+        var ofMissingCar = Assert.Single(second.Items);
+        Assert.Equal(otherCar.Id + 1, ofMissingCar.CarId);
+        Assert.Equal(RentarApiFactory.StoredCar.BrandName, ofMissingCar.BrandName);
+        Assert.Equal(RentarApiFactory.StoredCar.ColorName, ofMissingCar.ColorName);
+        Assert.Equal(RentarApiFactory.StoredCar.Description, ofMissingCar.Description);
+        Assert.Equal(RentarApiFactory.StoredDailyPrice, ofMissingCar.DailyPrice);
+        Assert.Equal(RentarApiFactory.StoredCustomer.FirstName, ofMissingCar.UserName);
     }
 
     [Fact]
