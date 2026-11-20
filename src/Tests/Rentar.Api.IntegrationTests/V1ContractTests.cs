@@ -1,0 +1,295 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Net.Http;
+using System.Text.Json;
+using System.Threading.Tasks;
+using Xunit;
+
+namespace Rentar.Api.IntegrationTests;
+
+/// <summary>
+/// Pins what every v1 endpoint answers - status, <c>success</c>, <c>message</c> and the shape of <c>data</c> - so v1
+/// stays exactly as the frontend knows it while the code behind it changes.
+/// </summary>
+public class V1ContractTests(RentarApiFactory factory) : IntegrationTestBase(factory)
+{
+    private readonly List<string> _responses = [];
+
+    [Fact]
+    public async Task EveryEndpoint_AnswersAsItAlwaysHas()
+    {
+        Factory.Clock.FreezeAt(new DateTimeOffset(DateTime.Today.AddHours(12)));
+
+        await AuthAndUsersAsync();
+        await MaintenanceHourAsync();
+        await BrandsColorsAndCarsAsync();
+        await CarImagesAsync();
+        await CustomersRentalsPaymentsAndFindeksAsync();
+        await DeletesAsync();
+
+        Assert.Equal(Expected, _responses);
+    }
+
+    private static readonly string[] Expected =
+    [
+        "auth/register => 200 {data: {expiration: string, token: string}, message: \"Access Token Created\", success: true}",
+        "auth/register taken => 400 {message: \"User already registered\", success: false}",
+        "auth/login => 200 {data: {expiration: string, token: string}, message: \"Access Token Created\", success: true}",
+        "auth/login wrong password => 400 \"Password is wrong\"",
+        "auth/login unknown email => 400 \"User not found\"",
+        "auth/checkpassword => 200 {data: {email: string, firstName: string, id: number, lastName: string, passwordHash: string, passwordSalt: string, status: bool}, message: \"Logged in to system successfully\", success: true}",
+        "auth/checkpassword wrong password => 400 \"Password is wrong\"",
+        "users/getall => 200 {data: [{email: string, firstName: string, id: number, lastName: string, passwordHash: string, passwordSalt: string, status: bool}], message: \"Users Listed\", success: true}",
+        "users/getbymail => 200 {data: {email: string, firstName: string, id: number, lastName: string, passwordHash: string, passwordSalt: string, status: bool}, message: null, success: true}",
+        "users/getuserbyid => 200 {data: {email: string, firstName: string, id: number, lastName: string, passwordHash: string, passwordSalt: string, status: bool}, message: null, success: true}",
+        "users/add => 200 {message: \"User Added\", success: true}",
+        "users/update => 200 {data: {email: string, firstName: string, id: number, lastName: string, passwordHash: string, passwordSalt: string, status: bool}, message: \"Your settings successfully updated\", success: true}",
+        "users/getall maintenance => 503 {data: null, message: \"Servers in Maintenance (Time)\", success: false}",
+        "customers/getall maintenance => 503 {data: null, message: \"Servers in Maintenance (Time)\", success: false}",
+        "rentals/getrentaldetails maintenance => 503 {data: null, message: \"Servers in Maintenance (Time)\", success: false}",
+        "brands/add => 200 {message: \"Brand Added\", success: true}",
+        "brands/add invalid => 400 {Errors: [{AttemptedValue: string, CustomState: null, ErrorCode: string, ErrorMessage: string, FormattedMessagePlaceholderValues: object, PropertyName: string, Severity: number}], Message: string, StatusCode: 400}",
+        "brands/getall => 200 {data: [{brandName: string, id: number}], message: \"Brands Listed\", success: true}",
+        "brands/getbyid => 200 {data: {brandName: string, id: number}, message: null, success: true}",
+        "brands/update => 200 {message: \"Brand Updated\", success: true}",
+        "colors/add => 200 {message: \"Color Added\", success: true}",
+        "colors/getall => 200 {data: [{colorName: string, id: number}], message: \"Colors Listed\", success: true}",
+        "colors/getbyid => 200 {data: {colorName: string, id: number}, message: null, success: true}",
+        "colors/update => 200 {message: \"Color Updated\", success: true}",
+        "colors/update invalid => 400 {message: \"Color Name is Invalid\", success: false}",
+        "cars/add => 200 {message: \"Car Added\", success: true}",
+        "cars/addreturnabledata => 200 {data: {brandId: number, colorId: number, dailyPrice: number, description: string, id: number, minimumFindeksRating: number, modelYear: number}, message: null, success: true}",
+        "cars/getall => 200 {data: [{brandId: number, colorId: number, dailyPrice: number, description: string, id: number, minimumFindeksRating: number, modelYear: number}], message: \"Cars Listed\", success: true}",
+        "cars/getcardetails => 200 {data: [{brandId: number, brandName: string, carId: number, colorId: number, colorName: string, dailyPrice: number, description: string, id: number, imagePath: null, minimumFindeksRating: number, modelYear: number}], message: null, success: true}",
+        "cars/getcardetailsbyid => 200 {data: {brandId: number, brandName: string, carId: number, colorId: number, colorName: string, dailyPrice: number, description: string, id: number, imagePath: null, minimumFindeksRating: number, modelYear: number}, message: null, success: true}",
+        "cars/getcarsbybrandid => 200 {data: [{brandId: number, brandName: string, carId: number, colorId: number, colorName: string, dailyPrice: number, description: string, id: number, imagePath: null, minimumFindeksRating: number, modelYear: number}], message: null, success: true}",
+        "cars/getcarsbycolorid => 200 {data: [{brandId: number, brandName: string, carId: number, colorId: number, colorName: string, dailyPrice: number, description: string, id: number, imagePath: null, minimumFindeksRating: number, modelYear: number}], message: \"Cars Listed\", success: true}",
+        "cars/getcarsbybrandidandcolorid => 200 {data: [{brandId: number, brandName: string, carId: number, colorId: number, colorName: string, dailyPrice: number, description: string, id: number, imagePath: null, minimumFindeksRating: number, modelYear: number}], message: null, success: true}",
+        "cars/update => 200 {message: \"Car Updated\", success: true}",
+        "cars/add unknown brand => 400 {message: \"Brand not found\", success: false}",
+        "cars/update unknown color => 400 {message: \"Color not found\", success: false}",
+        "carimages/add without file => 200 {message: null, success: true}",
+        "carimages/add invalid file => 400 {message: \"Only PNG and JPEG images (.png, .jpg, .jpeg) can be uploaded\", success: false}",
+        "carimages/add unknown car => 400 {message: \"Desired car is not on the database\", success: false}",
+        "carimages/getall => 200 {data: [{carId: number, date: string, id: number, imagePath: string}], message: null, success: true}",
+        "carimages/getbyid => 200 {data: {carId: number, date: string, id: number, imagePath: string}, message: null, success: true}",
+        "carimages/getbycarid => 200 {data: [{carId: number, date: string, id: number, imagePath: string}], message: null, success: true}",
+        "carimages/update => 200 {message: null, success: true}",
+        "carimages/update unknown image => 400 {message: \"Car image not found\", success: false}",
+        "carimages/delete => 200 {message: null, success: true}",
+        "carimages/delete without images => 400 \"This car do not have image!\"",
+        "customers/add => 200 {message: \"Customer Added\", success: true}",
+        "customers/add unknown user => 400 {message: \"User not found\", success: false}",
+        "customers/getall => 200 {data: [{companyId: null, id: number, userId: number}], message: \"Customers Listed\", success: true}",
+        "customers/getcustomersbyuserid => 200 {data: [{companyId: null, id: number, userId: number}], message: null, success: true}",
+        "rentals/add => 200 {message: \"Rental Added\", success: true}",
+        "rentals/add unknown car => 400 {message: \"Car not found\", success: false}",
+        "rentals/add unknown customer => 400 {message: \"Customer not found\", success: false}",
+        "rentals/add payment declined => 200 {message: \"Rental Added\", success: true}",
+        "rentals/getall => 200 {data: [{carId: number, customerId: number, id: number, rentDate: string, returnDate: string}], message: \"Rentals Listed\", success: true}",
+        "rentals/getrentalbycarid => 200 {data: {carId: number, customerId: number, id: number, rentDate: string, returnDate: string}, message: null, success: true}",
+        "rentals/getrentaldetails => 200 {data: [{brandName: string, carId: number, colorName: string, companyName: null, dailyPrice: number, description: string, modelYear: number, rentDate: string, rentalId: number, returnDate: string, userName: string}], message: null, success: true}",
+        "rentals/isrentable => 200 {message: null, success: true}",
+        "rentals/isrentable taken => 400 {message: \"This car already rentaled by someone\", success: false}",
+        "payments/pay => 200 {message: \"Payment successful\", success: true}",
+        "payments/pay => 400 {message: \"Payment failed\", success: false}",
+        "findeks/calculate => 200 {data: number, message: \"Findeks rating calculated successfully\", success: true}",
+        "cars/delete => 200 {message: \"Car Deleted\", success: true}",
+        "cars/delete unknown car => 500 {Message: string, StatusCode: 500}",
+        "cars/delete rented car => 400 {message: \"Car can not be deleted while it has rentals\", success: false}",
+        "colors/delete in use => 400 {message: \"Color can not be deleted while cars use it\", success: false}",
+        "brands/delete in use => 400 {message: \"Brand can not be deleted while cars use it\", success: false}",
+        "colors/delete => 200 {message: \"Color Deleted\", success: true}",
+        "brands/delete => 200 {message: \"Brand Deleted\", success: true}",
+    ];
+
+    private async Task AuthAndUsersAsync()
+    {
+        // v1 clients still send findeksRating and companyName; the ratings now live in Findeks and companies in Companies,
+        // so both are ignored.
+        var registration = new { firstName = "Sezer", lastName = "Tetik", email = "driver@example.com", password = "Passw0rd!", findeksRating = 900 };
+        await Post("auth/register", "/api/v1/auth/register", registration);
+        await Post("auth/register taken", "/api/v1/auth/register", registration);
+
+        await Post("auth/login", "/api/v1/auth/login", new { email = "driver@example.com", password = "Passw0rd!" });
+        await Post("auth/login wrong password", "/api/v1/auth/login", new { email = "driver@example.com", password = "wrong" });
+        await Post("auth/login unknown email", "/api/v1/auth/login", new { email = "nobody@example.com", password = "Passw0rd!" });
+        await Post("auth/checkpassword", "/api/v1/auth/checkpassword", new { email = "driver@example.com", password = "Passw0rd!" });
+        await Post("auth/checkpassword wrong password", "/api/v1/auth/checkpassword", new { email = "driver@example.com", password = "wrong" });
+
+        await Get("users/getall", "/api/v1/users/getall");
+        await Get("users/getbymail", "/api/v1/users/getbymail?email=driver@example.com");
+        await Get("users/getuserbyid", "/api/v1/users/getuserbyid?id=1");
+        await Post("users/add", "/api/v1/users/add", new { firstName = "Ada", lastName = "Lovelace", email = "ada@example.com", passwordHash = "AAAA", passwordSalt = "AAAA", status = true, findeksRating = 1200 });
+        await Post("users/update", "/api/v1/users/update", new { id = 1, firstName = "Sezer", lastName = "Tetik", email = "driver@example.com", password = "Passw0rd!", findeksRating = 1000 });
+    }
+
+    private async Task MaintenanceHourAsync()
+    {
+        Factory.Clock.FreezeAt(new DateTimeOffset(DateTime.Today.AddHours(22).AddMinutes(30)));
+
+        Factory.Settings.Apply(("Maintenance:Enabled", "true"));
+        _responses.Add(await DescribeAsync("users/getall maintenance", await Client.GetJsonAsync("/api/v1/users/getall")));
+        _responses.Add(await DescribeAsync("customers/getall maintenance", await Client.GetJsonAsync("/api/v1/customers/getall")));
+        _responses.Add(await DescribeAsync("rentals/getrentaldetails maintenance", await Client.GetJsonAsync("/api/v1/rentals/getrentaldetails")));
+
+        Factory.Settings.Apply(("Maintenance:Enabled", "false"));
+        Factory.Clock.FreezeAt(new DateTimeOffset(DateTime.Today.AddHours(12)));
+    }
+
+    private async Task BrandsColorsAndCarsAsync()
+    {
+        await Post("brands/add", "/api/v1/brands/add", new { brandName = "Toyota" });
+        await Post("brands/add invalid", "/api/v1/brands/add", new { brandName = "A" });
+        await Get("brands/getall", "/api/v1/brands/getall");
+        await Get("brands/getbyid", "/api/v1/brands/getbyid?id=1");
+        await Post("brands/update", "/api/v1/brands/update", new { id = 1, brandName = "Toyota" });
+
+        await Post("colors/add", "/api/v1/colors/add", new { colorName = "Red" });
+        await Get("colors/getall", "/api/v1/colors/getall");
+        await Get("colors/getbyid", "/api/v1/colors/getbyid?id=1");
+        await Post("colors/update", "/api/v1/colors/update", new { id = 1, colorName = "Red" });
+        await Post("colors/update invalid", "/api/v1/colors/update", new { id = 1, colorName = "R" });
+
+        var car = new { brandId = 1, colorId = 1, modelYear = 2021, dailyPrice = 950m, description = "Corolla 1.6", minimumFindeksRating = 700 };
+        await Post("cars/add", "/api/v1/cars/add", car);
+        await Post("cars/addreturnabledata", "/api/v1/cars/addreturnabledata", car with { description = "Civic 1.5" });
+        await Get("cars/getall", "/api/v1/cars/getall");
+        await Get("cars/getcardetails", "/api/v1/cars/getcardetails");
+        await Get("cars/getcardetailsbyid", "/api/v1/cars/getcardetailsbyid?id=1");
+        await Get("cars/getcarsbybrandid", "/api/v1/cars/getcarsbybrandid?brandId=1");
+        await Get("cars/getcarsbycolorid", "/api/v1/cars/getcarsbycolorid?colorId=1");
+        await Get("cars/getcarsbybrandidandcolorid", "/api/v1/cars/getcarsbybrandidandcolorid?brandId=1&colorId=1");
+        await Post("cars/update", "/api/v1/cars/update", new { id = 2, brandId = 1, colorId = 1, modelYear = 2022, dailyPrice = 990m, description = "Civic 1.5", minimumFindeksRating = 700 });
+        await Post("cars/add unknown brand", "/api/v1/cars/add", car with { brandId = 999 });
+        await Post("cars/update unknown color", "/api/v1/cars/update", new { id = 2, brandId = 1, colorId = 999, modelYear = 2022, dailyPrice = 990m, description = "Civic 1.5", minimumFindeksRating = 700 });
+    }
+
+    private async Task CarImagesAsync()
+    {
+        await Form("carimages/add without file", HttpMethod.Post, "/api/v1/carimages/add", ("carId", "1"));
+        await Form("carimages/add invalid file", HttpMethod.Post, "/api/v1/carimages/add", ("carId", "1"), ("file", "notes.md", TestImages.Text));
+        await Form("carimages/add unknown car", HttpMethod.Post, "/api/v1/carimages/add", ("carId", "999"));
+        await Get("carimages/getall", "/api/v1/carimages/getall");
+        await Get("carimages/getbyid", "/api/v1/carimages/getbyid?id=1");
+        await Get("carimages/getbycarid", "/api/v1/carimages/getbycarid?carId=1");
+        await Form("carimages/update", HttpMethod.Post, "/api/v1/carimages/update", ("Id", "1"), ("CarId", "1"), ("objectFile", "car.png", TestImages.Png));
+        await Form("carimages/update unknown image", HttpMethod.Post, "/api/v1/carimages/update", ("Id", "999"), ("CarId", "1"), ("objectFile", "car.png", TestImages.Png));
+        await Send("carimages/delete", HttpMethod.Delete, "/api/v1/carimages/delete?id=1");
+        await Send("carimages/delete without images", HttpMethod.Delete, "/api/v1/carimages/delete?id=1");
+    }
+
+    private async Task CustomersRentalsPaymentsAndFindeksAsync()
+    {
+        await Post("customers/add", "/api/v1/customers/add", new { userId = 1, companyName = "Rentar Logistics" });
+        await Post("customers/add unknown user", "/api/v1/customers/add", new { userId = 404, companyName = "Rentar Logistics" });
+        await Get("customers/getall", "/api/v1/customers/getall");
+        await Get("customers/getcustomersbyuserid", "/api/v1/customers/getcustomersbyuserid?userId=1");
+
+        await Post("rentals/add", "/api/v1/rentals/add", new { carId = 1, customerId = 1, rentDate = "2026-09-18T10:00:00", returnDate = "2026-09-20T10:00:00" });
+        await Factory.DeliverEventsAsync();
+        await Post("rentals/add unknown car", "/api/v1/rentals/add", new { carId = 404, customerId = 1, rentDate = "2026-09-18T10:00:00", returnDate = "2026-09-20T10:00:00" });
+        await Post("rentals/add unknown customer", "/api/v1/rentals/add", new { carId = 1, customerId = 404, rentDate = "2026-09-18T10:00:00", returnDate = "2026-09-20T10:00:00" });
+        // The payment is taken once the booking's event is delivered; a declined one cancels the rental, which v1 no
+        // longer lists, so car 1 still has one rental below.
+        Factory.PaymentGateway.Declines = true;
+        await Post("rentals/add payment declined", "/api/v1/rentals/add", new { carId = 1, customerId = 1, rentDate = "2026-10-18T10:00:00", returnDate = "2026-10-20T10:00:00" });
+        await Factory.DeliverEventsAsync();
+        Factory.PaymentGateway.Declines = false;
+        await Get("rentals/getall", "/api/v1/rentals/getall");
+        await Get("rentals/getrentalbycarid", "/api/v1/rentals/getrentalbycarid?carId=1");
+        await Get("rentals/getrentaldetails", "/api/v1/rentals/getrentaldetails");
+        await Post("rentals/isrentable", "/api/v1/rentals/isrentable", new { carId = 1, customerId = 1, rentDate = "2026-09-25T10:00:00", returnDate = "2026-09-26T10:00:00" });
+        await Post("rentals/isrentable taken", "/api/v1/rentals/isrentable", new { carId = 1, customerId = 1, rentDate = "2026-09-19T10:00:00", returnDate = "2026-09-21T10:00:00" });
+
+        await Get("payments/pay", "/api/v1/payments/pay");
+        Factory.PaymentGateway.Declines = true;
+        await Get("payments/pay", "/api/v1/payments/pay");
+        Factory.PaymentGateway.Declines = false;
+
+        await Get("findeks/calculate", "/api/v1/findeks/calculate");
+    }
+
+    private async Task DeletesAsync()
+    {
+        await Post("cars/delete", "/api/v1/cars/delete", new { id = 2 });
+        await Post("cars/delete unknown car", "/api/v1/cars/delete", new { id = 999 });
+        // Car 1 is rented, so it stays, and with it the brand and the color it has.
+        await Post("cars/delete rented car", "/api/v1/cars/delete", new { id = 1 });
+        await Post("colors/delete in use", "/api/v1/colors/delete", new { id = 1, colorName = "Red" });
+        await Post("brands/delete in use", "/api/v1/brands/delete", new { id = 1, brandName = "Toyota" });
+        // A brand and a color no car has go at once.
+        await Client.PostJsonAsync("/api/v1/brands/add", new { brandName = "Fiat" });
+        await Client.PostJsonAsync("/api/v1/colors/add", new { colorName = "White" });
+        await Post("colors/delete", "/api/v1/colors/delete", new { id = 2, colorName = "White" });
+        await Post("brands/delete", "/api/v1/brands/delete", new { id = 2, brandName = "Fiat" });
+    }
+
+    private async Task Get(string name, string url)
+    {
+        _responses.Add(await DescribeAsync(name, await Client.GetJsonAsync(url)));
+    }
+
+    private async Task Post(string name, string url, object body)
+    {
+        _responses.Add(await DescribeAsync(name, await Client.PostJsonAsync(url, body)));
+    }
+
+    private async Task Send(string name, HttpMethod method, string url)
+    {
+        using var request = new HttpRequestMessage(method, url);
+        _responses.Add(await DescribeAsync(name, await Client.SendAsync(request, TestContext.Current.CancellationToken)));
+    }
+
+    private async Task Form(string name, HttpMethod method, string url, params object[] fields)
+    {
+        using var form = new MultipartFormDataContent();
+        foreach (var field in fields)
+        {
+            switch (field)
+            {
+                case (string key, string value):
+                    form.Add(new StringContent(value), key);
+                    break;
+                case (string key, string fileName, byte[] bytes):
+                    form.Add(new ByteArrayContent(bytes), key, fileName);
+                    break;
+            }
+        }
+
+        using var request = new HttpRequestMessage(method, url);
+        request.Content = form;
+        _responses.Add(await DescribeAsync(name, await Client.SendAsync(request, TestContext.Current.CancellationToken)));
+    }
+
+    /// <summary>
+    /// One line per response: the status, then the body with its keys sorted. <c>success</c>, <c>message</c> and status
+    /// codes keep their values; everything else is reduced to its JSON kind, and objects and arrays to their keys.
+    /// </summary>
+    private static async Task<string> DescribeAsync(string name, HttpResponseMessage response)
+    {
+        var body = await response.ReadTextAsync();
+        var shape = body.Length == 0 ? "<empty>" : Describe(JsonDocument.Parse(body).RootElement, isRoot: true);
+        return $"{name} => {(int)response.StatusCode} {shape}";
+    }
+
+    private static readonly HashSet<string> LiteralKeys = new(StringComparer.Ordinal) { "success", "message", "statusCode", "StatusCode" };
+
+    private static string Describe(JsonElement element, bool isRoot = false, int depth = 0)
+    {
+        return element.ValueKind switch
+        {
+            JsonValueKind.Object => depth > 2
+                ? "object"
+                : "{" + string.Join(", ", element.EnumerateObject()
+                    .OrderBy(p => p.Name, StringComparer.Ordinal)
+                    .Select(p => $"{p.Name}: {(isRoot && LiteralKeys.Contains(p.Name) ? p.Value.GetRawText() : Describe(p.Value, depth: depth + 1))}")) + "}",
+            JsonValueKind.Array => element.GetArrayLength() == 0 ? "[]" : $"[{Describe(element[0], depth: depth + 1)}]",
+            JsonValueKind.String => isRoot ? element.GetRawText() : "string",
+            JsonValueKind.Number => "number",
+            JsonValueKind.True or JsonValueKind.False => "bool",
+            _ => "null"
+        };
+    }
+}

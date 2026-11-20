@@ -1,0 +1,218 @@
+using Rentar.Modules.Fleet.Application;
+using Rentar.Modules.Fleet.Application.Common.Interfaces;
+using Rentar.Modules.Fleet.Domain;
+using Rentar.Modules.Fleet.Presentation.Endpoints.V2;
+using Rentar.Modules.Rentals.Application.Commands;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Net;
+using System.Net.Http;
+using System.Threading.Tasks;
+using Xunit;
+
+namespace Rentar.Api.IntegrationTests.V2;
+
+public class CarsEndpointsTests(RentarApiFactory factory) : V2TestBase(factory)
+{
+    [Fact]
+    public async Task Create_ReturnsTheCarWithItsBrandAndColor()
+    {
+        var brand = await CreateBrandAsync();
+        var color = await CreateColorAsync();
+
+        var response = await Client.PostJsonAsync("/api/v2/cars", new CarRequest(brand.Id, color.Id, 2021, 950m, "Corolla 1.6", 700));
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var car = await response.ReadAsAsync<CarResponse>();
+        Assert.Equal($"/api/v2/cars/{car.Id}", response.Headers.Location?.OriginalString);
+        Assert.Equal(new CarResponse(car.Id, brand.Id, "Toyota", color.Id, "Red", 2021, 950m, "Corolla 1.6", 700, null), car);
+
+        var fetched = await Client.GetJsonAsync($"/api/v2/cars/{car.Id}");
+        Assert.Equal(car, await fetched.ReadAsAsync<CarResponse>());
+    }
+
+    [Fact]
+    public async Task GetAll_FiltersByBrandColorOrBoth()
+    {
+        var toyota = await CreateBrandAsync();
+        var fiat = await CreateBrandAsync("Fiat");
+        var red = await CreateColorAsync();
+        var white = await CreateColorAsync("White");
+
+        await CreateCarAsync(toyota.Id, red.Id, "Red Corolla");
+        await CreateCarAsync(toyota.Id, white.Id, "White Corolla");
+        await CreateCarAsync(fiat.Id, red.Id, "Red Egea");
+
+        Assert.Equal(["Red Corolla", "Red Egea", "White Corolla"], await DescriptionsAsync("/api/v2/cars"));
+        Assert.Equal(["Red Corolla", "White Corolla"], await DescriptionsAsync($"/api/v2/cars?brandId={toyota.Id}"));
+        Assert.Equal(["Red Corolla", "Red Egea"], await DescriptionsAsync($"/api/v2/cars?colorId={red.Id}"));
+        Assert.Equal(["Red Egea"], await DescriptionsAsync($"/api/v2/cars?brandId={fiat.Id}&colorId={red.Id}"));
+    }
+
+    [Fact]
+    public async Task Update_ReplacesTheCar()
+    {
+        var car = await CreateCarAsync();
+        var white = await CreateColorAsync("White");
+
+        var response = await Client.PutJsonAsync($"/api/v2/cars/{car.Id}", new CarRequest(car.BrandId, white.Id, 2024, 1200m, "Corolla Hybrid", 800));
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        var fetched = await (await Client.GetJsonAsync($"/api/v2/cars/{car.Id}")).ReadAsAsync<CarResponse>();
+        Assert.Equal(new CarResponse(car.Id, car.BrandId, "Toyota", white.Id, "White", 2024, 1200m, "Corolla Hybrid", 800, null), fetched);
+    }
+
+    [Fact]
+    public async Task GetAll_ByBrand_IsRefreshedAfterAddingAnotherCar()
+    {
+        var brand = await CreateBrandAsync();
+        var color = await CreateColorAsync();
+        await CreateCarAsync(brand.Id, color.Id, "Corolla 1.6");
+
+        // The first list fills the cache the caching aspect keeps for the brand query.
+        Assert.Equal(["Corolla 1.6"], await DescriptionsAsync($"/api/v2/cars?brandId={brand.Id}"));
+        await CreateCarAsync(brand.Id, color.Id, "Corolla 1.8");
+
+        Assert.Equal(["Corolla 1.6", "Corolla 1.8"], await DescriptionsAsync($"/api/v2/cars?brandId={brand.Id}"));
+    }
+
+    [Fact]
+    public async Task Delete_RemovesTheCarWithItsImagesAndTheirFiles()
+    {
+        var car = await CreateCarAsync();
+        var image = await (await UploadImageAsync(car.Id, "car.png", TestImages.Png)).ReadAsAsync<CarImageBody>();
+        var stored = UploadedFile(image.ImagePath);
+        Assert.True(File.Exists(stored));
+        using var withoutFile = new MultipartFormDataContent();
+        withoutFile.Add(new StringContent("no file"), "note");
+        Assert.Equal(HttpStatusCode.Created,
+            (await Client.PostAsync($"/api/v2/cars/{car.Id}/images", withoutFile, TestContext.Current.CancellationToken)).StatusCode);
+
+        var response = await Client.DeleteResourceAsync($"/api/v2/cars/{car.Id}");
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        await AssertProblemAsync(await Client.GetJsonAsync($"/api/v2/cars/{car.Id}"), HttpStatusCode.NotFound);
+        Assert.Empty(await (await Client.GetJsonAsync($"/api/v2/cars/{car.Id}/images")).ReadItemsAsync<CarImageBody>());
+        Assert.False(File.Exists(stored));
+        // Every car without an image of its own shares the default file, so deleting one car leaves it.
+        Assert.True(File.Exists(UploadedFile(IImageStorage.DefaultImageName)));
+    }
+
+    [Fact]
+    public async Task Delete_WhenTheCarCanNotBeDeleted_KeepsItsImagesAndFiles()
+    {
+        var car = await CreateCarAsync();
+        var image = await (await UploadImageAsync(car.Id, "car.png", TestImages.Png)).ReadAsAsync<CarImageBody>();
+        var stored = UploadedFile(image.ImagePath);
+
+        HttpResponseMessage response;
+        await using (await Factory.RefuseAsync("fleet", "Cars", "DELETE"))
+        {
+            response = await Client.DeleteResourceAsync($"/api/v2/cars/{car.Id}");
+        }
+
+        await AssertProblemAsync(response, HttpStatusCode.InternalServerError);
+        Assert.Equal([image.Id], (await (await Client.GetJsonAsync($"/api/v2/cars/{car.Id}/images")).ReadItemsAsync<CarImageBody>()).Select(i => i.Id));
+        Assert.True(File.Exists(stored));
+
+        await Client.DeleteResourceAsync($"/api/v2/cars/{car.Id}/images");
+        Assert.False(File.Exists(stored));
+    }
+
+    [Fact]
+    public async Task Delete_OfACarWithRentals_IsAConflict_AndKeepsTheCarAndItsImages()
+    {
+        var car = await CreateCarAsync();
+        var image = await (await UploadImageAsync(car.Id, "car.png", TestImages.Png)).ReadAsAsync<CarImageBody>();
+        var customer = await CreateCustomerAsync();
+        var rented = await Client.PostJsonAsync(
+            "/api/v2/rentals",
+            new CreateRentalCommand(car.Id, customer.Id, new DateTime(2026, 9, 18, 10, 0, 0), new DateTime(2026, 9, 20, 10, 0, 0)));
+        Assert.Equal(HttpStatusCode.Created, rented.StatusCode);
+
+        var response = await Client.DeleteResourceAsync($"/api/v2/cars/{car.Id}");
+
+        await AssertProblemAsync(response, HttpStatusCode.Conflict, Messages.CarHasRentals);
+        Assert.Equal(HttpStatusCode.OK, (await Client.GetJsonAsync($"/api/v2/cars/{car.Id}")).StatusCode);
+        Assert.Equal([image.Id], (await (await Client.GetJsonAsync($"/api/v2/cars/{car.Id}/images")).ReadItemsAsync<CarImageBody>()).Select(i => i.Id));
+        Assert.True(File.Exists(UploadedFile(image.ImagePath)));
+
+        // Removes the stored file again so the test leaves wwwroot/uploads untouched.
+        await Client.DeleteResourceAsync($"/api/v2/cars/{car.Id}/images");
+    }
+
+    [Theory]
+    [InlineData("GET")]
+    [InlineData("PUT")]
+    [InlineData("DELETE")]
+    public async Task UnknownCar_IsNotFound(string method)
+    {
+        var response = method switch
+        {
+            "GET" => await Client.GetJsonAsync("/api/v2/cars/404"),
+            "PUT" => await Client.PutJsonAsync("/api/v2/cars/404", new CarRequest(1, 1, 2021, 950m, "Corolla 1.6", 700)),
+            _ => await Client.DeleteResourceAsync("/api/v2/cars/404")
+        };
+
+        await AssertProblemAsync(response, HttpStatusCode.NotFound, "Car 404 was not found.");
+    }
+
+    [Fact]
+    public async Task Create_WithoutPriceOrDescription_ReturnsValidationProblem()
+    {
+        var response = await Client.PostJsonAsync("/api/v2/cars", new CarRequest(1, 1, 2021, 0m, "", 700));
+
+        await AssertValidationProblemAsync(response, "dailyPrice", "description");
+    }
+
+    [Theory]
+    [InlineData(true, false, "Brand not found")]
+    [InlineData(false, true, "Color not found")]
+    public async Task Create_WithABrandOrColorThatIsNotStored_IsABadRequest(bool unknownBrand, bool unknownColor, string detail)
+    {
+        var brand = await CreateBrandAsync();
+        var color = await CreateColorAsync();
+
+        var response = await Client.PostJsonAsync("/api/v2/cars",
+            new CarRequest(unknownBrand ? 404 : brand.Id, unknownColor ? 404 : color.Id, 2021, 950m, "Corolla 1.6", 700));
+
+        await AssertProblemAsync(response, HttpStatusCode.BadRequest, detail);
+        Assert.Empty(await (await Client.GetJsonAsync("/api/v2/cars")).ReadItemsAsync<CarResponse>());
+    }
+
+    [Fact]
+    public async Task Update_WithABrandThatIsNotStored_IsABadRequest_AndKeepsTheCar()
+    {
+        var car = await CreateCarAsync();
+
+        var response = await Client.PutJsonAsync($"/api/v2/cars/{car.Id}", new CarRequest(404, car.ColorId, 2024, 1200m, "Corolla Hybrid", 800));
+
+        await AssertProblemAsync(response, HttpStatusCode.BadRequest, "Brand not found");
+        Assert.Equal(car, await (await Client.GetJsonAsync($"/api/v2/cars/{car.Id}")).ReadAsAsync<CarResponse>());
+    }
+
+    [Fact]
+    public async Task GetById_AnswersTheFirstImageUploaded()
+    {
+        var car = await CreateCarAsync();
+        var first = await (await UploadImageAsync(car.Id, "first.png", TestImages.Png)).ReadAsAsync<CarImageBody>();
+        await UploadImageAsync(car.Id, "second.jpg", TestImages.Jpeg);
+
+        var fetched = await (await Client.GetJsonAsync($"/api/v2/cars/{car.Id}")).ReadAsAsync<CarResponse>();
+
+        Assert.Equal(first.ImagePath, fetched.ImagePath);
+
+        await Client.DeleteResourceAsync($"/api/v2/cars/{car.Id}/images");
+    }
+
+    private async Task<List<string>> DescriptionsAsync(string url)
+    {
+        var response = await Client.GetJsonAsync(url);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var cars = await response.ReadItemsAsync<CarResponse>();
+        return cars.Select(c => c.Description).Order().ToList();
+    }
+}

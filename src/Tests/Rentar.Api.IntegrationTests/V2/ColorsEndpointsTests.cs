@@ -1,0 +1,51 @@
+using Rentar.Modules.Fleet.Application;
+using Rentar.Modules.Fleet.Domain;
+using Rentar.Modules.Fleet.Presentation.Endpoints.V2;
+using System.Net;
+using System.Threading.Tasks;
+using Xunit;
+
+namespace Rentar.Api.IntegrationTests.V2;
+
+public class ColorsEndpointsTests(RentarApiFactory factory) : V2TestBase(factory)
+{
+    [Fact]
+    public async Task Color_CanBeCreatedReadReplacedAndDeleted()
+    {
+        var color = await CreateColorAsync("Blu");
+        Assert.True(color.Id > 0);
+
+        var replaced = await Client.PutJsonAsync($"/api/v2/colors/{color.Id}", new ColorRequest("Blue"));
+        Assert.Equal(HttpStatusCode.NoContent, replaced.StatusCode);
+
+        var fetched = await Client.GetJsonAsync($"/api/v2/colors/{color.Id}");
+        Assert.Equal("Blue", (await fetched.ReadAsAsync<ColorBody>()).ColorName);
+
+        var deleted = await Client.DeleteResourceAsync($"/api/v2/colors/{color.Id}");
+        Assert.Equal(HttpStatusCode.NoContent, deleted.StatusCode);
+
+        var colors = await (await Client.GetJsonAsync("/api/v2/colors")).ReadItemsAsync<ColorBody>();
+        Assert.Empty(colors);
+    }
+
+    [Fact]
+    public async Task Delete_OfAColorCarsStillHave_IsAConflict_AndKeepsTheColor()
+    {
+        var car = await CreateCarAsync(colorName: "Red");
+
+        var response = await Client.DeleteResourceAsync($"/api/v2/colors/{car.ColorId}");
+
+        await AssertProblemAsync(response, HttpStatusCode.Conflict, Messages.ColorHasCars);
+        Assert.Equal(HttpStatusCode.OK, (await Client.GetJsonAsync($"/api/v2/colors/{car.ColorId}")).StatusCode);
+    }
+
+    [Fact]
+    public async Task Update_WithNameShorterThanTwoCharacters_ReturnsProblemWithTheServiceMessage()
+    {
+        var color = await CreateColorAsync();
+
+        var response = await Client.PutJsonAsync($"/api/v2/colors/{color.Id}", new ColorRequest("R"));
+
+        await AssertProblemAsync(response, HttpStatusCode.BadRequest, DomainMessages.ColorNameInvalid);
+    }
+}

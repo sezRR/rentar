@@ -1,0 +1,16 @@
+<Project>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!--
+      Every project references the annotations itself: ReSharper/Rider honors [UsedImplicitly] on a base type (the
+      use case handler interfaces, UseCaseValidator, IEndpoint) only in projects that can see the attribute, so without
+      this every handler, validator and endpoint is reported as never used. Compile-time only; nothing ships.
+    -->
+    <PackageReference Include="JetBrains.Annotations" PrivateAssets="all" />
+  </ItemGroup>
+
+</Project>

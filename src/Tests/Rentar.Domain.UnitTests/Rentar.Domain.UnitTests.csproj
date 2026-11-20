@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <OutputType>Exe</OutputType>
+    <TestingPlatformDotnetTestSupport>true</TestingPlatformDotnetTestSupport>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="xunit.v3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Only the domains: their invariants need nothing else, so the tests build and run without the host or Docker. -->
+    <ProjectReference Include="../../Modules/Companies/Rentar.Modules.Companies.Domain/Rentar.Modules.Companies.Domain.csproj" />
+    <ProjectReference Include="../../Modules/Customers/Rentar.Modules.Customers.Domain/Rentar.Modules.Customers.Domain.csproj" />
+    <ProjectReference Include="../../Modules/Findeks/Rentar.Modules.Findeks.Domain/Rentar.Modules.Findeks.Domain.csproj" />
+    <ProjectReference Include="../../Modules/Fleet/Rentar.Modules.Fleet.Domain/Rentar.Modules.Fleet.Domain.csproj" />
+    <ProjectReference Include="../../Modules/Identity/Rentar.Modules.Identity.Domain/Rentar.Modules.Identity.Domain.csproj" />
+    <ProjectReference Include="../../Modules/Rentals/Rentar.Modules.Rentals.Domain/Rentar.Modules.Rentals.Domain.csproj" />
+  </ItemGroup>
+
+</Project>
