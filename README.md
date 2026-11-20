@@ -107,6 +107,12 @@ dotnet ef migrations add <Name> --project $project --startup-project $project --
 > non-cancelled overlaps (including touching endpoints) must be resolved before migrating; the migration fails rather
 > than deleting or cancelling historical bookings automatically.
 
+> Upgrading a database from before rentals kept snapshots: Rentals' `AddRentalSnapshots` migration fills in each stored
+> rental's car, customer, company and daily price from what the Fleet, Customers, Identity and Companies schemas hold
+> when it runs, so those rentals show the values of that moment rather than of their booking, and computes the total
+> price from them. A rental whose car or customer's user is already gone gets empty names and a price of `0`. Startup
+> migrates schemas in alphabetical order, which keeps Rentals after the others; when migrating by hand, do the same.
+
 **Tests**
 
 - `src/Tests/Rentar.Api.IntegrationTests` drives the API in memory (`WebApplicationFactory`) against a throwaway
@@ -303,8 +309,11 @@ src/
 
 Every module has its own `DbContext`, its own schema and its own `__EFMigrationsHistory` table inside that
 schema, so modules migrate independently; the schema also holds the module's `OutboxMessages` and `InboxMessages`. Data in another module is referenced by id only: there are no cross-schema
-foreign keys or joins. For example, rental details are put together by the `GetRentalDetailsQuery` use case from the
-Customers, Identity and Fleet contracts.
+foreign keys or joins. For example, a rental is booked by asking the Fleet, Customers, Identity and Companies
+contracts for its car and customer (`GetRentalSnapshotQuery`), and keeps what they answered as its own snapshot:
+`Car_*` and `Customer_*` columns, its `DailyPrice` and a `TotalPrice` billing each started 24 hours as a day. Rental
+details read only that snapshot, so renaming a color, moving a car to another brand, changing its price or renaming a
+user or company never rewrites a past rental.
 
 Inside a module, relationships are mapped as EF Core navigations backed by foreign keys:
 

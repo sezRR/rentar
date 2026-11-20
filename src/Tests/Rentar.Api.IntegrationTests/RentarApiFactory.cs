@@ -5,6 +5,7 @@ using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
 using Rentar.Modules.Payments.Application.Common.Interfaces;
+using Rentar.Modules.Rentals.Domain;
 using Rentar.Shared.Infrastructure.Messaging;
 using Rentar.Shared.Infrastructure.Persistence;
 using System;
@@ -110,26 +111,67 @@ public class RentarApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         }
     }
 
+    /// <summary>The car every rental stored by <see cref="InsertRental"/> was booked as.</summary>
+    public static readonly RentalCarSnapshot StoredCar = new(
+        BrandId: 404, BrandName: "Lada", ColorId: 404, ColorName: "Beige", ModelYear: 1990, Description: "Niva 1.7");
+
+    /// <summary>The customer every rental stored by <see cref="InsertRental"/> was booked as.</summary>
+    public static readonly RentalCustomerSnapshot StoredCustomer = new(
+        FirstName: "Gone", LastName: "Customer", CompanyId: null, CompanyName: null);
+
+    /// <summary>The daily price every rental stored by <see cref="InsertRental"/> was booked at.</summary>
+    public const decimal StoredDailyPrice = 400m;
+
     /// <summary>
     /// Stores a rental of a car Fleet does not know, as deleting a rented car left behind before it asked Rentals.
-    /// No endpoint does: creating a rental asks Fleet for its car, and a rented car can not be deleted.
+    /// No endpoint does: creating a rental asks Fleet for its car, and a rented car can not be deleted. The rental
+    /// was booked as <see cref="StoredCar"/> and <see cref="StoredCustomer"/>.
     /// </summary>
     public async Task StoreRentalOfMissingCarAsync(int carId, int customerId, DateTime rentDate, DateTime returnDate)
     {
         await using var connection = new NpgsqlConnection(ConnectionString);
         await connection.OpenAsync();
 
-        await using var command = new NpgsqlCommand(
+        await using var command = InsertRental(connection, carId, customerId, rentDate, returnDate, "Confirmed");
+        await command.ExecuteNonQueryAsync();
+    }
+
+    /// <summary>
+    /// A command storing a rental row directly, booked as <see cref="StoredCar"/> and <see cref="StoredCustomer"/> at
+    /// <see cref="StoredDailyPrice"/> a day, for tests that need what no endpoint stores.
+    /// </summary>
+    public static NpgsqlCommand InsertRental(
+        NpgsqlConnection connection, int carId, int customerId, DateTime rentDate, DateTime returnDate, string status)
+    {
+        var command = new NpgsqlCommand(
             """
-            INSERT INTO rentals."Rentals" ("CarId", "CustomerId", "RentDate", "ReturnDate", "Status")
-            VALUES (@carId, @customerId, @rentDate, @returnDate, 'Confirmed')
+            INSERT INTO rentals."Rentals" (
+                "CarId", "CustomerId", "RentDate", "ReturnDate", "Status",
+                "Car_BrandId", "Car_BrandName", "Car_ColorId", "Car_ColorName", "Car_ModelYear", "Car_Description",
+                "Customer_FirstName", "Customer_LastName", "Customer_CompanyId", "Customer_CompanyName",
+                "DailyPrice", "TotalPrice")
+            VALUES (
+                @carId, @customerId, @rentDate, @returnDate, @status,
+                @brandId, @brandName, @colorId, @colorName, @modelYear, @description,
+                @firstName, @lastName, NULL, NULL,
+                @dailyPrice, @dailyPrice)
             """,
             connection);
         command.Parameters.AddWithValue("carId", carId);
         command.Parameters.AddWithValue("customerId", customerId);
         command.Parameters.AddWithValue("rentDate", rentDate);
         command.Parameters.AddWithValue("returnDate", returnDate);
-        await command.ExecuteNonQueryAsync();
+        command.Parameters.AddWithValue("status", status);
+        command.Parameters.AddWithValue("brandId", StoredCar.BrandId);
+        command.Parameters.AddWithValue("brandName", StoredCar.BrandName);
+        command.Parameters.AddWithValue("colorId", StoredCar.ColorId);
+        command.Parameters.AddWithValue("colorName", StoredCar.ColorName);
+        command.Parameters.AddWithValue("modelYear", StoredCar.ModelYear);
+        command.Parameters.AddWithValue("description", StoredCar.Description);
+        command.Parameters.AddWithValue("firstName", StoredCustomer.FirstName);
+        command.Parameters.AddWithValue("lastName", StoredCustomer.LastName);
+        command.Parameters.AddWithValue("dailyPrice", StoredDailyPrice);
+        return command;
     }
 
     /// <summary>

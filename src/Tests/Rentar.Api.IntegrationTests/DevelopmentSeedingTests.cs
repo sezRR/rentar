@@ -98,6 +98,11 @@ public class DevelopmentSeedingTests(RentarApiFactory factory) : V2TestBase(fact
         var after = await (await client.GetJsonAsync("/api/v2/rentals")).ReadItemsAsync<RentalBody>();
         Assert.Equal(rentals.Select(rental => (rental.Id, rental.RentDate, rental.ReturnDate)).OrderBy(rental => rental.Id),
             after.Select(rental => (rental.Id, rental.RentDate, rental.ReturnDate)).OrderBy(rental => rental.Id));
+        // The demo rentals keep the car, user and price they were seeded with, whatever was edited since.
+        Assert.All(rentals, rental => Assert.NotEqual("", rental.Car.BrandName));
+        Assert.Contains(rentals, rental => rental.Customer.FirstName == "Renter");
+        Assert.Equal(rentals.Select(rental => (rental.Id, rental.Car, rental.Customer, rental.DailyPrice)).OrderBy(rental => rental.Id),
+            after.Select(rental => (rental.Id, rental.Car, rental.Customer, rental.DailyPrice)).OrderBy(rental => rental.Id));
         await AssertNoEventsOrChargesAsync();
     }
 

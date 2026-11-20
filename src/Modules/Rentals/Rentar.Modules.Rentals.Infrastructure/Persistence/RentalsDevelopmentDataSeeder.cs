@@ -1,5 +1,8 @@
 using Microsoft.EntityFrameworkCore;
+using Rentar.Modules.Rentals.Application.Common.Models;
+using Rentar.Modules.Rentals.Application.Queries;
 using Rentar.Modules.Rentals.Domain;
+using Rentar.Shared.Application.UseCases;
 using Rentar.Shared.Infrastructure.Persistence.Seeding;
 using System;
 using System.Threading;
@@ -7,8 +10,10 @@ using System.Threading.Tasks;
 
 namespace Rentar.Modules.Rentals.Infrastructure.Persistence;
 
-internal sealed class RentalsDevelopmentDataSeeder(IDbContextFactory<RentalsDbContext> contextFactory, TimeProvider timeProvider)
-    : IDevelopmentDataSeeder
+internal sealed class RentalsDevelopmentDataSeeder(
+    IDbContextFactory<RentalsDbContext> contextFactory,
+    IQueryHandler<GetRentalSnapshotQuery, RentalSnapshotResponse> getSnapshot,
+    TimeProvider timeProvider) : IDevelopmentDataSeeder
 {
     public int Order => 60;
 
@@ -39,8 +44,11 @@ internal sealed class RentalsDevelopmentDataSeeder(IDbContextFactory<RentalsDbCo
                 continue;
             }
 
-            // Demo history, not a real booking: no outbox event or gateway charge is produced.
-            database.Rentals.Add(new Rental(carId, customerId, start, end).Confirmed());
+            // Demo history, not a real booking: no outbox event or gateway charge is produced. It still keeps the car and
+            // customer as they are now, like a booking does.
+            var snapshot = await getSnapshot.HandleAsync(new GetRentalSnapshotQuery(carId, customerId), cancellationToken);
+            database.Rentals.Add(
+                new Rental(carId, customerId, start, end, snapshot.Car, snapshot.Customer, snapshot.DailyPrice).Confirmed());
             await database.SaveChangesAsync(cancellationToken);
         }
     }

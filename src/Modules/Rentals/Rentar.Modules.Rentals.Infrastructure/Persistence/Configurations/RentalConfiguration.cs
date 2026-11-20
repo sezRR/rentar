@@ -20,5 +20,10 @@ internal sealed class RentalConfiguration : IEntityTypeConfiguration<Rental>
         builder.Property(rental => rental.Status)
             .HasConversion<string>()
             .HasMaxLength(16);
+
+        // The rental's own copy of what other modules said when it was booked, in columns of the rental's row
+        // (Car_BrandName, Customer_FirstName, ...), so its history reads without asking them and never changes with them.
+        builder.ComplexProperty(rental => rental.Car);
+        builder.ComplexProperty(rental => rental.Customer);
     }
 }

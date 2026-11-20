@@ -1,7 +1,7 @@
 using FluentValidation;
-using Rentar.Modules.Customers.Contracts;
-using Rentar.Modules.Fleet.Contracts;
 using Rentar.Modules.Rentals.Application.Common.Interfaces;
+using Rentar.Modules.Rentals.Application.Common.Models;
+using Rentar.Modules.Rentals.Application.Queries;
 using Rentar.Modules.Rentals.Contracts.Events;
 using Rentar.Modules.Rentals.Domain;
 using Rentar.Shared.Application.Aspects.Transaction;
@@ -19,9 +19,11 @@ namespace Rentar.Modules.Rentals.Application.Commands;
 /// <summary>
 /// Books a rental and publishes <see cref="RentalCreatedEvent"/>, on which Payments takes its payment; answers the
 /// stored rental, <see cref="RentalStatus.Pending"/> until the payment's outcome confirms or cancels it. Throws
-/// <see cref="BusinessRuleException"/> when the Fleet module does not know the car or the Customers module does not know
-/// the customer, and <see cref="ConflictException"/> when an active rental overlaps the car's or customer's period.
-/// The dates are local times, so they carry no UTC offset; touching endpoints count as overlap.
+/// <see cref="BusinessRuleException"/> when <see cref="GetRentalSnapshotQuery"/> does, as another module does not know
+/// the car, the customer or its user, and <see cref="ConflictException"/> when an active rental overlaps the car's or
+/// customer's period. The dates are local times, so they carry no UTC offset; touching endpoints count as overlap.
+/// The rental keeps that snapshot of the car, the customer and the daily price, so later changes in those modules leave
+/// it as it was booked.
 /// </summary>
 public sealed record CreateRentalCommand(int CarId, int CustomerId, DateTime RentDate, DateTime ReturnDate);
 
@@ -36,8 +38,7 @@ public sealed class CreateRentalCommandValidator : UseCaseValidator<CreateRental
 
 public sealed class CreateRentalCommandHandler(
     IRentalDal rentalDal,
-    IFleetModuleApi fleetModule,
-    ICustomersModuleApi customersModule,
+    IQueryHandler<GetRentalSnapshotQuery, RentalSnapshotResponse> getSnapshot,
     IEventPublisher eventPublisher) : ICommandHandler<CreateRentalCommand, Rental>
 {
     // Exclusion constraints arbitrate concurrent bookings; read committed lets a losing insert report that conflict
@@ -45,19 +46,7 @@ public sealed class CreateRentalCommandHandler(
     [TransactionScopeAspect(IsolationLevel.ReadCommitted)]
     public async Task<Rental> HandleAsync(CreateRentalCommand command, CancellationToken cancellationToken = default)
     {
-        // The car and the customer live in other modules, so no foreign key guards the references; those modules are
-        // asked instead.
-        var cars = await fleetModule.GetCarsAsync([command.CarId], cancellationToken);
-        if (cars.Count == 0)
-        {
-            throw new BusinessRuleException(Messages.CarNotFound);
-        }
-
-        var customers = await customersModule.GetCustomersAsync([command.CustomerId], cancellationToken);
-        if (customers.Count == 0)
-        {
-            throw new BusinessRuleException(Messages.CustomerNotFound);
-        }
+        var snapshot = await getSnapshot.HandleAsync(new GetRentalSnapshotQuery(command.CarId, command.CustomerId), cancellationToken);
 
         if (await rentalDal.AnyAsync(
             r => r.CarId == command.CarId
@@ -80,7 +69,14 @@ public sealed class CreateRentalCommandHandler(
             throw new ConflictException(Messages.CustomerNotAvailable);
         }
 
-        var rental = new Rental(command.CarId, command.CustomerId, command.RentDate, command.ReturnDate);
+        var rental = new Rental(
+            command.CarId,
+            command.CustomerId,
+            command.RentDate,
+            command.ReturnDate,
+            snapshot.Car,
+            snapshot.Customer,
+            snapshot.DailyPrice);
 
         await rentalDal.AddAsync(rental, cancellationToken);
 

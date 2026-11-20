@@ -1,5 +1,8 @@
 using Rentar.Modules.Companies.Contracts;
+using Rentar.Modules.Companies.Presentation.Endpoints.V2;
 using Rentar.Modules.Customers.Application.Commands;
+using Rentar.Modules.Fleet.Presentation.Endpoints.V2;
+using Rentar.Modules.Identity.Presentation.Endpoints.V2;
 using Rentar.Modules.Rentals.Application;
 using Rentar.Modules.Rentals.Application.Commands;
 using Rentar.Modules.Rentals.Application.Common.Models;
@@ -37,6 +40,11 @@ public class RentalsEndpointsTests(RentarApiFactory factory) : V2TestBase(factor
         Assert.Equal(customer.Id, fetched.CustomerId);
         Assert.Equal(RentDate, fetched.RentDate);
         Assert.Equal(ReturnDate, fetched.ReturnDate);
+        Assert.Equal(new RentalCarSnapshot(car.BrandId, "Toyota", car.ColorId, "Red", 2021, "Corolla 1.6"), fetched.Car);
+        Assert.Equal(new RentalCustomerSnapshot("Sezer", "Tetik", null, null), fetched.Customer);
+        Assert.Equal(950m, fetched.DailyPrice);
+        // Two days, from 10:00 to 10:00.
+        Assert.Equal(1900m, fetched.TotalPrice);
     }
 
     [Fact]
@@ -182,7 +190,7 @@ public class RentalsEndpointsTests(RentarApiFactory factory) : V2TestBase(factor
     }
 
     [Fact]
-    public async Task Details_CombineCustomerUserCompanyAndCarFromTheirModules()
+    public async Task Details_ShowCustomerUserCompanyAndCarAsTheRentalWasBooked()
     {
         // Signed in before the clock is frozen: the access token's times come from the clock.
         var owner = await SignInAsNewUserAsync("renter@example.com");
@@ -191,37 +199,99 @@ public class RentalsEndpointsTests(RentarApiFactory factory) : V2TestBase(factor
         FreezeClockAtNoon();
         var car = await CreateCarAsync();
         await CreateRentalAsync(car.Id, customer.Id);
-        // Fleet does not know this car, so its rental has no details to show.
+        // Fleet no longer knows this car; its rental still shows the car and customer it was booked for.
         await Factory.StoreRentalOfMissingCarAsync(car.Id + 1, customer.Id, RentDate.AddDays(10), ReturnDate.AddDays(10));
 
         var response = await Client.GetJsonAsync("/api/v2/rentals/details");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var detail = Assert.Single(await response.ReadItemsAsync<RentalDetailResponse>());
+        var details = await response.ReadItemsAsync<RentalDetailResponse>();
+        Assert.Equal(2, details.Count);
+        var detail = details[0];
         Assert.Equal(car.Id, detail.CarId);
         Assert.Equal("Toyota", detail.BrandName);
         Assert.Equal("Red", detail.ColorName);
         Assert.Equal("Rentar Logistics", detail.CompanyName);
         Assert.Equal("Sezer", detail.UserName);
+
+        var ofMissingCar = details[1];
+        Assert.Equal(car.Id + 1, ofMissingCar.CarId);
+        Assert.Equal(RentarApiFactory.StoredCar.BrandName, ofMissingCar.BrandName);
+        Assert.Equal(RentarApiFactory.StoredCar.Description, ofMissingCar.Description);
+        Assert.Equal(RentarApiFactory.StoredCustomer.FirstName, ofMissingCar.UserName);
+        Assert.Null(ofMissingCar.CompanyName);
     }
 
     [Fact]
-    public async Task Details_PageOnlyTheRentalsTheyShow()
+    public async Task Details_KeepWhatTheRentalWasBookedWith_WhateverChangesLater()
+    {
+        await SignInAsNewUserAsync("owner@example.com");
+        var company = await RegisterCompanyAsync();
+        var member = await CreateUserAsync("member@example.com", "Ada");
+        var employee = await AddEmployeeAsync(company.Id, member.Id, "Member");
+        var customer = await CreateAsync<CustomerBody>("/api/v2/customers", new CreateCustomerCommand(member.Id, company.Id));
+        var car = await CreateCarAsync("Toyota", "Blue");
+        var rental = await CreateRentalAsync(car.Id, customer.Id);
+        var otherColor = await CreateColorAsync("Black");
+
+        // Everything a rental shows changes in its own module after the rental was booked.
+        Assert.Equal(HttpStatusCode.NoContent,
+            (await Client.PutJsonAsync($"/api/v2/colors/{car.ColorId}", new ColorRequest("Navy"))).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent,
+            (await Client.PutJsonAsync($"/api/v2/brands/{car.BrandId}", new BrandRequest("Lexus"))).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await Client.PutJsonAsync($"/api/v2/cars/{car.Id}",
+            new CarRequest(car.BrandId, otherColor.Id, 2025, 2000m, "Corolla 2.0", 700))).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await Client.PutJsonAsync($"/api/v2/users/{member.Id}",
+            new UserRequest("Grace", "Hopper", "member@example.com", Password))).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent,
+            (await Client.PutJsonAsync($"/api/v2/companies/{company.Id}", new CompanyRequest("Rentar Fleet"))).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent,
+            (await Client.DeleteResourceAsync($"/api/v2/companies/{company.Id}/employees/{employee.Id}")).StatusCode);
+        await DeliverEventsAsync();
+
+        var stored = await RentalAsync(rental.Id);
+        Assert.Equal(RentalStatus.Confirmed, stored.Status);
+        Assert.Equal(new RentalCarSnapshot(car.BrandId, "Toyota", car.ColorId, "Blue", 2021, "Corolla 1.6"), stored.Car);
+        Assert.Equal(new RentalCustomerSnapshot("Ada", "Tetik", company.Id, "Rentar Logistics"), stored.Customer);
+        Assert.Equal(950m, stored.DailyPrice);
+        Assert.Equal(1900m, stored.TotalPrice);
+
+        var detail = Assert.Single(await (await Client.GetJsonAsync("/api/v2/rentals/details")).ReadItemsAsync<RentalDetailResponse>());
+        Assert.Equal("Toyota", detail.BrandName);
+        Assert.Equal("Blue", detail.ColorName);
+        Assert.Equal(2021, detail.ModelYear);
+        Assert.Equal("Corolla 1.6", detail.Description);
+        Assert.Equal(950m, detail.DailyPrice);
+        Assert.Equal("Ada", detail.UserName);
+        Assert.Equal("Rentar Logistics", detail.CompanyName);
+
+        // A rental booked now keeps the car and customer as they are now.
+        var later = await CreateRentalAsync(car.Id, customer.Id, RentDate.AddDays(10), ReturnDate.AddDays(10));
+        Assert.Equal(new RentalCarSnapshot(car.BrandId, "Lexus", otherColor.Id, "Black", 2025, "Corolla 2.0"), later.Car);
+        Assert.Equal(new RentalCustomerSnapshot("Grace", "Hopper", null, null), later.Customer);
+        Assert.Equal(2000m, later.DailyPrice);
+    }
+
+    [Fact]
+    public async Task Details_PageEveryRentalThatIsNotCancelled_EvenOfACarThatIsGone()
     {
         var car = await CreateCarAsync();
         var otherCar = await CreateCarAsync("Fiat", "White", "Egea");
         await CreateRentalAsync(car.Id, (await CreateCustomerAsync()).Id);
-        // Stored between the two shown rentals, but Fleet does not know its car, so no page shows it.
-        await Factory.StoreRentalOfMissingCarAsync(otherCar.Id + 1, (await CreateCustomerAsync("hidden@example.com")).Id, RentDate, ReturnDate);
+        // Stored between the other two, of a car Fleet no longer knows; it is paged like any other.
+        await Factory.StoreRentalOfMissingCarAsync(otherCar.Id + 1, (await CreateCustomerAsync("gone@example.com")).Id, RentDate, ReturnDate);
         await CreateRentalAsync(otherCar.Id, (await CreateCustomerAsync("second@example.com")).Id);
 
         var first = await (await Client.GetJsonAsync("/api/v2/rentals/details?limit=1")).ReadAsAsync<PagedResponse<RentalDetailResponse>>();
         var second = await (await Client.GetJsonAsync($"/api/v2/rentals/details?limit=1&cursor={first.Page.NextCursor}"))
             .ReadAsAsync<PagedResponse<RentalDetailResponse>>();
+        var third = await (await Client.GetJsonAsync($"/api/v2/rentals/details?limit=1&cursor={second.Page.NextCursor}"))
+            .ReadAsAsync<PagedResponse<RentalDetailResponse>>();
 
         Assert.Equal(car.Id, Assert.Single(first.Items).CarId);
-        Assert.Equal(otherCar.Id, Assert.Single(second.Items).CarId);
-        Assert.False(second.Page.HasMore);
+        Assert.Equal(otherCar.Id + 1, Assert.Single(second.Items).CarId);
+        Assert.Equal(otherCar.Id, Assert.Single(third.Items).CarId);
+        Assert.False(third.Page.HasMore);
     }
 
     [Fact]

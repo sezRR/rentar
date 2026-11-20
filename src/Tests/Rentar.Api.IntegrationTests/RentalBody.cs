@@ -15,4 +15,8 @@ public sealed class RentalBody
     public DateTime RentDate { get; init; }
     public DateTime ReturnDate { get; init; }
     public RentalStatus Status { get; init; }
+    public RentalCarSnapshot Car { get; init; }
+    public RentalCustomerSnapshot Customer { get; init; }
+    public decimal DailyPrice { get; init; }
+    public decimal TotalPrice { get; init; }
 }

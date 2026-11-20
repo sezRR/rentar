@@ -68,7 +68,7 @@ public class RentalsEndpointsTests(RentarApiFactory factory) : IntegrationTestBa
     }
 
     [Fact]
-    public async Task GetRentalDetails_CombinesCustomerUserAndCarFromTheirModules()
+    public async Task GetRentalDetails_ShowCustomerUserAndCarAsTheRentalWasBooked()
     {
         Factory.Clock.FreezeAt(new DateTimeOffset(DateTime.Today.AddHours(12)));
 
@@ -77,14 +77,15 @@ public class RentalsEndpointsTests(RentarApiFactory factory) : IntegrationTestBa
         var carId = await AddCarAsync();
 
         await Client.PostJsonAsync("/api/v1/rentals/add", NewRental(carId, customerId));
-        // Fleet does not know this car, so its rental has no details to show.
+        // Fleet no longer knows this car; its rental still shows the car it was booked for.
         await Factory.StoreRentalOfMissingCarAsync(carId + 1, customerId, RentDate.AddDays(10), ReturnDate.AddDays(10));
 
         var response = await Client.GetJsonAsync("/api/v1/rentals/getrentaldetails");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         var details = await response.ReadAsAsync<V1Response<List<RentalDetailResponse>>>();
-        var detail = Assert.Single(details.Data);
+        Assert.Equal(2, details.Data.Count);
+        var detail = details.Data[0];
         Assert.Equal(carId, detail.CarId);
         Assert.Equal("Toyota", detail.BrandName);
         Assert.Equal("Red", detail.ColorName);
@@ -94,6 +95,13 @@ public class RentalsEndpointsTests(RentarApiFactory factory) : IntegrationTestBa
         Assert.Null(detail.CompanyName);
         Assert.Equal("Sezer", detail.UserName);
         Assert.Equal(RentDate, detail.RentDate);
+
+        var ofMissingCar = details.Data[1];
+        Assert.Equal(carId + 1, ofMissingCar.CarId);
+        Assert.Equal(RentarApiFactory.StoredCar.BrandName, ofMissingCar.BrandName);
+        Assert.Equal(RentarApiFactory.StoredCar.ColorName, ofMissingCar.ColorName);
+        Assert.Equal(RentarApiFactory.StoredDailyPrice, ofMissingCar.DailyPrice);
+        Assert.Equal(RentarApiFactory.StoredCustomer.FirstName, ofMissingCar.UserName);
     }
 
     private async Task<int> RegisterUserAsync(string firstName, string email)

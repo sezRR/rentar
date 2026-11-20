@@ -18,6 +18,7 @@ public class FleetModuleApi(ICarDal carDal) : IFleetModuleApi
 
         var ids = carIds.ToArray();
         var cars = await carDal.GetCarDetailsAsync(c => ids.Contains(c.Id), cancellationToken);
-        return cars.ConvertAll(c => new CarSummary(c.CarId, c.BrandName, c.ColorName, c.ModelYear, c.DailyPrice, c.Description));
+        return cars.ConvertAll(c => new CarSummary(
+            c.CarId, c.BrandId, c.BrandName, c.ColorId, c.ColorName, c.ModelYear, c.DailyPrice, c.Description));
     }
 }

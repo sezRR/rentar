@@ -240,16 +240,7 @@ public class RentalBookingConflictsTests(RentarApiFactory factory) : V2TestBase(
 
     private static NpgsqlCommand Insert(NpgsqlConnection connection, int carId, int customerId)
     {
-        var command = new NpgsqlCommand(
-            """
-            INSERT INTO rentals."Rentals" ("CarId", "CustomerId", "RentDate", "ReturnDate", "Status")
-            VALUES (@carId, @customerId, @start, @end, 'Pending')
-            """, connection);
-        command.Parameters.AddWithValue("carId", carId);
-        command.Parameters.AddWithValue("customerId", customerId);
-        command.Parameters.AddWithValue("start", Start);
-        command.Parameters.AddWithValue("end", End);
-        return command;
+        return RentarApiFactory.InsertRental(connection, carId, customerId, Start, End, "Pending");
     }
 
     private Task<RentalBody> BookAsync(int carId, int customerId)
